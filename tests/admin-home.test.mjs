@@ -9,7 +9,7 @@ function setup(role) {
   const root = {}, values = new Map();
   const storage = { getItem: k => values.get(k), setItem: (k,v) => values.set(k,v) };
   const context = vm.createContext({ document: { querySelector: s => s === '#app' ? root : {}, addEventListener() {} },
-    localStorage: storage, sessionStorage: storage, URL, location: { hostname: 'localhost', href: 'http://localhost/' }, classroomBackend: '', FEATURES: [],
+    localStorage: storage, sessionStorage: storage, URL, Blob, location: { hostname: 'localhost', href: 'http://localhost/' }, classroomBackend: '', FEATURES: [],
     role, opened: 0, sampleSessions: [{id:'active-code',name:'Class <one>',status:'paused',hour:0},{id:'past-code',name:'Old class',status:'completed',hour:72}] });
   vm.runInContext(source, context);
   vm.runInContext("api = async () => ({user:{name:'Test instructor',role},sessions:sampleSessions}); load = async () => { opened++; };", context);
@@ -42,4 +42,18 @@ test('creation form offers familiar cities and a separate custom ID', () => {
  assert.match(html,/name="sessionCity"/);assert.match(html,/value="london"/);
  assert.match(html,/name="customSessionId"/);assert.match(html,/data-custom-session hidden/);
  assert.match(html,/name="name"/);assert.match(html,/session-setup/);
+});
+
+test('session export prepares a real download link with the fetched replay and cleans it up', async () => {
+ const h=setup('instructor');
+ h.context.replayData={initial:{id:'qa-export'},commands:[{command:{type:'step',hours:1}}]};
+ h.context.link={focus(){this.focused=true;}};
+ h.run("api = async path => { if(path !== '/sessions/qa-export/replay') throw new Error('Wrong session'); return replayData; }; modal = (title, body) => { releaseExportDownload(); }; dialog.querySelector = () => link;");
+ await h.run("action('session-export','qa-export')");
+ assert.equal(h.context.link.download,'session-qa-export.json');
+ assert.equal(h.context.link.focused,true);
+ const url=h.context.link.href;
+ assert.deepEqual(await (await fetch(url)).json(),h.context.replayData);
+ h.run('releaseExportDownload()');
+ await assert.rejects(fetch(url));
 });
