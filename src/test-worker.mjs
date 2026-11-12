@@ -1,4 +1,4 @@
-import { TestClassroom } from './test-classroom.mjs?v=8a9187ee85b7';
+import { TestClassroom } from './test-classroom.mjs?v=8336f9332acd';
 
 const rooms = new Map();
 onconnect = event => {
