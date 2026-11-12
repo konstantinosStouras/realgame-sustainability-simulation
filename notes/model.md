@@ -81,7 +81,7 @@ All ledger postings are integer EUR cents, double-entry, with debits positive an
 | Deposit placed | Debit deposits; credit cash |
 | Deposit matured | Debit cash; credit deposits and interest income |
 
-Loans fund in 24 h; aggregate outstanding principal including pending loans is capped at €150,000. Terms are 7–90 days with one bullet repayment and 9% simple annual interest. Deposits run 1–90 days at 4% simple annual interest, with no early withdrawal. Interest is rounded once: `principal cents * annual rate * term hours / 8760`. Interest is recognized at maturity, not accrued daily. These are simulated contracts, not financial advice or actual products.
+Bullet loans fund in 24 hours and repay once after 7–90 days at 9% simple annual interest. Annuity loans fund in 48 hours and repay weekly over 1–20 weeks at an 8% annual rate. Each installment rounds interest to cents on the remaining scheduled principal. The final installment settles rounding differences. The €150,000 loan limit counts original principal on every pending or unpaid loan. Deposits run 1–90 days at 4% simple annual interest with no early withdrawal. Bullet and deposit interest is rounded once using `principal cents * annual rate * term hours / 8760`. Interest is recognized when due.
 
 Daily overhead includes €350 rent, the active energy supplier's standing fee, overflow storage, marketing and research. Unpaid overhead is recognized as a liability and retried at subsequent daily closes. Fixed assets use a simplified 20% annual **declining-balance** depreciation divided by 365 at each close. Supplier credit allows new purchase commitments up to current cash plus €80,000 less existing supplier payables.
 
