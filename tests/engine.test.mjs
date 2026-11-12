@@ -48,6 +48,18 @@ test('loans fund after 24 h and deposits mature with exact simple interest', () 
   assert.equal(balance(c, 'interestIncome'), -Math.round(100000 * 0.04 * 24 / 8760));
   advance(s, 168); assert.equal(c.loans[0].paidAt, 192); assert.equal(balance(c, 'debt'), 0); assertInvariants(s);
 });
+test('two-week annuity matches the observed funding delay and rounded weekly quote', () => {
+  const s = quiet(), c = s.companies[0];
+  act(s, { type: 'loan', plan: 'annuity', amount: 1000000, weeks: 2 });
+  const loan = c.loans[0];
+  assert.equal(Math.round((loan.installments[0].principal + loan.installments[0].interest) / 100), 5012);
+  assert.equal(balance(c, 'debt'), 0);
+  advance(s, 47); assert.equal(loan.fundedAt, null);
+  advance(s, 1); assert.equal(loan.fundedAt, 48);
+  advance(s, 168); assert.equal(loan.installments[0].paidAt, 216); assert.equal(loan.paidAt, null);
+  advance(s, 168); assert.equal(loan.paidAt, 384);
+  assert.equal(balance(c, 'debt'), 0); assertInvariants(s);
+});
 test('unfunded repayment stays pending without duplicate interest or negative cash', () => {
   const s = quiet(), c = s.companies[0]; act(s, { type: 'loan', amount: 15000000, term: 168 }); advance(s, 24);
   // Test fixture: move all cash to deposits with balanced entry.

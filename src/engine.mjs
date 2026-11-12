@@ -219,10 +219,30 @@ export function applyCommand(s, actor, a, realAt = '2026-01-01T00:00:00.000Z') {
     }
     if (a.type === 'budget') { c.marketing = integer(a.marketing, 'Daily marketing cents', 0, 100000); c.research = integer(a.research, 'Daily research cents', 0, 100000); result = 'Budgets saved. Daily costs and quality effects apply at each daily close.'; }
     if (a.type === 'loan') {
+      if (a.plan === 'annuity') {
+        const amount = integer(a.amount, 'Principal in cents', 100000, 15000000);
+        const weeks = integer(a.weeks, 'Term in weeks', 1, 20);
+        if (sum(c.loans.filter(x => x.paidAt === null).map(x => x.amount)) + amount > 15000000) fail('Total loan limit is €150,000 including pending funding.');
+        const rate = 0.08 * 168 / 8760;
+        const weeklyPayment = Math.round(amount * rate / (1 - (1 + rate) ** -weeks));
+        const installments = [];
+        let remaining = amount;
+        for (let i = 1; i <= weeks; i++) {
+          const interest = Math.round(remaining * rate);
+          const principal = i === weeks ? remaining : Math.min(remaining, weeklyPayment - interest);
+          installments.push({ principal, interest });
+          remaining -= principal;
+        }
+        const loan = { id: uid(s, 'loan'), amount, term: weeks * 168, plan: 'annuity', installments, interest: sum(installments.map(i => i.interest)), requestedAt: s.hour, fundedAt: null, paidAt: null };
+        c.loans.push(loan);
+        schedule(s, c, 'loanFunding', s.hour + 48, { loanId: loan.id }, `Loan ${loan.id} funding: €${amount / 100}`);
+        result = `Annuity loan accepted. Funding in 48 h. Weekly payment €${(weeklyPayment / 100).toFixed(2)}.`;
+      } else {
       const amount = integer(a.amount, 'Loan cents', 100000, 15000000), term = integer(a.term, 'Term hours', 168, 2160);
       if (sum(c.loans.filter(x => x.paidAt === null).map(x => x.amount)) + amount > 15000000) fail('Total loan limit is €150,000 including pending funding.');
       const l = { id: uid(s, 'loan'), amount, term, interest: Math.round(amount * 0.09 * term / 8760), requestedAt: s.hour, fundedAt: null, paidAt: null }; c.loans.push(l);
       schedule(s, c, 'loanFunding', s.hour + 24, { loanId: l.id }, `Loan ${l.id} funding: €${amount / 100}`); result = 'Loan accepted. Funding in 24 h; 9% simple annual interest, one repayment at maturity.';
+      }
     }
     if (a.type === 'deposit') {
       const amount = integer(a.amount, 'Deposit cents', 10000, 10000000), term = integer(a.term, 'Term hours', 24, 2160); available(c, amount);
@@ -286,12 +306,18 @@ function executeEvent(s, e) {
   if (e.type === 'loanFunding') {
     const l = c.loans.find(x => x.id === d.loanId); l.fundedAt = s.hour;
     post(s, c, `Loan funding ${l.id}`, { cash: l.amount, debt: -l.amount });
-    schedule(s, c, 'loanRepayment', s.hour + l.term, { loanId: l.id }, `Repay loan ${l.id} plus interest`);
+    if (l.installments) {
+      l.installments.forEach((_, index) => schedule(s, c, 'loanRepayment', s.hour + (index + 1) * 168, { loanId: l.id, installment: index }, `Loan ${l.id} weekly payment ${index + 1}`));
+    } else schedule(s, c, 'loanRepayment', s.hour + l.term, { loanId: l.id }, `Repay loan ${l.id} plus interest`);
   }
   if (e.type === 'loanRepayment') {
     const l = c.loans.find(x => x.id === d.loanId);
-    if (!e.accrued) { post(s, c, `Loan interest due ${l.id}`, { expense: l.interest, interestPayable: -l.interest }); e.accrued = true; }
-    if (!settle(s, c, e, { debt: l.amount, interestPayable: l.interest, cash: -l.amount - l.interest }, l.amount + l.interest, `Loan repayment ${l.id}`)) return; l.paidAt = s.hour;
+    const installment = l.installments?.[d.installment];
+    const { principal, interest } = installment ?? { principal: l.amount, interest: l.interest };
+    if (!e.accrued) { post(s, c, `Loan interest due ${l.id}`, { expense: interest, interestPayable: -interest }); e.accrued = true; }
+    if (!settle(s, c, e, { debt: principal, interestPayable: interest, cash: -principal - interest }, principal + interest, `Loan repayment ${l.id}`)) return;
+    if (installment) installment.paidAt = s.hour;
+    if (!l.installments || l.installments.every(i => i.paidAt != null)) l.paidAt = s.hour;
   }
   if (e.type === 'depositMaturity') {
     const dep = c.deposits.find(x => x.id === d.depositId); dep.maturedAt = s.hour;
@@ -417,7 +443,7 @@ export function forecast(s, c) {
     if (e.type === 'purchasePayment') amount = -c.purchases.find(x => x.id === e.data.purchaseId).cost;
     if (e.type === 'customerPayment') amount = c.shipments.find(x => x.id === e.data.shipmentId).revenue;
     if (e.type === 'loanFunding') amount = c.loans.find(x => x.id === e.data.loanId).amount;
-    if (e.type === 'loanRepayment') { const l = c.loans.find(x => x.id === e.data.loanId); amount = -l.amount - l.interest; }
+    if (e.type === 'loanRepayment') { const l = c.loans.find(x => x.id === e.data.loanId); const part = l.installments?.[e.data.installment]; amount = part ? -part.principal - part.interest : -l.amount - l.interest; }
     if (e.type === 'depositMaturity') { const d = c.deposits.find(x => x.id === e.data.depositId); amount = d.amount + d.interest; }
     return { eventId: e.id, hour: e.at, amount, description: e.description, blocked: e.blocked || null };
   }).filter(x => x.amount).sort((a, b) => a.hour - b.hour);
