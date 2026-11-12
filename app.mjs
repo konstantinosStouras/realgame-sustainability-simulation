@@ -1,5 +1,5 @@
-import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=e6b5c3243005';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=e6b5c3243005';
+import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=b54c7163d63f';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=b54c7163d63f';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -162,7 +162,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=e6b5c3243005')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=b54c7163d63f')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -211,7 +211,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=e6b5c3243005')).testClient();
+      const client = (await import('./src/test-client.mjs?v=b54c7163d63f')).testClient();
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -364,7 +364,7 @@ function chart(metricName, unit, { selected = false, range = 30 } = {}) {
   let min = Math.min(0, ...raw) / scale, max = Math.max(1, ...raw) / scale; if (max === min) max++;
   const x = i => 62 + i * 520 / Math.max(1, snaps.length - 1), y = val => 204 - (val / scale - min) / (max - min) * 174;
   const grid = Array.from({ length: 5 }, (_, i) => { const val = min + (max - min) * i / 4, at = 204 - i * 43.5; return `<line class="gridline" x1="62" x2="590" y1="${at}" y2="${at}"/><text text-anchor="end" x="52" y="${at + 4}">${Math.abs(val) >= 1000 ? `${(val / 1000).toFixed(1)}k` : number(val)}</text>`; }).join('');
-  return `<svg class="chart" viewBox="0 0 610 246" role="img" aria-label="${esc(metricName)} in ${unit}, daily snapshots. Exact values are available in Reports data tables."><text x="10" y="13">${unit}</text>${grid}${series.map(serie => `<polyline class="chart-line color-${serie.color}" points="${serie.values.map((v, i) => `${x(i)},${y(v)}`).join(' ')}"/>${serie.values.map((v, i) => `<circle class="c${serie.color}" r="3" cx="${x(i)}" cy="${y(v)}"><title>${esc(serie.name)} · ${simDate(snaps[i].hour)} · ${number(v / scale)} ${unit}</title></circle>`).join('')}`).join('')}${[...new Set([0, Math.floor((snaps.length - 1) / 2), snaps.length - 1])].map(i => `<text text-anchor="middle" x="${x(i)}" y="230">${simDate(snaps[i].hour).split(',')[0]}</text>`).join('')}</svg><div class="chart-legend">${series.map(c => `<span><i class="legend-dot c${c.color}"></i>${esc(c.name)}</span>`).join('')}</div>`;
+  return `<div class="chart-scroll" tabindex="0" role="region" aria-label="Scrollable chart"><svg class="chart" viewBox="-20 -6 660 252" role="img" aria-label="${esc(metricName)} in ${unit}, daily snapshots. Exact values are available in Reports data tables."><text x="10" y="13">${unit}</text>${grid}${series.map(serie => `<polyline class="chart-line color-${serie.color}" points="${serie.values.map((v, i) => `${x(i)},${y(v)}`).join(' ')}"/>${serie.values.map((v, i) => `<circle class="c${serie.color}" r="3" cx="${x(i)}" cy="${y(v)}"><title>${esc(serie.name)} · ${simDate(snaps[i].hour)} · ${number(v / scale)} ${unit}</title></circle>`).join('')}`).join('')}${[...new Set([0, Math.floor((snaps.length - 1) / 2), snaps.length - 1])].map(i => `<text text-anchor="middle" x="${x(i)}" y="230">${simDate(snaps[i].hour).split(',')[0]}</text>`).join('')}</svg></div><div class="chart-legend">${series.map(c => `<span><i class="legend-dot c${c.color}"></i>${esc(c.name)}</span>`).join('')}</div>`;
 }
 function pendingEvents(limit = 6) {
   const events = state.events.filter(e => e.status === 'pending' && (!company() || e.companyId === company().id)).sort((a, b) => a.at - b.at).slice(0, limit);
@@ -567,7 +567,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=e6b5c3243005')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=b54c7163d63f')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -673,7 +673,7 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=e6b5c3243005')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    try { const client = (await import('./src/test-client.mjs?v=b54c7163d63f')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p>' + button('test-leave','Return to classroom') + '</main>'; }
     return;
   }
