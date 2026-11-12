@@ -36,6 +36,32 @@
 .workspace-tools button:focus-visible { outline-offset: -2px; }
 .workspace-tools button[aria-current="page"],
 .workspace-tools button[aria-pressed="true"] { background: var(--lime); color: var(--ink); }
+.workspace-menu { position: relative; flex: 1 0 auto; }
+.workspace-menu > summary { color: inherit; padding: 11px 8px; font-weight: 600; }
+.workspace-menu-items {
+  position: absolute;
+  inset-inline-end: 0;
+  min-width: 190px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: white;
+  box-shadow: 0 4px 12px #173a3130;
+}
+.workspace-menu-items button {
+  width: 100%;
+  justify-content: flex-start;
+  padding: 4px 8px;
+  color: var(--ink);
+}
+.workspace-menu-items button .workspace-tool-label {
+  display: inline;
+  position: static;
+  transform: none;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
 .workspace-tool-label {
   display: none;
   position: absolute;
@@ -74,23 +100,39 @@
 }
 .student-pane {
   min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: 12px;
+  border: 1px solid #397346;
+  border-radius: 4px 16px 4px 4px;
+  box-shadow: 0 3px 10px #173a311c;
   background: white;
 }
+.student-pane:has(#pane-production, #pane-finance, #pane-energy) { grid-column: 1 / -1; }
 .pane-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 16px;
-  background: var(--soft);
-  border-radius: 11px 11px 0 0;
+  padding: 2px 8px 2px 12px;
+  background: #397346;
+  border-radius: 2px 14px 0 0;
+  color: white;
 }
-.pane-title h2 { margin: 0; }
-.pane-content { padding: 12px; max-height: 560px; overflow: auto; }
-.pane-content .panel { margin: 0 0 12px; padding: 14px; }
+.pane-title h2 { margin: 0; font-size: 15px; }
+.pane-title button { background: transparent; color: white; border: 0; padding: 3px 9px; font-size: 22px; line-height: 1; }
+.pane-title button:hover { background: #265833; }
+.pane-content { padding: 10px 12px; }
+.pane-content .panel { margin: 0 0 12px; padding: 0; border: 0; border-radius: 0; }
 .pane-content .panel:last-child { margin-bottom: 0; }
+.pane-content .panel-head { margin-bottom: 8px; }
+.pane-content th, .pane-content td { padding: 7px 8px; border-bottom: 1px solid var(--line); }
+.pane-content th { background: #f2f6ef; font-size: 11px; letter-spacing: 0; text-transform: none; }
+.pane-content tbody tr:nth-child(even) { background: #fafbf9; }
+.inventory-filters { display: flex; flex-wrap: wrap; gap: 4px 14px; border: 1px solid var(--line); border-radius: 5px; margin: 0 0 8px; padding: 0 8px; }
+.inventory-filters legend { color: var(--muted); font-size: 11px; }
+.inventory-table :is(th, td):not(:first-child) { text-align: right; white-space: nowrap; }
+.inventory-table td:first-child { white-space: nowrap; }
+.inventory-note { margin: 8px 0 0; }
+.stock-kind { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-right: 4px; border-radius: 50%; font-size: 10px; font-weight: 700; background: #233a31; color: white; }
+.stock-kind.component { background: #d9e9a9; color: #233a31; }
 @media (max-width: 980px) {
   .student-panels { grid-template-columns: minmax(0, 1fr); }
 }

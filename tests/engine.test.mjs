@@ -119,8 +119,22 @@ test('daily cutoff is immutable and exact completion retains future obligations'
   assert.equal(JSON.stringify(s.snapshots[0]), snapshot); assert.equal(s.companies[0].investments[0].activeAt, 48);
 });
 test('production respects materials and machine/staff bottlenecks', () => {
-  const s = createSession(), c = s.companies[0]; advance(s, 1); assert.equal(c.production, 12); assert.equal(c.inventory.cell.qty, 14400 - 12 * 24); assertInvariants(s);
+  const s = createSession(), c = s.companies[0]; advance(s, 1);
+  assert.equal(c.production, 12);
+  assert.equal(c.inventory.cell.qty, 14400 - 12 * 32);
+  assert.equal(c.inventory.frame.qty, 600 - 12);
+  assert.equal(c.inventory.controller.qty, 600 - 12 * 2);
+  assertInvariants(s);
   const before = c.production; c.shifts = [false, false, false]; advance(s, 1); assert.equal(c.production, before);
+});
+test('saved sessions without a recipe retain their historical material consumption', () => {
+  const s = createSession(), c = s.companies[0];
+  delete s.recipe;
+  advance(s, 1);
+  assert.equal(c.production, 12);
+  assert.equal(c.inventory.cell.qty, 14400 - 12 * 24);
+  assert.equal(c.inventory.controller.qty, 600 - 12);
+  assertInvariants(s);
 });
 test('messaging scope and authoritative identity are preserved in views', () => {
   const s = quiet(); act(s, { type: 'message', channel: 'team:company-1', text: 'Internal', senderName: 'Spoofed' });

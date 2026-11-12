@@ -1,7 +1,12 @@
 // Original economic model. Monetary values are integer EUR cents.
 export const VERSION = 1;
 export const ITEMS = { cell: 'PV cell', frame: 'Recycled frame', controller: 'Controller', panel: 'Solar module' };
-export const RECIPE = { cell: 24, frame: 1, controller: 1 };
+export const RECIPE = { cell: 32, frame: 1, controller: 2 };
+export const productionRecipe = session => session.recipe ?? { cell: 24, frame: 1, controller: 1 };
+export function itemName(session, item) {
+  if (!session.recipe) return ITEMS[item];
+  return { cell: 'Photo cell', frame: 'Recycled frame', controller: 'Junction box', panel: 'Solar panel' }[item];
+}
 export const FEATURES = ['offers', 'purchasing', 'production', 'finance', 'energy', 'investments', 'messaging'];
 export const INVESTMENTS = {
   delivery: { name: 'Dispatch assistant', cost: 1800000, delay: 48 },
@@ -75,6 +80,7 @@ export function createSession({ id = 'session', name = 'The circular economy cha
   integer(seed, 'Seed', 0, 4294967295); integer(days, 'Duration in days', 1, 180);
   if (!Array.isArray(companyNames) || companyNames.length < 1 || companyNames.length > 12) fail('Choose 1–12 companies.');
   const s = { id, name: cleanText(name, 'Session name'), schema: VERSION, seed, rng: seed >>> 0, sequence: 0, revision: 0, hour: 0, startDate: '2026-01-01T00:00:00.000Z', endHour: days * 24, status: 'paused', secondsPerHour: 4, features: Object.fromEntries(FEATURES.map(f => [f, { visible: true, allowed: true }])), effects: { carbonDemand: true }, catalog: catalog(), companies: [], events: [], snapshots: [], messages: [], audit: [] };
+  s.recipe = { ...RECIPE };
   companyNames.forEach((name, i) => {
     const c = { id: `company-${i + 1}`, name: cleanText(name, 'Company name', 60), accounts: {}, ledger: [], inventory: {}, offers: [], orders: [], shipments: [], purchases: [], loans: [], deposits: [], investments: [], notices: [], reorder: {}, autoStatus: {}, workers: 8, machines: 2, shifts: [true, false, false], energy: 'grid', efficiency: 1, satisfaction: 1, quality: 1, marketing: 0, research: 0, production: 0, energyKwh: 0, energyCost: 0, emissions: 0, dispatched: 0, received: 0, receivedValue: 0, demandUnits: 0, lastBottleneck: 'Waiting for the first production hour' };
     for (const [item, qty, cost, carbon, capacity] of [['cell', 14400, 310, 2.2, 36000], ['frame', 600, 1800, 9, 1500], ['controller', 600, 2400, 6, 1500], ['panel', 180, 13000, 72, 1200]]) c.inventory[item] = { qty, value: qty * cost, carbon: qty * carbon, capacity };
@@ -100,7 +106,7 @@ function purchase(s, c, a, automated = false) {
   const p = { id: uid(s, 'purchase'), supplier: sup.name, item: sup.item, qty, cost, carbon: qty * (sup.carbon + sup.freight), orderedAt: s.hour, expectedAt: s.hour + sup.lead, receivedAt: null, paidAt: null, term: sup.term };
   sup.stock -= qty; c.purchases.push(p);
   post(s, c, `Purchase committed: ${p.id}`, { inbound: cost, payable: -cost });
-  schedule(s, c, 'purchaseReceipt', p.expectedAt + sampleDelay(s, sup), { purchaseId: p.id }, `${qty} ${ITEMS[p.item]} arrive from ${sup.name}`);
+  schedule(s, c, 'purchaseReceipt', p.expectedAt + sampleDelay(s, sup), { purchaseId: p.id }, `${qty} ${itemName(s, p.item)} arrive from ${sup.name}`);
   return `Purchase ${p.id} accepted. Expected in ${sup.lead} h; payment ${sup.term} h after receipt.`;
 }
 function dispatch(s, c, a) {
@@ -349,16 +355,17 @@ function production(s, c, shifts) {
   if (!shifts[shift]) { c.lastBottleneck = 'Shift inactive'; return; }
   const energy = c.energyTerms || s.catalog.energy.find(x => x.id === c.energy);
   const machineLimit = c.machines * 6, staffLimit = c.workers * 2, capacity = c.inventory.panel.capacity - c.inventory.panel.qty;
-  const materials = Object.entries(RECIPE).map(([item, count]) => [item, Math.floor(c.inventory[item].qty / count)]);
+  const recipe = Object.entries(productionRecipe(s));
+  const materials = recipe.map(([item, count]) => [item, Math.floor(c.inventory[item].qty / count)]);
   const wage = c.workers * 1350, perUnitEnergy = Math.round(3 * c.efficiency * energy.rates[shift]);
   const cashLimit = Math.max(0, Math.floor((balance(c, 'cash') - wage) / perUnitEnergy));
-  const limits = [['Assembly lines', machineLimit], ['Staff', staffLimit], ['Finished-goods space', capacity], ['Cash for wages and energy', cashLimit], ...materials.map(([k, n]) => [ITEMS[k], n])];
+  const limits = [['Assembly lines', machineLimit], ['Staff', staffLimit], ['Finished-goods space', capacity], ['Cash for wages and energy', cashLimit], ...materials.map(([k, n]) => [itemName(s, k), n])];
   const qty = Math.max(0, Math.min(...limits.map(x => x[1]))); c.lastBottleneck = limits.find(x => x[1] === qty)?.[0] || 'At capacity';
   if (balance(c, 'cash') < wage) { c.lastBottleneck = 'Production paused: insufficient cash for wages'; return; }
   post(s, c, 'Active shift wages', { expense: wage, cash: -wage });
   if (!qty) return;
   let value = 0, carbon = 0;
-  for (const [item, amount] of Object.entries(RECIPE)) { const used = takeStock(c, item, qty * amount); value += used.value; carbon += used.carbon; }
+  for (const [item, amount] of recipe) { const used = takeStock(c, item, qty * amount); value += used.value; carbon += used.carbon; }
   const kwh = qty * 3 * c.efficiency, energyCost = qty * perUnitEnergy;
   addStock(c, 'panel', qty, value, carbon + kwh * energy.carbon);
   // Material conversion leaves total inventory account unchanged; energy and labour are period costs.

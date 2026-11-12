@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { randomUUID } from 'node:crypto';
+import { itemName, productionRecipe } from '../src/engine.mjs';
 
 // Unit harness for the original UI functions. It does not open a browser or
 // access a real service. The coordinator separately verifies rendered behavior.
@@ -20,7 +21,7 @@ function harness() {
     document, localStorage: storage(), sessionStorage: storage(), crypto: { randomUUID },
     setTimeout: () => 1, clearTimeout: () => {}, URL, AbortSignal,
     FormData: class extends Map { constructor(form) { super(form.values); } },
-    ITEMS: {}, INVESTMENTS: {}, FEATURES: [], firebaseConfig: {}, classroomBackend: 'https://classroom.example', location: { hostname: 'localhost' }, renderCount: 0,
+    itemName, productionRecipe, INVESTMENTS: {}, FEATURES: [], firebaseConfig: {}, classroomBackend: 'https://classroom.example', location: { hostname: 'localhost' }, renderCount: 0,
     activeTestForm: null
   });
   vm.runInContext(definitions, context);
@@ -135,6 +136,25 @@ test('settings that complete a session do not attempt a rejected follow-up clock
   await h.run('settingsSubmit(settingsFields)');
   assert.equal(h.run('submitted.length'), 1);
   assert.equal(h.run('submitted[0].type'), 'configure');
+});
+
+test('student workspace groups tools and shows filtered live stock with one Inventory heading', () => {
+  const h = harness();
+  h.run(`actor.role = 'student'; page = 'workspace';
+    state.recipe = {cell:32,frame:1,controller:2};
+    state.company = {
+      inventory:{cell:{qty:64,capacity:128,value:6400,carbon:32},panel:{qty:2,capacity:4,value:25000,carbon:120}},
+      purchases:[{item:'cell',qty:240,receivedAt:null}]
+    };
+    openPanels.add('inventory');`);
+  const navigation = h.run('workspaceNavigation(false, () => true)');
+  assert.match(navigation, /<summary>Information<\/summary>[\s\S]*data-id="inventory"[\s\S]*<summary>Decisions<\/summary>[\s\S]*data-id="orders"/);
+  const workspace = h.run('studentWorkspace(() => true)');
+  assert.equal((workspace.match(/<h2[^>]*>Inventory<\/h2>/g) || []).length, 1);
+  assert.match(workspace, /Solar panel[\s\S]*Photo cell[\s\S]*240/);
+  h.run("inventoryCategories.delete('component')");
+  assert.doesNotMatch(h.run('studentWorkspace(() => true)'), /Photo cell/);
+  assert.doesNotMatch(h.run("studentWorkspace(key => key !== 'supply')"), /Solar panel/);
 });
 
 test('pending energy and shift decisions retain the accepted choice and effective time', () => {

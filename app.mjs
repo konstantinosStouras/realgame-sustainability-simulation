@@ -1,5 +1,5 @@
-import { ITEMS, INVESTMENTS, FEATURES } from './src/engine.mjs?v=a8ecf4c9df98';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=a8ecf4c9df98';
+import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=a541f480519e';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=a541f480519e';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -23,7 +23,7 @@ const check = (name, label, on, disabled = false) => `<label class="check"><inpu
 const select = (name, label, options, value) => `<label>${esc(label)}<select name="${esc(name)}">${options.map(([id, text]) => `<option value="${esc(id)}" ${id === value ? 'selected' : ''}>${esc(text)}</option>`).join('')}</select></label>`;
 const button = (action, text, id = '', cls = '', disabled = false) => `<button class="${cls}" data-action="${action}" data-id="${esc(id)}" ${disabled ? 'disabled' : ''}>${text}</button>`;
 const table = (headers, rows, empty = 'Nothing here yet.') => rows.length ? `<div class="table-wrap"><table><thead><tr>${headers.map(h => `<th scope="col">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : `<p class="empty">${empty}</p>`;
-const panel = (title, subtitle, body, action = '') => `<section class="panel"><div class="panel-head"><div><h2>${title}</h2>${subtitle ? `<p>${subtitle}</p>` : ''}</div>${action}</div>${body}</section>`;
+const panel = (title, subtitle, body, action = '') => `<section class="panel">${title || subtitle || action ? `<div class="panel-head"><div>${title ? `<h2>${title}</h2>` : ''}${subtitle ? `<p>${subtitle}</p>` : ''}</div>${action}</div>` : ''}${body}</section>`;
 const metric = (label, value, hint, name) => `<article class="metric"><div class="metric-label">${label}${icon(name)}</div><div class="metric-value">${value}</div><small>${hint}</small></article>`;
 const permitted = feature => !isTeacher() && state.status !== 'completed' && state.features[feature]?.allowed;
 function toast(message) { const el = document.querySelector('#toast'); el.textContent = message; clearTimeout(toast.timeout); toast.timeout = setTimeout(() => { el.textContent = ''; }, 9000); }
@@ -108,7 +108,7 @@ function renderWelcome() {
   if (localStorage.getItem('studio-backend')) root.querySelector('.welcome-layout > .panel').insertAdjacentHTML('beforeend', `<p>${button('forget-server', 'Reset server connection', '', 'small')}</p>`);
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=a8ecf4c9df98')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=a541f480519e')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -126,14 +126,22 @@ async function enterFirebase() {
 function renderLobby() { root.innerHTML = `<main class="welcome" id="content">${brand}<h1>Your classroom.</h1><p>Welcome, ${esc(user.name)}. ${user.role === 'instructor' ? 'Create a session to begin.' : 'Join a company with the code your instructor provided.'}</p>${button(user.role === 'instructor' ? 'create' : 'join', user.role === 'instructor' ? 'Create session' : 'Join company', '', 'primary')} ${button('logout', 'Sign out')}</main>`; }
 const pages = { overview: 'Overview', orders: 'Sales & dispatch', supply: 'Supply & inventory', production: 'Production', finance: 'Finance', energy: 'Energy & growth', reports: 'Reports', messages: 'Messages', admin: 'Session control' };
 const studentPanels = {
-  inventory: ['Inventory', 'supply', inventoryPanel],
-  suppliers: ['Suppliers', 'supply', () => suppliersPanel() + purchasesPanel() + replenishmentPanel()],
-  logistics: ['Logistics', 'supply', logisticsPanel],
-  orders: ['Orders', 'orders', () => ordersPanel() + shipmentsPanel() + dispatchAssistantPanel()],
-  offers: ['Sales offers', 'orders', offersPanel],
+  inventory: ['Inventory', 'supply', () => inventoryPanel(true)],
+  suppliers: ['Suppliers', 'supply', () => suppliersPanel(true)],
+  purchases: ['Purchase history', 'supply', () => purchasesPanel(true)],
+  shipments: ['Shipment history', 'orders', () => shipmentsPanel(true)],
+  replenishment: ['Replenishment', 'supply', () => replenishmentPanel(true)],
+  logistics: ['Logistics', 'supply', () => logisticsPanel(true)],
+  orders: ['Orders & dispatch', 'orders', () => ordersPanel(true) + dispatchAssistantPanel()],
+  offers: ['Sales offers', 'orders', () => offersPanel(true)],
+  production: ['Production', 'production', productionPage],
+  finance: ['Finance', 'finance', financePage],
+  energy: ['Energy & growth', 'energy', energyPage],
   messages: ['Messages', 'messages', messagesPage]
 };
 const openPanels = new Set();
+const informationPanels = new Set(['inventory', 'purchases', 'shipments', 'logistics', 'messages']);
+const inventoryCategories = new Set(['finished', 'component']);
 const primaryPages = ['overview', 'production', 'finance', 'energy', 'reports'];
 const panelIcons = {
   suppliers: '<circle cx="8" cy="6" r="3"/><path d="M2 18v-2a6 6 0 0 1 9-5M14 13l4-2 4 2v6l-4 2-4-2ZM14 13l4 2 4-2m-4 2v6"/>',
@@ -144,17 +152,18 @@ const panelIcons = {
 function workspaceNavigation(admin, visible) {
   const tool = (action, id, label, state, graphic) =>
     `<button type="button" data-action="${action}" data-id="${id}" aria-label="${esc(label)}" ${state}>${graphic}<span class="workspace-tool-label" aria-hidden="true">${esc(label)}</span></button>`;
-  const pageKeys = admin ? [...primaryPages, 'orders', 'supply', 'messages', 'admin'] : primaryPages;
+  const pageKeys = admin ? [...primaryPages, 'orders', 'supply', 'messages', 'admin'] : ['overview', 'reports'];
   const pageTools = pageKeys.filter(visible).map(key =>
     tool('nav', key, pages[key], page === key ? 'aria-current="page"' : '', icon(key))
   );
-  const panelTools = admin ? [] : Object.entries(studentPanels)
-    .filter(([id]) => studentPanelVisible(id, visible))
+  const panelTools = information => Object.entries(studentPanels)
+    .filter(([id]) => informationPanels.has(id) === information && studentPanelVisible(id, visible))
     .map(([id, [label, iconKey]]) =>
       tool('panel', id, label, `aria-pressed="${page === 'workspace' && openPanels.has(id)}"`, icon(iconKey, panelIcons[id]))
-    );
+    ).join('');
+  const groups = admin ? [] : [['Information', panelTools(true)], ['Decisions', panelTools(false)]];
   return `<header class="workspace-nav">${brand}
-    <nav class="workspace-tools" aria-label="Workspace">${[...pageTools, ...panelTools].join('')}</nav>
+    <nav class="workspace-tools" aria-label="Workspace">${pageTools.join('')}${groups.filter(([, items]) => items).map(([label, items]) => `<details class="workspace-menu"><summary>${label}</summary><div class="workspace-menu-items">${items}</div></details>`).join('')}</nav>
   </header>`;
 }
 
@@ -166,8 +175,8 @@ function studentWorkspace(visible) {
   if (!panels.length) return '<p class="empty">Choose a tool from the top bar to open its panel here.</p>';
   return '<div class="student-panels">' + panels.map(id => {
     const [label, , renderPanel] = studentPanels[id];
-    return '<section class="student-pane" aria-label="' + label + ' panel"><div class="pane-title"><h2>' + label + '</h2>' +
-      button('close-panel', 'Close ' + label, id, 'small') +
+    return '<section class="student-pane" aria-labelledby="pane-' + id + '"><div class="pane-title"><h2 id="pane-' + id + '" tabindex="-1">' + label + '</h2>' +
+      '<button type="button" data-action="close-panel" data-id="' + id + '" aria-label="Close ' + label + '">×</button>' +
       '</div><div class="pane-content">' + renderPanel() + '</div></section>';
   }).join('') + '</div>';
 }
@@ -216,17 +225,17 @@ function overviewPage() {
 function instructorOverview() {
   return `<div class="metrics">${metric('Participating companies', state.companies.length, 'Shared scenario and clock', 'overview')}${metric('Completed days', state.snapshots.length, 'Immutable daily snapshots', 'reports')}${metric('Pending outcomes', state.events.filter(e => e.status === 'pending').length, 'Includes payments and arrivals', 'orders')}${metric('Session duration', `${number(state.endHour / 24)} days`, `${number(Math.max(0, state.endHour - state.hour))} h remaining`, 'admin')}</div>${panel('Company comparison', 'Live values · select a company above for read-only preview', table(['Company', 'Cash', 'Profit', 'Ready stock', 'Open units', ''], state.companies.map(c => [esc(c.name), money(c.cash), money(c.profit), c.inventory, c.openUnits, button('preview', 'Preview', c.id, 'small')])))}<div class="grid2">${panel('Profit over time', 'Cumulative EUR · daily close', chart('profit', 'EUR'))}${panel('Carbon over time', 'Cumulative kg CO₂e · daily close', chart('emissions', 'kg CO₂e'))}</div>`;
 }
-function offersPanel() {
+function offersPanel(embedded = false) {
   const c = company();
-  return `${panel('Sales offers', 'One transparent offer per market. Editing affects future orders.', table(['Market', 'Price / module', 'Quantity band', 'Delivery promise', 'Payment after receipt', ''], c.offers.map(o => [esc(state.catalog.markets.find(m => m.id === o.marketId)?.name), exactMoney(o.price), `${o.min}–${o.max}`, `${o.delivery} h`, `${o.payment} h`, `${o.enabled ? '<span class="badge">Active</span>' : '<span class="badge amber">Off</span>'} ${button('offer', 'Edit', o.id, 'small', !permitted('offers'))}`])))}`;
+  return `${panel(embedded ? '' : 'Sales offers', 'One transparent offer per market. Editing affects future orders.', table(['Market', 'Price / module', 'Quantity band', 'Delivery promise', 'Payment after receipt', ''], c.offers.map(o => [esc(state.catalog.markets.find(m => m.id === o.marketId)?.name), exactMoney(o.price), `${o.min}–${o.max}`, `${o.delivery} h`, `${o.payment} h`, `${o.enabled ? '<span class="badge">Active</span>' : '<span class="badge amber">Off</span>'} ${button('offer', 'Edit', o.id, 'small', !permitted('offers'))}`])))}`;
 }
-function ordersPanel() {
+function ordersPanel(embedded = false) {
   const c = company();
-  return `${panel('Customer orders', 'Original quantities are preserved. Split shipments share the accepted price and promise.', table(['Order / market', 'Original', 'To dispatch', 'Received', 'Promised arrival', ''], c.orders.slice().reverse().map(o => [`<strong>${esc(o.id)}</strong><small>${esc(o.customer)} · ${exactMoney(o.price)} / module</small>`, o.originalQty, o.remaining, o.received, `${simDate(o.dueAt)}${o.remaining && o.dueAt < state.hour ? '<small class="danger">Overdue</small>' : ''}`, button('dispatch', 'Dispatch', o.id, 'small', !permitted('offers') || !o.remaining)])))}`;
+  return `${panel(embedded ? '' : 'Customer orders', 'Original quantities are preserved. Split shipments share the accepted price and promise.', table(['Order / market', 'Original', 'To dispatch', 'Received', 'Promised arrival', ''], c.orders.slice().reverse().map(o => [`<strong>${esc(o.id)}</strong><small>${esc(o.customer)} · ${exactMoney(o.price)} / module</small>`, o.originalQty, o.remaining, o.received, `${simDate(o.dueAt)}${o.remaining && o.dueAt < state.hour ? '<small class="danger">Overdue</small>' : ''}`, button('dispatch', 'Dispatch', o.id, 'small', !permitted('offers') || !o.remaining)])))}`;
 }
-function shipmentsPanel() {
+function shipmentsPanel(embedded = false) {
   const c = company();
-  return `${panel('Shipment history', 'Goods leave stock at dispatch; revenue is earned at customer receipt; cash follows the payment term.', table(['Shipment', 'Quantity', 'Route', 'Dispatched', 'Customer receipt', 'Paid'], c.shipments.slice().reverse().map(s => [`${esc(s.id)}<small>${esc(s.orderId)}</small>`, s.qty, esc(s.route), simDate(s.dispatchedAt), s.receivedAt === null ? `In transit<small>Estimate ${simDate(s.expectedAt)}</small>` : simDate(s.receivedAt), s.paidAt === null ? 'Pending' : simDate(s.paidAt)])))}`;
+  return `${panel(embedded ? '' : 'Shipment history', 'Goods leave stock at dispatch; revenue is earned at customer receipt; cash follows the payment term.', table(['Shipment', 'Quantity', 'Route', 'Dispatched', 'Customer receipt', 'Paid'], c.shipments.slice().reverse().map(s => [`${esc(s.id)}<small>${esc(s.orderId)}</small>`, s.qty, esc(s.route), simDate(s.dispatchedAt), s.receivedAt === null ? `In transit<small>Estimate ${simDate(s.expectedAt)}</small>` : simDate(s.receivedAt), s.paidAt === null ? 'Pending' : simDate(s.paidAt)])))}`;
 }
 function dispatchAssistantPanel() {
   const c = company();
@@ -235,23 +244,39 @@ function dispatchAssistantPanel() {
 function ordersPage() {
   return offersPanel() + ordersPanel() + shipmentsPanel() + dispatchAssistantPanel();
 }
-function inventoryPanel() {
+function inventoryPanel(embedded = false) {
   const c = company();
-  return `${panel('Inventory', 'Live stock, weighted acquisition cost, and embodied carbon. Incoming stock is not available for production.', table(['Item', 'On hand', 'Incoming', 'Capacity', 'Avg cost / unit', 'kg CO₂e / unit'], Object.entries(c.inventory).map(([key, i]) => [ITEMS[key], number(i.qty), number(total(c.purchases.filter(p => p.item === key && p.receivedAt === null), 'qty')), number(i.capacity), exactMoney(i.qty ? i.value / i.qty : 0), number(i.qty ? i.carbon / i.qty : 0)])))}`;
+  const category = key => key === 'panel' ? 'finished' : 'component';
+  const categories = [['finished', 'Finished'], ['component', 'Components']];
+  const filters = embedded ? `<fieldset class="inventory-filters"><legend>Show stock</legend>${categories.map(([id, label]) => check('stock-' + id, label, inventoryCategories.has(id))).join('')}</fieldset>` : '';
+  const rows = Object.keys(c.inventory).sort((a, b) => Number(b === 'panel') - Number(a === 'panel'))
+    .filter(key => !embedded || inventoryCategories.has(category(key))).map(key => {
+      const stock = c.inventory[key];
+      const ordered = total(c.purchases.filter(p => p.item === key && p.receivedAt === null), 'qty');
+      const type = category(key);
+      return [
+        `<span class="stock-kind ${type}" aria-label="${type === 'finished' ? 'Finished' : 'Component'}">${type === 'finished' ? 'F' : 'C'}</span> ${itemName(state, key)}`,
+        `<span class="nowrap"><strong>${number(stock.qty)}</strong> / ${number(stock.capacity)}</span>`,
+        stock.qty ? exactMoney(stock.value / stock.qty) : '—',
+        ordered ? number(ordered) : '—',
+        stock.qty ? precise(stock.carbon / stock.qty) : '—'
+      ];
+    });
+  return panel(embedded ? '' : 'Inventory', '', `${filters}<div class="inventory-table">${table(['Item', 'Amount / capacity', 'Avg cost / unit', 'Ordered', 'kg CO₂e / unit'], rows, 'Select Finished or Components to show stock.')}</div><p class="form-note inventory-note">Ordered quantities become available at receipt. Stock above capacity costs €0.05 per excess unit per day.</p>`);
 }
-function suppliersPanel() {
-  return `${panel('Supplier marketplace', 'All orders have a landed fixed fee. Supplier stock is shared across companies.', table(['Supplier / item', 'Unit price', 'Order fee', 'Lead / payment', 'Delivery accuracy', 'Component / freight CO₂e', 'Available / lot', ''], state.catalog.suppliers.filter(s => s.enabled).map(s => [`<strong>${esc(s.name)}</strong><small>${ITEMS[s.item]}</small>`, exactMoney(s.price), exactMoney(s.fee), `${s.lead} h / ${s.term} h<small>Payment after receipt</small>`, `${s.reliability}% on time<small>Up to ${s.maxDelay} h extra</small>`, `${precise(s.carbon)} / ${precise(s.freight)} kg per unit<small>${precise(s.carbon + s.freight)} kg total per unit</small>`, `${number(s.stock)}<small>Minimum ${s.min} · lot ${s.lot}</small>`, button('purchase', 'Order', s.id, 'small', !permitted('purchasing'))])))}`;
+function suppliersPanel(embedded = false) {
+  return `${panel(embedded ? '' : 'Supplier marketplace', 'All orders have a landed fixed fee. Supplier stock is shared across companies.', table(['Supplier / item', 'Unit price', 'Order fee', 'Lead / payment', 'Delivery accuracy', 'Component / freight CO₂e', 'Available / lot', ''], state.catalog.suppliers.filter(s => s.enabled).map(s => [`<strong>${esc(s.name)}</strong><small>${itemName(state, s.item)}</small>`, exactMoney(s.price), exactMoney(s.fee), `${s.lead} h / ${s.term} h<small>Payment after receipt</small>`, `${s.reliability}% on time<small>Up to ${s.maxDelay} h extra</small>`, `${precise(s.carbon)} / ${precise(s.freight)} kg per unit<small>${precise(s.carbon + s.freight)} kg total per unit</small>`, `${number(s.stock)}<small>Minimum ${s.min} · lot ${s.lot}</small>`, button('purchase', 'Order', s.id, 'small', !permitted('purchasing'))])))}`;
 }
-function logisticsPanel() {
-  return `${panel('Logistics services', 'Compare the enabled routes before dispatching a customer order.', table(['Route', 'Duration', 'Cost / shipment', 'Cost / unit', 'Delivery accuracy', 'Transport CO₂e'], state.catalog.routes.filter(r => r.enabled).map(r => [esc(r.name), `${r.hours} h`, exactMoney(r.fixed), exactMoney(r.unit), `${r.reliability}% on time<small>Up to ${r.maxDelay} h extra</small>`, `${precise(r.carbonFixed)} kg / shipment<small>${precise(r.carbonUnit)} kg / unit</small>`]), 'No transport routes are enabled.'))}`;
+function logisticsPanel(embedded = false) {
+  return `${panel(embedded ? '' : 'Logistics services', 'Compare the enabled routes before dispatching a customer order.', table(['Route', 'Duration', 'Cost / shipment', 'Cost / unit', 'Delivery accuracy', 'Transport CO₂e'], state.catalog.routes.filter(r => r.enabled).map(r => [esc(r.name), `${r.hours} h`, exactMoney(r.fixed), exactMoney(r.unit), `${r.reliability}% on time<small>Up to ${r.maxDelay} h extra</small>`, `${precise(r.carbonFixed)} kg / shipment<small>${precise(r.carbonUnit)} kg / unit</small>`]), 'No transport routes are enabled.'))}`;
 }
-function purchasesPanel() {
+function purchasesPanel(embedded = false) {
   const c = company();
-  return `${panel('Purchase history', 'Committed → received → paid', table(['Purchase', 'Quantity', 'Landed cost', 'Expected', 'Receipt', 'Payment'], c.purchases.slice().reverse().map(p => [`${esc(p.id)}<small>${ITEMS[p.item]} · ${esc(p.supplier)}</small>`, p.qty, exactMoney(p.cost), simDate(p.expectedAt), p.receivedAt === null ? 'In transit' : simDate(p.receivedAt), p.paidAt === null ? 'Pending' : simDate(p.paidAt)])))}`;
+  return `${panel(embedded ? '' : 'Purchase history', 'Committed → received → paid', table(['Purchase', 'Quantity', 'Landed cost', 'Expected', 'Receipt', 'Payment'], c.purchases.slice().reverse().map(p => [`${esc(p.id)}<small>${itemName(state, p.item)} · ${esc(p.supplier)}</small>`, p.qty, exactMoney(p.cost), simDate(p.expectedAt), p.receivedAt === null ? 'In transit' : simDate(p.receivedAt), p.paidAt === null ? 'Pending' : simDate(p.paidAt)])))}`;
 }
-function replenishmentPanel() {
+function replenishmentPanel(embedded = false) {
   const c = company();
-  return `${panel('Replenishment policies', 'A policy includes available + incoming stock to avoid duplicate orders.', `<p class="form-note">${esc(c.autoStatus.purchasing || 'Install the replenishment assistant to automate your policies.')}</p>${table(['Item', 'Reorder at or below', 'Order quantity', 'State', ''], ['cell', 'frame', 'controller'].map(key => [ITEMS[key], c.reorder[key]?.point ?? '—', c.reorder[key]?.qty ?? '—', c.reorder[key]?.enabled ? 'Enabled' : 'Off', button('reorder', 'Set policy', key, 'small', !permitted('investments'))]))}`)}`;
+  return `${panel(embedded ? '' : 'Replenishment policies', 'A policy includes available + incoming stock to avoid duplicate orders.', `<p class="form-note">${esc(c.autoStatus.purchasing || 'Install the replenishment assistant to automate your policies.')}</p>${table(['Item', 'Reorder at or below', 'Order quantity', 'State', ''], ['cell', 'frame', 'controller'].map(key => [itemName(state, key), c.reorder[key]?.point ?? '—', c.reorder[key]?.qty ?? '—', c.reorder[key]?.enabled ? 'Enabled' : 'Off', button('reorder', 'Set policy', key, 'small', !permitted('investments'))]))}`)}`;
 }
 function supplyPage() {
   return inventoryPanel() + suppliersPanel() + logisticsPanel() + purchasesPanel() + replenishmentPanel();
@@ -260,7 +285,7 @@ function productionPage() {
   const c = company(), pendingShift = state.events.find(e => e.companyId === c.id && e.type === 'shifts' && e.status === 'pending');
   const shiftLabels = ['00:00–08:00', '08:00–16:00', '16:00–24:00'];
   const describeShifts = shifts => shiftLabels.filter((_, i) => shifts[i]).join(', ') || 'No shifts';
-  return `<div class="metrics">${metric('Machine capacity', `${c.machines * 6} / h`, `${c.machines} assembly lines`, 'production')}${metric('Staff capacity', `${c.workers * 2} / h`, `${c.workers} workers`, 'overview')}${metric('Modules produced', number(c.production), 'Cumulative completed output', 'supply')}${metric('Electricity consumed', number(c.energyKwh), 'kWh · cumulative production', 'energy')}</div><div class="advice"><strong>Current bottleneck: ${esc(c.lastBottleneck)}</strong>Each solar module uses 24 PV cells, 1 frame, and 1 controller. Output is limited by materials, staff, machines, storage space, and cash. Active shifts incur wages even when materials run out.</div><div class="grid2">${panel('Production schedule', 'Changes take effect at the next 8-hour boundary.', `<p class="form-note"><strong>Active schedule:</strong> ${describeShifts(c.shifts)} UTC.</p>${pendingShift ? `<div class="advice"><strong>Saved schedule pending: ${describeShifts(pendingShift.data.shifts)} UTC.</strong>Effective ${simDate(pendingShift.at)}. The active schedule continues until then.</div>` : ''}<form id="shifts-form">${shiftLabels.map((s, i) => check(`shift${i}`, s + ' UTC simulation time', pendingShift ? pendingShift.data.shifts[i] : c.shifts[i], !!pendingShift)).join('')}<p class="form-note">Wages: €13.50 per worker per active hour. Electricity: 3 kWh per module before efficiency upgrades.</p>${button('submit', pendingShift ? 'Shift change pending' : 'Save shift schedule', '', 'primary', !permitted('production') || !!pendingShift)}<div class="error" role="alert"></div></form>`)}${panel('People & equipment', 'Recruitment and reductions take 48 h; machinery takes 72 h.', `<div class="value-list"><div><span>Workers</span><strong>${c.workers}</strong></div><div><span>Assembly lines</span><strong>${c.machines}</strong></div><div><span>Energy efficiency factor</span><strong>${c.efficiency}</strong></div></div><div class="toolbar">${button('staff', 'Change staffing', '', '', !permitted('production'))}${button('invest', 'Add assembly line', 'machine', '', !permitted('investments'))}</div>`)}</div>${panel('Production trend', 'Modules completed each day · immutable closes', chart('dailyProduction', 'modules'))}`;
+  return `<div class="metrics">${metric('Machine capacity', `${c.machines * 6} / h`, `${c.machines} assembly lines`, 'production')}${metric('Staff capacity', `${c.workers * 2} / h`, `${c.workers} workers`, 'overview')}${metric('Modules produced', number(c.production), 'Cumulative completed output', 'supply')}${metric('Electricity consumed', number(c.energyKwh), 'kWh · cumulative production', 'energy')}</div><div class="advice"><strong>Current bottleneck: ${esc(c.lastBottleneck)}</strong>Each ${itemName(state, "panel").toLowerCase()} uses ${Object.entries(productionRecipe(state)).map(([item, qty]) => qty + " " + itemName(state, item).toLowerCase() + (qty === 1 ? "" : item === "controller" && state.recipe ? "es" : "s")).join(", ")}. Output is limited by materials, staff, machines, storage space, and cash. Active shifts incur wages even when materials run out.</div><div class="grid2">${panel('Production schedule', 'Changes take effect at the next 8-hour boundary.', `<p class="form-note"><strong>Active schedule:</strong> ${describeShifts(c.shifts)} UTC.</p>${pendingShift ? `<div class="advice"><strong>Saved schedule pending: ${describeShifts(pendingShift.data.shifts)} UTC.</strong>Effective ${simDate(pendingShift.at)}. The active schedule continues until then.</div>` : ''}<form id="shifts-form">${shiftLabels.map((s, i) => check(`shift${i}`, s + ' UTC simulation time', pendingShift ? pendingShift.data.shifts[i] : c.shifts[i], !!pendingShift)).join('')}<p class="form-note">Wages: €13.50 per worker per active hour. Electricity: 3 kWh per module before efficiency upgrades.</p>${button('submit', pendingShift ? 'Shift change pending' : 'Save shift schedule', '', 'primary', !permitted('production') || !!pendingShift)}<div class="error" role="alert"></div></form>`)}${panel('People & equipment', 'Recruitment and reductions take 48 h; machinery takes 72 h.', `<div class="value-list"><div><span>Workers</span><strong>${c.workers}</strong></div><div><span>Assembly lines</span><strong>${c.machines}</strong></div><div><span>Energy efficiency factor</span><strong>${c.efficiency}</strong></div></div><div class="toolbar">${button('staff', 'Change staffing', '', '', !permitted('production'))}${button('invest', 'Add assembly line', 'machine', '', !permitted('investments'))}</div>`)}</div>${panel('Production trend', 'Modules completed each day · immutable closes', chart('dailyProduction', 'modules'))}`;
 }
 function financePage() {
   const c = company(), a = c.accounts;
@@ -314,17 +339,19 @@ async function action(name, id) {
   if (name === 'forget-server') { backend = localWorkspace ? '' : classroomBackend; localStorage.removeItem('studio-backend'); health = null; state = null; try { health = await api('/health'); } catch {} if (firebaseClient?.user) await enterFirebase(); else renderWelcome(); return; }
   if (name === 'retry-decision') { const pending = JSON.parse(sessionStorage.getItem(`studio-pending:${backend}:${actor.id}:${sessionId}`) || 'null'); if (pending) await command(pending.command); render(); return; }
   if (name === 'close') { dialog.close(); if (state) render(); return; }
-  if (name === 'panel' || name === 'close-panel') {
+  const shortcut = name === 'nav' && !isTeacher() && (id === 'supply' ? 'inventory' : Object.hasOwn(studentPanels, id) && id);
+  if (shortcut) id = shortcut;
+  if (shortcut || name === 'panel' || name === 'close-panel') {
     if (isTeacher() || !Object.hasOwn(studentPanels, id)) return;
-    if (name === 'close-panel' || (page === 'workspace' && openPanels.has(id))) openPanels.delete(id);
+    if (name === 'close-panel' || (name === 'panel' && page === 'workspace' && openPanels.has(id))) openPanels.delete(id);
     else openPanels.add(id);
     page = 'workspace';
     render();
-    root.querySelector('.page-heading h1')?.focus();
+    (root.querySelector('#pane-' + id) || root.querySelector('.page-heading h1'))?.focus();
     return;
   }
   if (name === 'nav') { page = id; render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=a8ecf4c9df98')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=a541f480519e')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); renderWelcome(); return; }
@@ -340,7 +367,7 @@ async function action(name, id) {
   if (name === 'dispatch') openDispatch(id);
   if (name === 'purchase') {
     const sup = state.catalog.suppliers.find(x => x.id === id);
-    modal(`Order ${ITEMS[sup.item]}`, `<p class="form-note">${esc(sup.name)} · ${exactMoney(sup.price)} per unit + ${exactMoney(sup.fee)} order fee. Estimated receipt ${simDate(state.hour + sup.lead)}; payment ${sup.term} h after actual receipt. Minimum ${sup.min}; lots of ${sup.lot}.</p>${field('qty', 'Quantity', sup.min, 'number', `min="${sup.min}" max="${sup.stock}" step="${sup.lot}"`)}<div id="purchase-quote" class="advice"></div>`, f => command({ type: 'purchase', supplierId: id, qty: value(f, 'qty') }), 'Place purchase');
+    modal(`Order ${itemName(state, sup.item)}`, `<p class="form-note">${esc(sup.name)} · ${exactMoney(sup.price)} per unit + ${exactMoney(sup.fee)} order fee. Estimated receipt ${simDate(state.hour + sup.lead)}; payment ${sup.term} h after actual receipt. Minimum ${sup.min}; lots of ${sup.lot}.</p>${field('qty', 'Quantity', sup.min, 'number', `min="${sup.min}" max="${sup.stock}" step="${sup.lot}"`)}<div id="purchase-quote" class="advice"></div>`, f => command({ type: 'purchase', supplierId: id, qty: value(f, 'qty') }), 'Place purchase');
     const update = () => { const qty = Number(dialog.querySelector('[name=qty]').value); dialog.querySelector('#purchase-quote').textContent = `${exactMoney(qty * sup.price + sup.fee)} committed payable · ${number(qty * (sup.carbon + sup.freight))} kg CO₂e. Cash is paid after receipt, not now.`; }; dialog.querySelector('form').addEventListener('input', update); update();
   }
   if (name === 'staff') modal('Change staffing', `<p class="form-note">${c.workers} current workers. Enter a positive number to recruit or negative to reduce. Recruitment costs €250 per worker; severance €500. Effective in 48 h.</p>${field('delta', 'Change in workers', 1, 'number', 'min="-20" max="20"')}`, f => command({ type: 'staff', delta: value(f, 'delta') }));
@@ -350,7 +377,7 @@ async function action(name, id) {
   if (name === 'invest') { const inv = INVESTMENTS[id]; modal(inv.name, `<p>${money(inv.cost)} is prepaid now. The investment becomes operational after ${inv.delay} simulation hours, at ${simDate(state.hour + inv.delay)}.</p><p class="form-note">This accepted contract will remain pending if the session ends before activation.</p>`, () => command({ type: 'invest', kind: id }), 'Confirm investment'); }
   if (name === 'energy-switch') { const e = state.catalog.energy.find(x => x.id === id); modal(`Switch to ${e.name}`, `<p>Agreement fee ${money(e.fee)} paid now. Switch effective at ${simDate(state.hour + e.delay)}. Standing charge ${exactMoney(e.daily)} per day. Existing inventory retains its original footprint.</p>`, () => command({ type: 'energy', energyId: id }), 'Confirm switch'); }
   if (name === 'budget') modal('Daily research & marketing', `<div class="form-grid">${field('research', 'Research (EUR per day)', c.research / 100, 'number', 'min="0" max="1000" step="0.01"')}${field('marketing', 'Marketing (EUR per day)', c.marketing / 100, 'number', 'min="0" max="1000" step="0.01"')}</div><p class="form-note">Costs recur at every daily close. Quality grows with the square root of research spending; marketing changes the demand score.</p>`, f => command({ type: 'budget', research: Math.round(value(f, 'research') * 100), marketing: Math.round(value(f, 'marketing') * 100) }));
-  if (name === 'reorder') { const policy = c.reorder[id]; modal(`Replenishment · ${ITEMS[id]}`, `${select('supplierId', 'Preferred supplier', state.catalog.suppliers.filter(s => s.item === id && s.enabled).map(s => [s.id, `${s.name} · lot ${s.lot}`]), policy?.supplierId)}<div class="form-grid">${field('point', 'Reorder point (stock + incoming)', policy?.point || (id === 'cell' ? 6000 : 250), 'number', 'min="0"')}${field('qty', 'Quantity per order', policy?.qty || (id === 'cell' ? 7200 : 300), 'number', 'min="1"')}</div>${check('enabled', 'Enable this policy', policy?.enabled ?? true)}<p class="form-note">Only runs after the replenishment investment is active. The assistant reports blocked orders and retries hourly.</p>`, f => command({ type: 'reorder', supplierId: f.get('supplierId'), point: value(f, 'point'), qty: value(f, 'qty'), enabled: f.has('enabled') })); }
+  if (name === 'reorder') { const policy = c.reorder[id]; modal(`Replenishment · ${itemName(state, id)}`, `${select('supplierId', 'Preferred supplier', state.catalog.suppliers.filter(s => s.item === id && s.enabled).map(s => [s.id, `${s.name} · lot ${s.lot}`]), policy?.supplierId)}<div class="form-grid">${field('point', 'Reorder point (stock + incoming)', policy?.point || (id === 'cell' ? 6000 : 250), 'number', 'min="0"')}${field('qty', 'Quantity per order', policy?.qty || (id === 'cell' ? 7200 : 300), 'number', 'min="1"')}</div>${check('enabled', 'Enable this policy', policy?.enabled ?? true)}<p class="form-note">Only runs after the replenishment investment is active. The assistant reports blocked orders and retries hourly.</p>`, f => command({ type: 'reorder', supplierId: f.get('supplierId'), point: value(f, 'point'), qty: value(f, 'qty'), enabled: f.has('enabled') })); }
   if (name === 'step') { if (id === 'custom') modal('Advance the simulation', field('hours', 'Hours to advance (1–168)', 24, 'number', 'min="1" max="168"'), f => command({ type: 'step', hours: value(f, 'hours') }), 'Advance'); else { await command({ type: 'step', hours: Number(id) }); render(); } }
   if (name === 'clock') { await command({ type: 'clock', status: id }); render(); }
   if (name === 'settings') modal('Session settings', `${field('name', 'Session name', state.name, 'text', 'maxlength="120"')}<div class="form-grid">${field('days', 'Total duration from start (days)', state.endHour / 24, 'number', `min="${Math.ceil(state.hour / 24)}" max="180"`)}${field('speed', 'Real seconds per simulation hour', state.secondsPerHour, 'number', 'min="1" max="120"')}</div>`, async f => { await command({ type: 'configure', name: f.get('name'), endHour: value(f, 'days') * 24 }); if (state.status !== 'completed' && !solo) await command({ type: 'clock', status: state.status, secondsPerHour: value(f, 'speed') }); }, 'Save settings');
@@ -370,12 +397,22 @@ Verdant Energy</textarea></label>`, async f => { const r = await api('/sessions'
   if (name === 'ledger-csv') csv('transaction-journal.csv', [['Hour', 'Simulation time (UTC)', 'Transaction', 'Account', 'Debit positive / credit negative (EUR)'], ...c.ledger.flatMap(l => Object.entries(l.lines).map(([a, n]) => [l.hour, simDate(l.hour), l.description, a, n / 100]))]);
 }
 document.addEventListener('click', async event => {
+  for (const menu of root.querySelectorAll('.workspace-menu[open]')) {
+    if (!menu.contains(event.target)) menu.open = false;
+  }
   const b = event.target.closest('[data-action]'); if (!b || b.disabled || b.dataset.action === 'submit') return;
   event.preventDefault();
   try {
     await action(b.dataset.action, b.dataset.id);
     if (b.dataset.action === 'nav' && b.closest('.workspace-nav')) root.querySelector('.page-heading h1')?.focus();
   } catch (e) { toast(e.message); }
+});
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape' || dialog.open) return;
+  const menu = root.querySelector('.workspace-menu[open]');
+  if (!menu) return;
+  menu.open = false;
+  menu.querySelector('summary').focus();
 });
 document.addEventListener('submit', async event => {
   const form = event.target; if (form.id === 'modal-form') return;
@@ -396,6 +433,13 @@ document.addEventListener('submit', async event => {
 document.addEventListener('change', async event => {
   const target = event.target;
   try {
+    if (target.name === 'stock-finished' || target.name === 'stock-component') {
+      const category = target.name.slice(6);
+      if (target.checked) inventoryCategories.add(category);
+      else inventoryCategories.delete(category);
+      render();
+      root.querySelector('[name="' + target.name + '"]')?.focus();
+    }
     if (target.name === 'preview') { preview = target.value || undefined; await load(); }
     if (target.name === 'report') { report = target.value; render(); }
     if (target.name === 'range') { reportRange = Number(target.value); render(); }
