@@ -76,11 +76,14 @@ function catalog() {
     ]
   };
 }
-export function createSession({ id = 'session', name = 'The circular economy challenge', seed = 20261112, days = 30, companyNames = ['Helio Works', 'Northstar Solar', 'Verdant Energy'] } = {}) {
+export function createSession({ id = 'session', name = 'The circular economy challenge', seed = 20261112, days = 30, companyNames = ['Helio Works', 'Northstar Solar', 'Verdant Energy'], revenueAt = 'receipt', dailyCorporateOverhead = 0 } = {}) {
   integer(seed, 'Seed', 0, 4294967295); integer(days, 'Duration in days', 1, 180);
+  if (!['dispatch', 'receipt'].includes(revenueAt)) fail('Choose dispatch or customer receipt for revenue recognition.');
+  integer(dailyCorporateOverhead, 'Daily corporate overhead (cents)', 0, 100000000);
   if (!Array.isArray(companyNames) || companyNames.length < 1 || companyNames.length > 12) fail('Choose 1–12 companies.');
   const s = { id, name: cleanText(name, 'Session name'), schema: VERSION, seed, rng: seed >>> 0, sequence: 0, revision: 0, hour: 0, startDate: '2026-01-01T00:00:00.000Z', endHour: days * 24, status: 'paused', secondsPerHour: 4, features: Object.fromEntries(FEATURES.map(f => [f, { visible: true, allowed: true }])), effects: { carbonDemand: true }, catalog: catalog(), companies: [], events: [], snapshots: [], messages: [], audit: [] };
   s.recipe = { ...RECIPE };
+  s.accounting = { revenueAt, dailyCorporateOverhead };
   companyNames.forEach((name, i) => {
     const c = { id: `company-${i + 1}`, name: cleanText(name, 'Company name', 60), accounts: {}, ledger: [], inventory: {}, offers: [], orders: [], shipments: [], purchases: [], loans: [], deposits: [], investments: [], notices: [], reorder: {}, autoStatus: {}, workers: 8, machines: 2, shifts: [true, false, false], energy: 'grid', efficiency: 1, satisfaction: 1, quality: 1, marketing: 0, research: 0, production: 0, energyKwh: 0, energyCost: 0, emissions: 0, dispatched: 0, received: 0, receivedValue: 0, demandUnits: 0, lastBottleneck: 'Waiting for the first production hour' };
     for (const [item, qty, cost, carbon, capacity] of [['cell', 14400, 310, 2.2, 36000], ['frame', 600, 1800, 9, 1500], ['controller', 600, 2400, 6, 1500], ['panel', 180, 13000, 72, 1200]]) c.inventory[item] = { qty, value: qty * cost, carbon: qty * carbon, capacity };
@@ -121,6 +124,10 @@ function dispatch(s, c, a) {
   const shipment = { id: uid(s, 'shipment'), orderId: order.id, qty, cost, stockValue: stock.value, carbon: route.carbonFixed + qty * route.carbonUnit, route: route.name, dispatchedAt: s.hour, expectedAt: s.hour + route.hours, receivedAt: null, paidAt: null, revenue: qty * order.price };
   order.remaining -= qty; c.shipments.push(shipment); c.dispatched += qty; c.emissions += shipment.carbon;
   post(s, c, `Goods in transit: ${shipment.id}`, { transit: stock.value, inventory: -stock.value });
+  if (s.accounting?.revenueAt === 'dispatch') {
+    shipment.recognizedAt = s.hour;
+    post(s, c, `Sale recognized at dispatch ${shipment.id}`, { receivable: shipment.revenue, revenue: -shipment.revenue, cogs: stock.value, transit: -stock.value });
+  }
   if (freightTerm) {
     shipment.freightDueAt = s.hour + freightTerm;
     shipment.freightPaidAt = null;
@@ -308,8 +315,10 @@ function executeEvent(s, e) {
   }
   if (e.type === 'customerReceipt') {
     const sh = c.shipments.find(x => x.id === d.shipmentId), order = c.orders.find(x => x.id === sh.orderId); sh.receivedAt = s.hour; order.received += sh.qty; c.received += sh.qty; c.receivedValue += sh.revenue;
-    post(s, c, `Revenue recognized at customer receipt ${sh.id}`, { receivable: sh.revenue, revenue: -sh.revenue });
-    post(s, c, `Cost of delivered goods ${sh.id}`, { cogs: sh.stockValue, transit: -sh.stockValue });
+    if (sh.recognizedAt == null) {
+      post(s, c, `Revenue recognized at customer receipt ${sh.id}`, { receivable: sh.revenue, revenue: -sh.revenue });
+      post(s, c, `Cost of delivered goods ${sh.id}`, { cogs: sh.stockValue, transit: -sh.stockValue });
+    }
     const early = order.dueAt - s.hour;
     c.satisfaction = Math.max(0.3, Math.min(1.3, c.satisfaction + (early < 0 ? -0.08 : early > 24 ? -0.02 : 0.025)));
     schedule(s, c, 'customerPayment', s.hour + order.payment, { shipmentId: sh.id }, `Customer pays for ${sh.id}`);
@@ -435,9 +444,12 @@ function dailyClose(s) {
     // Contractual overhead is expensed even if cash is exhausted; arrears are explicit.
     const paid = Math.min(balance(c, 'cash'), overhead), arrears = overhead - paid;
     post(s, c, 'Daily rent, energy standing charge, storage and budgets', { expense: overhead, cash: -paid, overheadPayable: -arrears });
+    const corporate = s.accounting?.dailyCorporateOverhead ?? 0;
+    const corporatePaid = Math.min(balance(c, 'cash'), corporate);
+    if (corporate) post(s, c, 'Daily corporate overhead', { expense: corporate, cash: -corporatePaid, overheadPayable: corporatePaid - corporate });
     const oldArrears = -balance(c, 'overheadPayable');
     if (oldArrears && balance(c, 'cash') > 0) { const payment = Math.min(oldArrears, balance(c, 'cash')); post(s, c, 'Settle overhead arrears', { overheadPayable: payment, cash: -payment }); }
-    if (arrears) notice(s, c, 'Daily overhead could not be fully paid. Arrears remain in liabilities and will be retried at daily close.', 'warning');
+    if (arrears || corporatePaid < corporate) notice(s, c, 'Daily overhead could not be fully paid. Arrears remain in liabilities and will be retried at daily close.', 'warning');
     const depreciation = Math.min(balance(c, 'fixedAssets'), Math.round(balance(c, 'fixedAssets') * 0.2 / 365));
     post(s, c, 'Daily depreciation (20% annual declining balance)', { expense: depreciation, fixedAssets: -depreciation });
     c.quality = Math.min(1.5, c.quality + Math.sqrt(c.research / 10000) * 0.004);

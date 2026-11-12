@@ -71,7 +71,7 @@ All ledger postings are integer EUR cents, double-entry, with debits positive an
 | Supplier receipt | Debit inventory; credit inbound asset |
 | Supplier paid | Debit payable; credit cash |
 | Customer dispatch | Debit goods in transit; credit inventory; freight expensed and paid |
-| Customer receipt | Debit receivable; credit revenue; debit cost of goods sold; credit goods in transit |
+| Sale recognized (receipt or dispatch, depending on session setting) | Debit receivable; credit revenue; debit cost of goods sold; credit goods in transit |
 | Customer paid | Debit cash; credit receivable |
 | Investment ordered | Debit construction/prepaid asset; credit cash |
 | Investment activated | Debit fixed assets; credit construction |
@@ -86,6 +86,12 @@ Bullet loans fund in 24 hours and repay once after 7–90 days at 9% simple annu
 Daily overhead includes €350 rent, the active energy supplier's standing fee, overflow storage, marketing and research. Unpaid overhead is recognized as a liability and retried at subsequent daily closes. Fixed assets use a simplified 20% annual **declining-balance** depreciation divided by 365 at each close. Supplier credit allows new purchase commitments up to current cash plus €80,000 less existing supplier payables.
 
 Carbon includes newly received purchased components and their inbound transport, production electricity, and dispatched customer freight. Opening stock's embodied carbon remains in stock intensity but is excluded from new operational emissions. Material conversion transfers carbon without double-counting it. This teaching footprint is not a certified corporate GHG inventory. There is no carbon price or offset system in v1.
+
+### Classroom accounting settings
+
+When creating a classroom, the instructor can recognize sales at customer receipt (the default) or at dispatch. Dispatch accounting posts revenue and the associated cost of goods sold together. Customer receipts and their service effects still follow actual arrival, and the payment term still starts at receipt. Existing classrooms keep their original accounting policy.
+
+An optional corporate overhead amount per company posts at each midnight close, in addition to operating costs. Unpaid overhead accrues as a liability. Use this setting to compare overhead assumptions across otherwise identical runs. The Finance page itemizes expenses from the journal. Reports list dispatches and customer receipts separately.
 
 ## Reports, roles, and durability
 

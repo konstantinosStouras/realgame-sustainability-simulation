@@ -20,7 +20,7 @@ export function createApp({ store = new Store(process.env.DATA_PATH || '.data/si
       if (origin && origin !== ownOrigin && !origins.includes(origin)) fail('This origin is not allowed.', 403);
       if (origins.includes(origin)) { res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Vary', 'Origin'); }
       if (req.method === 'OPTIONS') { res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type'); res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'); res.writeHead(204); res.end(); return; }
-      if (url.pathname === '/api/health') return send(200, { ok: true, demo, version: 1, auth: verifyFirebase ? 'firebase' : 'local-demo', projectId });
+      if (url.pathname === '/api/health') return send(200, { ok: true, demo, version: 1, classroomAccounting: true, auth: verifyFirebase ? 'firebase' : 'local-demo', projectId });
       if (!url.pathname.startsWith('/api/')) {
         if (req.method !== 'GET' && req.method !== 'HEAD') fail('Method not allowed.', 405);
         const files = { '/': 'index.html', '/index.html': 'index.html', '/styles.css': 'styles.css', '/app.mjs': 'app.mjs', '/src/engine.mjs': 'src/engine.mjs', '/src/solo.mjs': 'src/solo.mjs', '/src/firebase-client.mjs': 'src/firebase-client.mjs', '/firebase-config.mjs': 'firebase-config.mjs', '/notes/model.md': 'notes/model.md' };
