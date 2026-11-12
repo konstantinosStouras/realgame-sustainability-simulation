@@ -1,6 +1,6 @@
 /* Appearance stays outside the game root so live renders never reset it. */
 .theme-bar{position:sticky;top:0;z-index:30;min-height:52px;display:flex;justify-content:flex-end;align-items:center;padding:4px clamp(12px,3vw,38px);background:var(--paper);border-bottom:1px solid var(--line)}
-.theme-toggle{min-height:44px;font-size:12px;white-space:nowrap}
+.theme-toggle{min-height:44px;font-size:1rem;white-space:nowrap}
 .workspace-nav{top:53px}
 .sidebar{top:53px;height:calc(100vh - 53px)}
 #dialog>.theme-toggle{position:sticky;top:0;z-index:2;display:flex;margin:0 44px 18px 0;box-shadow:0 0 0 6px var(--paper)}
@@ -41,7 +41,7 @@
 [data-theme="dark"] .danger{color:var(--red)}
 /* One shared appearance control, beside the account on every signed-in screen. */
 .theme-bar[hidden]{display:none}
-.theme-toggle{width:42px;height:42px;border-radius:50%;padding:0;font-size:20px;display:inline-grid;place-items:center}
+.theme-toggle{width:42px;height:42px;border-radius:50%;padding:0;font-size:1.25rem;display:inline-grid;place-items:center}
 .workspace-nav{top:0}
 .admin-home{max-width:1180px;margin:auto;padding:0 28px 64px}
 .admin-header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:22px 0;border-bottom:1px solid var(--line);margin-bottom:42px}
@@ -51,10 +51,10 @@
 .admin-columns .panel{margin-bottom:20px}
 .admin-columns summary{font-weight:600;cursor:pointer;display:flex;align-items:center;gap:12px;list-style:none;min-height:44px}
 .admin-columns summary::-webkit-details-marker{display:none}
-.admin-columns summary::after{content:"+";margin-left:auto;flex:0 0 24px;text-align:center;font-size:24px;font-weight:400;color:var(--green)}
+.admin-columns summary::after{content:"+";margin-left:auto;flex:0 0 24px;text-align:center;font-size:1.5rem;font-weight:400;color:var(--green)}
 .admin-columns details[open]>summary::after{content:"−"}
 .admin-columns summary:focus-visible{outline:2px solid var(--green);outline-offset:6px;border-radius:4px}
-.admin-columns summary span{margin-left:auto;font-size:12px;font-weight:400;color:var(--muted);white-space:nowrap}
+.admin-columns summary span{margin-left:auto;font-size:1rem;font-weight:400;color:var(--muted);white-space:nowrap}
 .admin-columns summary:has(span)::after{margin-left:0}
 .session-card{border:1px solid var(--line);border-radius:12px;padding:20px;margin-top:16px;background:var(--paper)}
 .session-card-heading{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
@@ -72,17 +72,17 @@
 .account-dropdown button{display:block;width:100%;text-align:left;border:0;margin:4px 0;padding:12px}
 .topbar{gap:12px;flex-wrap:wrap}
 .top-actions{min-width:0;flex-wrap:wrap}
-@media(max-width:700px){.admin-home{padding:0 16px 32px}.admin-header{flex-wrap:wrap;margin-bottom:24px;gap:14px}.admin-header .account-controls{margin-left:auto}.admin-columns{grid-template-columns:minmax(0,1fr);gap:0}.account-name{max-width:155px}.admin-home h1{font-size:30px}.topbar{padding:12px 16px}.top-actions{width:100%;justify-content:space-between}.account-dropdown{max-height:70vh;overflow:auto}.session-card{padding:14px}}
+@media(max-width:700px){.admin-home{padding:0 16px 32px}.admin-header{flex-wrap:wrap;margin-bottom:24px;gap:14px}.admin-header .account-controls{margin-left:auto}.admin-columns{grid-template-columns:minmax(0,1fr);gap:0}.account-name{max-width:155px}.admin-home h1{font-size:1.875rem}.topbar{padding:12px 16px}.top-actions{width:100%;justify-content:space-between}.account-dropdown{max-height:70vh;overflow:auto}.session-card{padding:14px}}
 @media(max-width:380px){.account-name{max-width:120px}.account-controls{gap:6px}.top-actions{gap:8px}.account-menu summary{gap:6px}}
 
 [data-theme="dark"] .studio-intro{color:#e1eddc}
 
 /* Session action hierarchy and responsive touch targets. */
-.session-card-heading h3{margin:0;font-size:18px;line-height:1.4;overflow-wrap:anywhere}
-.session-status{text-transform:uppercase;letter-spacing:.06em;border-radius:30px;font-size:10px}
-.session-meta{color:var(--muted);font-size:12px;margin:10px 0 18px}
+.session-card-heading h3{margin:0;font-size:1.125rem;line-height:1.4;overflow-wrap:anywhere}
+.session-status{text-transform:uppercase;letter-spacing:.06em;border-radius:30px;font-size:0.875rem}
+.session-meta{color:var(--muted);font-size:1rem;margin:10px 0 18px}
 .session-actions{display:flex;flex-wrap:wrap;gap:8px}
-.session-actions button,.session-bulk{min-height:40px;padding:9px 13px;border-radius:8px;font-size:12px;font-weight:600;display:inline-flex;justify-content:center;align-items:center;gap:6px}
+.session-actions button,.session-bulk{min-height:40px;padding:9px 13px;border-radius:8px;font-size:1rem;font-weight:600;display:inline-flex;justify-content:center;align-items:center;gap:6px}
 .session-actions .session-open{background:#214f41;color:#fff;border-color:#214f41}
 .session-actions .session-export{background:#218345;color:#fff;border-color:#218345}
 .admin-home .session-danger{background:#fff1ec;color:#a52c15;border-color:#efbbae}
@@ -90,14 +90,14 @@
 .session-actions button:focus-visible,.session-access-button:focus-visible,.session-bulk:focus-visible{outline:3px solid var(--green);outline-offset:3px}
 .session-actions button[aria-busy=true]{opacity:.6;cursor:wait}
 .session-access{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:18px;padding-top:12px;border-top:1px solid var(--line)}
-.session-access-button{border:0;background:transparent;padding:6px 0;font-size:11px;color:var(--green)}
-.session-access small{font-size:10px;overflow-wrap:anywhere;color:var(--muted)}
+.session-access-button{border:0;background:transparent;padding:6px 0;font-size:1rem;color:var(--green)}
+.session-access small{font-size:0.875rem;overflow-wrap:anywhere;color:var(--muted)}
 [data-theme=dark] .session-actions .session-open{background:#c8dfa7;color:#15261d;border-color:#c8dfa7}
 [data-theme=dark] .session-actions .session-export{background:#287c48;color:#fff;border-color:#439c65}
 [data-theme=dark] .admin-home .session-danger{background:#3b2422;color:#ffb7a6;border-color:#855046}
 @media(max-width:480px){.session-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.session-actions button{min-height:44px;padding:9px 10px}.session-access{align-items:flex-start;flex-direction:column}}
 .session-action-hint{position:relative;display:inline-flex;min-width:0}
-.session-tooltip{position:absolute;bottom:calc(100% + 8px);left:0;width:280px;max-width:calc(100vw - 48px);padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--text);box-shadow:0 6px 24px #0003;font-size:12px;line-height:1.5;font-weight:400;z-index:80;visibility:hidden;opacity:0;transition:opacity .12s;pointer-events:none}
+.session-tooltip{position:absolute;bottom:calc(100% + 8px);left:0;width:280px;max-width:calc(100vw - 48px);padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--text);box-shadow:0 6px 24px #0003;font-size:1rem;line-height:1.5;font-weight:400;z-index:80;visibility:hidden;opacity:0;transition:opacity .12s;pointer-events:none}
 .session-action-hint:hover>.session-tooltip,.session-action-hint:focus-within>.session-tooltip{visibility:visible;opacity:1;pointer-events:auto}
 .session-actions .session-action-hint:nth-last-child(-n+2)>.session-tooltip{left:auto;right:0}
 @media(max-width:480px){.session-actions .session-action-hint>button{width:100%}.session-actions .session-action-hint:nth-child(even)>.session-tooltip{left:auto;right:0}.session-actions .session-action-hint:nth-child(odd)>.session-tooltip{left:0;right:auto}}
@@ -105,3 +105,16 @@
 /* Give setup controls room alongside session cards, then stack before they pinch. */
 @media(min-width:901px) { .admin-columns { grid-template-columns: minmax(320px, 1fr) minmax(0, 1.8fr); } }
 @media(min-width:701px) and (max-width:900px) { .admin-columns { grid-template-columns: minmax(0,1fr); gap: 0; } }
+
+/* Instructor home uses the same reading scale as the classroom. */
+.admin-columns > details > summary, .admin-columns .panel > summary { font-size: 1.125rem; }
+.admin-columns summary { flex-wrap: wrap; }
+.admin-columns summary span { white-space: normal; }
+.account-menu summary { font-size: 1rem; min-height: 48px; }
+.session-card-heading h3 { font-size: 1.375rem; }
+.session-actions button, .session-bulk { min-height: 44px; line-height: 1.4; }
+.session-meta, .session-tooltip { line-height: 1.6; }
+@media (max-width: 480px) {
+  .session-actions { grid-template-columns: 1fr; }
+  .session-actions .session-action-hint > .session-tooltip { left: 0; right: auto; }
+}

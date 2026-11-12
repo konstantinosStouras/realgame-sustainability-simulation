@@ -4,7 +4,7 @@ The instructor session cards use **Open**, **Copy link**, **Export data**, **Tes
 
 ## Real classroom lifecycle
 
-- Close commits the elapsed shared clock, freezes new student decisions and messages, and moves the session to Past sessions. Results and pending obligations remain available for read-only review. Instructors can still post debrief announcements or extend the duration to reopen play.
+- Close commits the elapsed shared clock, freezes new student decisions and messages, and moves the session to Past sessions. Results and pending obligations remain available to instructors for read-only review. Students return to the session-entry gate while the session is closed. Instructors can still post debrief announcements or extend the duration to reopen play.
 - Delete is an archive operation: the clock stops, session lists omit it, old join codes stop working, and session views, rosters, replay exports and test templates reject access. The database records are retained; student accounts are not deleted. The confirmation explicitly describes this behaviour.
 - Both commands require instructor authority and use revision checks, atomic state/audit writes and retry receipts. The browser retains a real classroom lifecycle request key across an interrupted response.
 - `/api/health` advertises `sessionLifecycle` and `testClassroom`. The authenticated, instructor-only `GET /api/sessions/:id/test-template` endpoint returns a setup allowlist, without student records, messages or decision history. This endpoint does not create a test session or write test data.

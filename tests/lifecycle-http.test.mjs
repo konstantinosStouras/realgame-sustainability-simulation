@@ -26,8 +26,9 @@ test('cloud HTTP lifecycle and template endpoints enforce roles, preserve result
     assert.equal((await call('/sessions/'+id+'/command','student',{key:'deny-delete',revision:0,command:{type:'deleteSession'}})).status,403);
     const close={key:'http-close',revision:0,command:{type:'closeSession'}};
     assert.equal((await call('/sessions/'+id+'/command','teacher',close)).status,200);
-    assert.equal((await call('/sessions/'+id,'student')).body.state.status,'completed');
-    assert.equal((await call('/sessions/'+id+'/command','student',{key:'closed-decision',revision:1,command:{type:'deposit',amount:10000,weeks:1}})).status,400);
+    assert.equal((await call('/sessions/'+id,'student')).status,403);
+    assert.equal((await call('/sessions/'+id,'teacher')).body.state.status,'completed');
+    assert.equal((await call('/sessions/'+id+'/command','student',{key:'closed-decision',revision:1,command:{type:'deposit',amount:10000,weeks:1}})).status,403);
     const deletion={key:'http-delete',revision:1,command:{type:'deleteSession'}};
     const result=await call('/sessions/'+id+'/command','teacher',deletion);
     assert.deepEqual(await call('/sessions/'+id+'/command','teacher',deletion),result);

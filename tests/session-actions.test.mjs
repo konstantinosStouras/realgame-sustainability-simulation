@@ -14,7 +14,7 @@ for (const kind of ['local','cloud']) test(kind + ': closing preserves results; 
  const send = (u,type,revision) => store.command(u,session.id,{key:type+'-request-key',revision,command:{type}});
  await assert.rejects(async()=>send(student,'closeSession',0), /Instructor/);
  await send(teacher,'closeSession',0);
- await assert.rejects(async()=>store.command(student,session.id,{key:'closed-message',revision:1,command:{type:'message',channel:'team:company-1',text:'No longer editable'}}),/read-only/);
+ await assert.rejects(async()=>store.command(student,session.id,{key:'closed-message',revision:1,command:{type:'message',channel:'team:company-1',text:'No longer editable'}}),/closed/);
  const setup = await store.testTemplate(teacher,session.id);
  assert.equal(setup.days,30);
  await assert.rejects(async()=>store.testTemplate(student,session.id),/Instructor/);

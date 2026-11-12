@@ -24,6 +24,7 @@ function harness(hostname = 'localhost') {
     itemName, productionRecipe, INVESTMENTS: {}, FEATURES: [], firebaseConfig: {}, classroomBackend: 'https://classroom.example', location: { hostname, href: 'https://' + hostname + '/' }, renderCount: 0,
     activeTestForm: null
   });
+  context.history = { replaceState: (_, __, href) => { context.location.href = href; } };
   vm.runInContext(definitions, context);
   const run = code => vm.runInContext(code, context);
   run(`render = () => { renderCount++; if (activeTestForm) activeTestForm.isConnected = false; };
@@ -270,7 +271,7 @@ for (const mode of ['inline', 'modal']) for (const choice of ['oslo', 'custom'])
     assert.equal(requests[1].id, 'fresh-class-731');
     for (const key of ['name', 'seed', 'days', 'revenueAt', 'dailyCorporateOverhead']) assert.equal(requests[1][key], requests[0][key]);
     assert.deepEqual(requests[1].companyNames, requests[0].companyNames);
-    assert.equal(h.run("sessionStorage.getItem('studio-session')"), 'fresh-class-731');
+    assert.equal(h.run("new URL(location.href).searchParams.get('session')"), 'fresh-class-731');
     if (mode === 'modal') assert.equal(dialog.open, false);
   });
 }

@@ -1,3 +1,4 @@
+import { requireOpen } from './session-access.mjs';
 import { testTemplate } from './test-template.mjs';
 import { sessionId } from '../src/session-id.mjs';
 import { DatabaseSync } from 'node:sqlite';
@@ -65,6 +66,7 @@ export class Store {
     this.session(id);
     const member = this.db.prepare('SELECT companyId FROM members WHERE sessionId=? AND userId=?').get(id, user.id);
     if (!member) fail('You are not a member of this session.', 403);
+    if (user.role === 'student') requireOpen(this.session(id));
     return { ...user, companyId: member.companyId };
   }
   list(user) { return this.db.prepare('SELECT s.state,m.companyId FROM sessions s JOIN members m ON m.sessionId=s.id WHERE m.userId=? ORDER BY s.rowid DESC').all(user.id).map(row => { const s = JSON.parse(row.state); return { id: s.id, name: s.name, hour: s.hour, status: s.status, companyId: row.companyId }; }).filter(s => s.status !== 'deleted'); }
@@ -79,11 +81,23 @@ export class Store {
       return s;
     });
   }
+  enter(user, id, code) {
+    if (typeof id === 'string') id = id.trim().toLowerCase();
+    if (typeof id !== 'string' || !/^[A-Za-z0-9-]{1,100}$/.test(id)) fail('Enter a valid session ID.');
+    const session = this.session(id);
+    if (user.role === 'instructor') { this.actor(user, id); return { sessionId: id }; }
+    requireOpen(session);
+    if (this.db.prepare('SELECT 1 FROM members WHERE sessionId=? AND userId=?').get(id, user.id)) return { sessionId: id };
+    if (!code) return { requiresCompanyCode: true };
+    const invite = this.db.prepare('SELECT sessionId FROM invites WHERE code=?').get(String(code).trim());
+    if (!invite || invite.sessionId !== id) fail('Company code does not belong to this session.');
+    return this.join(user, code);
+  }
   join(user, code) {
     if (user.role !== 'student') fail('Only students join through company codes.', 403);
     const inv = this.db.prepare('SELECT * FROM invites WHERE code=?').get(typeof code === 'string' ? code.trim() : '');
     if (!inv) fail('Invalid company join code.');
-    if (this.session(inv.sessionId).status === 'completed') fail('This session is closed.', 409);
+    requireOpen(this.session(inv.sessionId));
     if (this.db.prepare('SELECT 1 FROM members WHERE sessionId=? AND userId=?').get(inv.sessionId, user.id)) fail('Already a member. Ask the instructor to change your assignment.', 409);
     this.db.prepare('INSERT INTO members VALUES (?,?,?)').run(inv.sessionId, user.id, inv.companyId); return { sessionId: inv.sessionId };
   }
