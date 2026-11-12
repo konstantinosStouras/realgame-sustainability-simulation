@@ -1,5 +1,5 @@
-import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=a541f480519e';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=a541f480519e';
+import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=c3903f8b6d0a';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=c3903f8b6d0a';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -108,7 +108,7 @@ function renderWelcome() {
   if (localStorage.getItem('studio-backend')) root.querySelector('.welcome-layout > .panel').insertAdjacentHTML('beforeend', `<p>${button('forget-server', 'Reset server connection', '', 'small')}</p>`);
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=a541f480519e')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=c3903f8b6d0a')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -140,30 +140,54 @@ const studentPanels = {
   messages: ['Messages', 'messages', messagesPage]
 };
 const openPanels = new Set();
-const informationPanels = new Set(['inventory', 'purchases', 'shipments', 'logistics', 'messages']);
 const inventoryCategories = new Set(['finished', 'component']);
 const primaryPages = ['overview', 'production', 'finance', 'energy', 'reports'];
 const panelIcons = {
   suppliers: '<circle cx="8" cy="6" r="3"/><path d="M2 18v-2a6 6 0 0 1 9-5M14 13l4-2 4 2v6l-4 2-4-2ZM14 13l4 2 4-2m-4 2v6"/>',
+  purchases: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2ZM9 8h6m-6 4h6"/>',
+  shipments: '<path d="M3 9h8v11H3Zm9-3h9m-4-4 4 4-4 4M6 9v4"/>',
+  replenishment: '<path d="M20 9a8 8 0 0 0-14-3L3 9m0-6v6h6m-5 6a8 8 0 0 0 14 3l3-3m-6 0h6v6"/>',
   logistics: '<path d="M4 17H2V5h13v4h4l3 4v4h-3M8 17h7m0-8v5"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
   offers: '<path d="M3 4h8l10 10-7 7L3 10Z"/><circle cx="7.5" cy="8" r="1"/>'
 };
+const workspaceToolHints = {
+  overview: ['Home', 'See your company or classroom at a glance.'],
+  reports: ['Stats', 'Compare daily results and export data.'],
+  inventory: ['Stock', 'Check finished products and components.'],
+  suppliers: ['Buy', 'Compare suppliers and buy components.'],
+  purchases: ['Bills', 'Track purchases, arrivals and payments.'],
+  shipments: ['Sent', 'Check shipment status and delivery history.'],
+  replenishment: ['Refill', 'Set automatic restocking rules.'],
+  logistics: ['Route', 'Compare routes, freight costs and transit times.'],
+  orders: ['Send', 'Review orders and dispatch finished products.'],
+  offers: ['Sell', 'Set prices and publish sales offers.'],
+  production: ['Make', 'Manage production capacity and shifts.'],
+  finance: ['Cash', 'Review cash, accounts and financing.'],
+  energy: ['Grid', 'Choose energy providers and investments.'],
+  messages: ['Chat', 'Read announcements and send messages.'],
+  supply: ['Supply', 'Review suppliers, purchases and inventory.'],
+  admin: ['Class', 'Manage the simulation clock and classroom settings.']
+};
 
 function workspaceNavigation(admin, visible) {
-  const tool = (action, id, label, state, graphic) =>
-    `<button type="button" data-action="${action}" data-id="${id}" aria-label="${esc(label)}" ${state}>${graphic}<span class="workspace-tool-label" aria-hidden="true">${esc(label)}</span></button>`;
+  const tool = (action, id, label, state, graphic) => {
+    const [shortLabel, description] = workspaceToolHints[id];
+    return `<button type="button" data-action="${action}" data-id="${id}" aria-label="${esc(label)}" aria-describedby="tool-${id}-hint" ${state}>${graphic}
+      <span class="workspace-tool-short" aria-hidden="true">${esc(shortLabel)}</span>
+      <span class="workspace-tool-label"><strong aria-hidden="true">${esc(label)}</strong><span id="tool-${id}-hint">${esc(description)}</span></span>
+    </button>`;
+  };
   const pageKeys = admin ? [...primaryPages, 'orders', 'supply', 'messages', 'admin'] : ['overview', 'reports'];
   const pageTools = pageKeys.filter(visible).map(key =>
     tool('nav', key, pages[key], page === key ? 'aria-current="page"' : '', icon(key))
   );
-  const panelTools = information => Object.entries(studentPanels)
-    .filter(([id]) => informationPanels.has(id) === information && studentPanelVisible(id, visible))
+  const panelTools = admin ? [] : Object.entries(studentPanels)
+    .filter(([id]) => studentPanelVisible(id, visible))
     .map(([id, [label, iconKey]]) =>
       tool('panel', id, label, `aria-pressed="${page === 'workspace' && openPanels.has(id)}"`, icon(iconKey, panelIcons[id]))
-    ).join('');
-  const groups = admin ? [] : [['Information', panelTools(true)], ['Decisions', panelTools(false)]];
+    );
   return `<header class="workspace-nav">${brand}
-    <nav class="workspace-tools" aria-label="Workspace">${pageTools.join('')}${groups.filter(([, items]) => items).map(([label, items]) => `<details class="workspace-menu"><summary>${label}</summary><div class="workspace-menu-items">${items}</div></details>`).join('')}</nav>
+    <nav class="workspace-tools" aria-label="Workspace">${[...pageTools, ...panelTools].join('')}</nav>
   </header>`;
 }
 
@@ -351,7 +375,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=a541f480519e')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=c3903f8b6d0a')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); renderWelcome(); return; }
@@ -397,22 +421,12 @@ Verdant Energy</textarea></label>`, async f => { const r = await api('/sessions'
   if (name === 'ledger-csv') csv('transaction-journal.csv', [['Hour', 'Simulation time (UTC)', 'Transaction', 'Account', 'Debit positive / credit negative (EUR)'], ...c.ledger.flatMap(l => Object.entries(l.lines).map(([a, n]) => [l.hour, simDate(l.hour), l.description, a, n / 100]))]);
 }
 document.addEventListener('click', async event => {
-  for (const menu of root.querySelectorAll('.workspace-menu[open]')) {
-    if (!menu.contains(event.target)) menu.open = false;
-  }
   const b = event.target.closest('[data-action]'); if (!b || b.disabled || b.dataset.action === 'submit') return;
   event.preventDefault();
   try {
     await action(b.dataset.action, b.dataset.id);
     if (b.dataset.action === 'nav' && b.closest('.workspace-nav')) root.querySelector('.page-heading h1')?.focus();
   } catch (e) { toast(e.message); }
-});
-document.addEventListener('keydown', event => {
-  if (event.key !== 'Escape' || dialog.open) return;
-  const menu = root.querySelector('.workspace-menu[open]');
-  if (!menu) return;
-  menu.open = false;
-  menu.querySelector('summary').focus();
 });
 document.addEventListener('submit', async event => {
   const form = event.target; if (form.id === 'modal-form') return;

@@ -1,4 +1,4 @@
-import { createSession, applyCommand, publicView, assertInvariants } from './engine.mjs?v=a541f480519e';
+import { createSession, applyCommand, publicView, assertInvariants } from './engine.mjs?v=c3903f8b6d0a';
 const KEY = 'sustainability-studio-solo-v1';
 export function soloAdapter() {
   let state;
