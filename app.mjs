@@ -1,5 +1,5 @@
-import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=6080431fe70e';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=6080431fe70e';
+import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=a5357b4cf6b4';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=a5357b4cf6b4';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -137,7 +137,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=6080431fe70e')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=a5357b4cf6b4')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -156,9 +156,9 @@ function accountControls(person = user || actor) {
   return `<div class="account-controls"><span data-theme-slot></span><details class="account-menu"><summary><span class="avatar">${esc(person.name.slice(0, 2).toUpperCase())}</span><span class="account-name">${esc(person.name)}</span><span aria-hidden="true">⌄</span></summary><div class="account-dropdown"><strong>${esc(person.name)}</strong><small>${esc(person.role)}</small><hr>${button('profile', 'My profile & statistics')}${button('sessions', 'My sessions')}${person.role === 'instructor' ? button('create', 'Create a session', '', '', !!solo) : button('join', 'Join a company', '', '', !!solo)}${person.role === 'instructor' && state ? button('nav', 'Session settings', 'admin') + button('roster', 'Student directory', '', '', !!solo) : ''}<hr>${button('logout', 'Log out', '', 'danger')}</div></details></div>`;
 }
 const sessionCities = ["athens", "berlin", "cairo", "dubai", "lima", "lisbon", "london", "madrid", "miami", "oslo", "paris", "rome", "seoul", "sydney", "tokyo"];
-function createSessionFields() { return `<div class="session-setup"><p class="form-note">Give your class a name and a memorable session ID.</p>${field('name', 'Session name', 'Sustainability challenge', 'text', 'maxlength="120"')}${select('sessionCity', 'Session ID', [...sessionCities.map(city => [city, city]), ['custom', 'Choose my own ID…']], 'athens')}<label data-custom-session hidden>Custom session ID<input name="customSessionId" disabled minlength="3" maxlength="32" pattern="[A-Za-z0-9]+(-[A-Za-z0-9]+)*" placeholder="e.g. london-2026" autocapitalize="none" spellcheck="false"></label><p class="form-note">Choose a city or your own ID: 3–32 letters, numbers or hyphens. IDs must be unique. Students still use company join codes.</p><div class="form-grid">${field('seed', 'Random seed', 42, 'number', 'min="0" max="4294967295"')}${field('days', 'Duration (days)', 30, 'number', 'min="1" max="180"')}</div><label>Company names (one per line)<textarea name="companies" required>Helio Works
+function createSessionFields() { return `<div class="session-setup"><fieldset class="session-details"><legend>Session details</legend><p class="form-note">Give your class a name and a memorable session ID.</p>${field('name', 'Session name', 'Sustainability challenge', 'text', 'maxlength="120"')}${select('sessionCity', 'Session ID', [...sessionCities.map(city => [city, city]), ['custom', 'Choose my own ID…']], 'athens')}<label data-custom-session hidden>Custom session ID<input name="customSessionId" disabled minlength="3" maxlength="32" pattern="[A-Za-z0-9]+(-[A-Za-z0-9]+)*" placeholder="e.g. london-2026" autocapitalize="none" spellcheck="false"></label><p class="form-note">Choose a city or your own ID: 3–32 letters, numbers or hyphens. IDs must be unique. Students still use company join codes.</p></fieldset><fieldset><legend>Class setup</legend><div class="form-grid">${field('days', 'Duration (days)', 30, 'number', 'min="1" max="180"')}</div><label>Company names (one per line)<textarea name="companies" required rows="4">Helio Works
 Northstar Solar
-Verdant Energy</textarea></label>${health?.classroomAccounting ? `<div class="form-grid">${select('revenueAt', 'Recognize sales revenue at', [['receipt', 'Customer receipt'], ['dispatch', 'Dispatch']], 'receipt')}${field('corporateOverhead', 'Additional corporate overhead (€ per day, per company)', 0, 'number', 'min="0" max="1000000" step="0.01"')}</div><p class="form-note">Customer payment is due after receipt. Corporate overhead is charged at each daily close.</p>` : ''}</div>`; }
+Verdant Energy</textarea></label></fieldset><details class="session-advanced"><summary>Advanced settings</summary>${field('seed', 'Random seed', 42, 'number', 'min="0" max="4294967295"')}<p class="form-note">Use the same seed to repeat the starting conditions.</p>${health?.classroomAccounting ? `<div class="form-grid">${select('revenueAt', 'Recognize sales revenue at', [['receipt', 'Customer receipt'], ['dispatch', 'Dispatch']], 'receipt')}${field('corporateOverhead', 'Daily corporate overhead (€ per company)', 0, 'number', 'min="0" max="1000000" step="0.01"')}</div><p class="form-note">Customer payment is due after receipt. Corporate overhead is charged at each daily close.</p>` : ''}</details></div>`; }
 async function createClassroom(f) {  const r = await api('/sessions', { ...(health?.classroomAccounting ? { revenueAt: f.get('revenueAt'), dailyCorporateOverhead: Math.round(value(f, 'corporateOverhead') * 100) } : {}), id: f.get('sessionCity') === 'custom' ? f.get('customSessionId') : f.get('sessionCity'), name: f.get('name'), seed: value(f, 'seed'), days: value(f, 'days'), companyNames: f.get('companies').split('\n').map(x => x.trim()).filter(Boolean) }); sessionStorage.setItem('studio-session', r.id); page = 'admin'; await enter(true); }
 function renderAdminHome() {
   const active = sessions.filter(s => s.status !== 'completed'), past = sessions.filter(s => s.status === 'completed');
@@ -441,7 +441,7 @@ async function action(name, id) {
   if (name === 'session-test') {
     const replay = await api('/sessions/' + encodeURIComponent(id) + '/replay');
     modal('Start a test round?', '<p>Rehearse this session’s initial setup in a private browser sandbox. Classroom progress and student accounts are not copied or changed.</p>', async () => {
-      solo = (await import('./src/solo.mjs?v=6080431fe70e')).soloAdapter(replay.initial); solo.switchRole('instructor'); sessionId = 'solo'; preview = undefined; page = 'admin'; await load();
+      solo = (await import('./src/solo.mjs?v=a5357b4cf6b4')).soloAdapter(replay.initial); solo.switchRole('instructor'); sessionId = 'solo'; preview = undefined; page = 'admin'; await load();
     }, 'Start test round'); return;
   }
   if (['session-close', 'session-delete', 'sessions-delete'].includes(name)) {
@@ -474,7 +474,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=6080431fe70e')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=a5357b4cf6b4')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); renderWelcome(); return; }
