@@ -1,5 +1,5 @@
-import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=0790fa4de063';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=0790fa4de063';
+import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=6080431fe70e';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=6080431fe70e';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -16,6 +16,7 @@ let backend = localWorkspace ? savedBackend : (/^http:\/\/(localhost|127\.0\.0\.
 let linkedSession = new URL(location.href).searchParams.get('session');
 let state, actor, user, sessions = [], sessionId, preview, page = 'overview', channel = 'announcements', report = 'profit', reportRange = 30, selectedCompanies = new Set(), solo = null, health = null, roster = null, busy = false, online = true, firebaseClient = null;
 const submittingForms = new Set();
+let loadSequence = 0, pendingLoads = 0;
 const isTeacher = () => actor?.role === 'instructor';
 const company = () => state?.company;
 const simDate = hour => { const date = new Date(Date.parse(state?.startDate || '2026-01-01T00:00:00Z') + hour * 3600000); return date.toLocaleString('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }); };
@@ -55,16 +56,17 @@ async function connectBackend(input) {
 async function load(force = true, afterCommand = false) {
   if (solo) { ({ state, actor } = solo.view(preview)); if (force) render(); return; }
   if (!sessionId) return;
-  const loadingSession = sessionId;
+  const loadingSession = sessionId, loadingPreview = preview, sequence = ++loadSequence;
+  pendingLoads++;
   try {
     const data = await api(`/sessions/${sessionId}${preview ? `?company=${encodeURIComponent(preview)}` : ''}`);
-    if (sessionId !== loadingSession) return;
+    if (sessionId !== loadingSession || preview !== loadingPreview || sequence !== loadSequence || solo) return;
     const changed = !state || data.state.revision !== state.revision || !online;
     // Keep the version that the student actually reviewed while editing a decision.
     if (!force && !afterCommand && (submittingForms.size || dialog.open || document.activeElement?.closest('form'))) { online = true; return; }
     state = data.state; actor = data.actor; online = true;
     if ((force || changed) && !dialog.open && (force || (!submittingForms.size && !document.activeElement?.closest('form, details[open]')))) render();
-  } catch (e) { online = false; if (force) throw e; const status = document.querySelector('#connection'); if (status) status.textContent = 'Connection interrupted · reconnecting'; }
+  } catch (e) { if (sessionId !== loadingSession || preview !== loadingPreview || sequence !== loadSequence || solo) return; online = false; if (force) throw e; const status = document.querySelector('#connection'); if (status) status.textContent = 'Connection interrupted · reconnecting'; } finally { pendingLoads--; }
 }
 async function command(cmd) {
   if (busy) throw new Error('Another decision is still being submitted. Please wait and try again.'); busy = true;
@@ -135,7 +137,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=0790fa4de063')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=6080431fe70e')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -439,7 +441,7 @@ async function action(name, id) {
   if (name === 'session-test') {
     const replay = await api('/sessions/' + encodeURIComponent(id) + '/replay');
     modal('Start a test round?', '<p>Rehearse this session’s initial setup in a private browser sandbox. Classroom progress and student accounts are not copied or changed.</p>', async () => {
-      solo = (await import('./src/solo.mjs?v=0790fa4de063')).soloAdapter(replay.initial); solo.switchRole('instructor'); sessionId = 'solo'; preview = undefined; page = 'admin'; await load();
+      solo = (await import('./src/solo.mjs?v=6080431fe70e')).soloAdapter(replay.initial); solo.switchRole('instructor'); sessionId = 'solo'; preview = undefined; page = 'admin'; await load();
     }, 'Start test round'); return;
   }
   if (['session-close', 'session-delete', 'sessions-delete'].includes(name)) {
@@ -456,6 +458,7 @@ async function action(name, id) {
   if (name === 'session-export') { download('session-' + id + '.json', await api('/sessions/' + encodeURIComponent(id) + '/replay')); return; }
   if (name === 'open-session' || name === 'session-codes') { sessionStorage.setItem('studio-session', id); page = 'admin'; await enter(true); if (name === 'session-codes') await action('roster'); return; }
   if (name === 'sessions' && user?.role === 'instructor') { solo = null; await enter(); return; }
+  if (name === 'retry-start') { await startWorkspace(); return; }
   if (name === 'forget-server') { backend = localWorkspace ? '' : classroomBackend; localStorage.removeItem('studio-backend'); health = null; state = null; try { health = await api('/health'); } catch {} if (firebaseClient?.user) await enterFirebase(); else renderWelcome(); return; }
   if (name === 'retry-decision') { const pending = JSON.parse(sessionStorage.getItem(`studio-pending:${backend}:${actor.id}:${sessionId}`) || 'null'); if (pending) await command(pending.command); render(); return; }
   if (name === 'close') { dialog.close(); if (state) render(); return; }
@@ -471,7 +474,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=0790fa4de063')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=6080431fe70e')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); renderWelcome(); return; }
@@ -569,9 +572,28 @@ document.addEventListener('change', async event => {
     if (target.name?.startsWith('series-')) { if (!selectedCompanies.size) selectedCompanies = new Set(state.companies.map(c => c.id)); if (target.checked) selectedCompanies.add(target.name.slice(7)); else selectedCompanies.delete(target.name.slice(7)); if (!selectedCompanies.size) { selectedCompanies.add(target.name.slice(7)); toast('Keep at least one company selected to display the report.'); } render(); }
   } catch (e) { toast(e.message); }
 });
-try { health = await api('/health'); } catch { health = null; }
-if (!health || health.auth === 'firebase') {
-  renderWelcome();
-  try { const auth = await getFirebase(); if (auth.user) await enterFirebase(); } catch (e) { toast('Sign-in could not load. Check your connection and refresh the page.'); }
-} else if (token && health) { try { await enter(); } catch { token = ''; sessionStorage.removeItem('studio-token'); renderWelcome(); } } else renderWelcome();
-setInterval(() => { if (!solo && state && !busy) load(false); }, 3000);
+async function startWorkspace() {
+  // Restore authentication alongside discovery; never paint a speculative login.
+  const authReady = localWorkspace ? null : getFirebase().then(value => ({ value }), error => ({ error }));
+  try {
+    try { health = await api('/health'); } catch (error) {
+      if (token || !localWorkspace) throw error;
+      health = null;
+    }
+    if (!health || health.auth === 'firebase') {
+      const restored = authReady ? await authReady : { value: await getFirebase() };
+      if (restored.error) throw restored.error;
+      if (restored.value.user) await enterFirebase();
+      else renderWelcome();
+    } else if (token) {
+      try { await enter(); } catch (error) {
+        if (error.status !== 401) throw error;
+        token = ''; sessionStorage.removeItem('studio-token'); renderWelcome();
+      }
+    } else renderWelcome();
+  } catch (error) {
+    root.innerHTML = `<main class="welcome" id="content">${brand}<section class="panel" role="alert"><h1>Workspace temporarily unavailable</h1><p>We could not restore your workspace. Your sign-in has been kept. Check your connection and try again.</p>${button('retry-start', 'Try again', '', 'primary')}</section></main>`;
+  }
+}
+await startWorkspace();
+setInterval(() => { if (!solo && state && !busy && !pendingLoads && !document.hidden) load(false); }, 3000);
