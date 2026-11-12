@@ -24,6 +24,8 @@ If your npm shim is unavailable, run `node server/main.mjs --demo` after install
 
 Google sign-in supports Gmail and Google Workspace accounts. Email/password registration, verification, and password reset are handled by Firebase. Students sign in first, then enter a company join code. The server verifies Firebase ID tokens against the dedicated project and requires verified email. Google sign-in and email/password are enabled; website and loopback domains are authorized. The project owner's account is provisioned with an instructor custom claim.
 
+Firebase enforces the form's 10-character minimum for new passwords. Email-enumeration protection is enabled. These settings do not require usage-based billing; the project remains on the free plan until a paid backend is authorized.
+
 ```sh
 # Copy .env.example to .env, then:
 node --env-file=.env server/main.mjs

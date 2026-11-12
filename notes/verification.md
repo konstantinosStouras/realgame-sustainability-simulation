@@ -28,3 +28,9 @@ The [original overview screenshot](screenshots/studio-overview.jpg) contains onl
 Firebase Authentication and static Hosting are live. The Node/SQLite shared multiplayer server runs locally and has an explicit Docker/persistent-volume deployment configuration. It is **not hosted remotely**. A public HTTPS backend with persistent storage remains necessary before inviting a remote class. A browser may require local-network permission when a public HTTPS frontend connects to a loopback backend; opening the backend's own local URL avoids that cross-origin connection.
 
 This is a functional first release for teaching trials. It has not undergone a large-class load test or a formal external security assessment. Model simplifications, persistence limits, and supported economic rules are documented in [model.md](model.md).
+
+## Firebase registration follow-up
+
+On 12 November 2026, read back the project's authentication configuration and confirmed Google sign-in, email/password registration, the website's authorized domains, and email-enumeration protection. Aligned the server password policy with the registration form's 10-character minimum. Live public sign-up API checks rejected a nine-character password and accepted a ten-character password; the temporary synthetic account was removed afterward. No test email was sent.
+
+Billing is disabled for this dedicated project. Usage-based billing has not been enabled. Remote classroom deployment still requires both an approved hosting arrangement and persistent shared storage; enabling billing alone does not deploy or migrate the current SQLite backend.
