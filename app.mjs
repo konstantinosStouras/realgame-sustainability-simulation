@@ -1,9 +1,11 @@
 import { ITEMS, INVESTMENTS, FEATURES } from './src/engine.mjs';
+import { firebaseConfig } from './firebase-config.mjs';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
 const exactMoney = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format((n || 0) / 100);
 const number = n => new Intl.NumberFormat('en-GB', { maximumFractionDigits: 1 }).format(n || 0);
+const precise = n => new Intl.NumberFormat('en-GB', { maximumFractionDigits: 3 }).format(n || 0);
 const total = (list, key) => list.reduce((sum, x) => sum + (x[key] || 0), 0);
 const icon = name => `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">${({ overview: '<path d="M3 10 12 3l9 7v11h-7v-7h-4v7H3Z"/>', orders: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/>', supply: '<path d="m3 7 9-4 9 4v11l-9 4-9-4ZM3 7l9 5 9-5M12 12v10"/>', production: '<path d="M3 21V10l6 4V8l6 5V3h5v18ZM7 18h1m4 0h1m4 0h1"/>', finance: '<rect x="3" y="5" width="18" height="15" rx="2"/><path d="M3 9h18m-6 5h6"/>', energy: '<path d="m13 2-9 12h7l-1 8 10-13h-7Z"/>', reports: '<path d="M4 20V12h4v8m4 0V4h4v16m4 0v-9M2 21h20"/>', messages: '<path d="M4 4h16v12H9l-5 5Z"/><path d="M8 8h8m-8 4h5"/>', admin: '<circle cx="12" cy="12" r="3"/><path d="m9 3 1-1h4l1 3 3 1 3-1 1 5-3 2 1 3 1 2-4 4-3-2-3 1-2 1-4-4 2-3-1-3-1-2 4-4Z"/>' })[name] || '<path d="M12 3v18M3 12h18"/>'}</svg>`;
 const brand = `<div class="brand"><span class="brand-mark">s</span><span>Sustainability<small>Studio</small></span></div>`;
@@ -23,25 +25,55 @@ const permitted = feature => !isTeacher() && state.status !== 'completed' && sta
 function toast(message) { const el = document.querySelector('#toast'); el.textContent = message; clearTimeout(toast.timeout); toast.timeout = setTimeout(() => { el.textContent = ''; }, 9000); }
 async function api(path, body) {
   if (firebaseClient?.user && health?.auth === 'firebase' && path !== '/health') token = await firebaseClient.token();
-  const response = await fetch(`${backend}/api${path}`, { method: body === undefined ? 'GET' : 'POST', headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(token ? { Authorization: `Bearer ${token}` } : {}) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(15000) });
+  let response;
+  try { response = await fetch(`${backend}/api${path}`, { method: body === undefined ? 'GET' : 'POST', headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(token && path !== '/health' ? { Authorization: `Bearer ${token}` } : {}) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(15000) }); }
+  catch { throw new Error('Cannot reach the classroom server. Check its address and that it is running. For a local server, open its local URL directly; this browser may restrict connections from public websites to your computer.'); }
   const result = await response.json(); if (!response.ok) throw Object.assign(new Error(result.error || 'Request failed'), { status: response.status }); return result;
 }
-async function load(force = true) {
+async function connectBackend(input) {
+  const url = new URL(input);
+  const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+  if (url.username || url.password || url.pathname !== '/' || url.search || url.hash || (url.protocol !== 'https:' && !(local && url.protocol === 'http:'))) throw new Error('Use an HTTPS server origin, or HTTP on localhost, without credentials, a path, or query parameters.');
+  const previous = backend; backend = url.origin;
+  try {
+    const result = await api('/health');
+    if (result.ok !== true || (result.auth === 'firebase' && result.projectId !== firebaseConfig.projectId)) throw new Error('This is not a compatible Sustainability Studio server.');
+    health = result; localStorage.setItem('studio-backend', backend); token = ''; sessionStorage.removeItem('studio-token');
+  } catch (e) { backend = previous; throw e; }
+  if (firebaseClient?.user && health.auth === 'firebase') await enterFirebase(); else renderWelcome();
+}
+async function load(force = true, afterCommand = false) {
   if (solo) { ({ state, actor } = solo.view(preview)); if (force) render(); return; }
   if (!sessionId) return;
   try {
     const data = await api(`/sessions/${sessionId}${preview ? `?company=${encodeURIComponent(preview)}` : ''}`);
     const changed = !state || data.state.revision !== state.revision || !online;
+    // Keep the version that the student actually reviewed while editing a decision.
+    if (!force && !afterCommand && (dialog.open || document.activeElement?.closest('form'))) { online = true; return; }
     state = data.state; actor = data.actor; online = true;
     if ((force || changed) && !dialog.open && (force || !document.activeElement?.closest('form, details[open]'))) render();
   } catch (e) { online = false; if (force) throw e; const status = document.querySelector('#connection'); if (status) status.textContent = 'Connection interrupted · reconnecting'; }
 }
 async function command(cmd) {
   if (busy) return; busy = true;
+  const storageKey = `studio-pending:${backend}:${actor.id}:${sessionId}`;
+  let request;
   try {
-    const response = solo ? solo.command(cmd) : await api(`/sessions/${sessionId}/command`, { key: crypto.randomUUID(), revision: state.revision, command: cmd });
-    toast(response.message); await load(false); return true;
-  } catch (e) { if (e.status === 409) await load(false); throw e; } finally { busy = false; }
+    if (!solo) {
+      request = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
+      if (request && JSON.stringify(request.command) !== JSON.stringify(cmd)) throw new Error('An earlier decision has an unknown response. Retry that same decision before starting another.');
+      request ||= { key: crypto.randomUUID(), revision: state.revision, command: cmd };
+      sessionStorage.setItem(storageKey, JSON.stringify(request));
+    }
+    const response = solo ? solo.command(cmd) : await api(`/sessions/${sessionId}/command`, request);
+    sessionStorage.removeItem(storageKey);
+    toast(response.message); await load(false, true); return true;
+  } catch (e) {
+    if (e.status) sessionStorage.removeItem(storageKey); // HTTP rejection guarantees no successful mutation.
+    if (e.status === 409) await load(false, true);
+    if (!e.status && request && !dialog.open) render();
+    throw e;
+  } finally { busy = false; }
 }
 async function signIn(result) {
   token = result.token; user = result.user; sessionStorage.setItem('studio-token', token); await enter();
@@ -64,6 +96,7 @@ function renderWelcome() {
     const panel = root.querySelector('.welcome-layout > .panel');
     panel.innerHTML = firebaseForm() + `<details><summary>Classroom server connection</summary><form id="backend-form">${field('backend', 'Server URL', backend || 'http://127.0.0.1:3000', 'url')}${button('submit', 'Connect server')}<div class="error" role="alert"></div></form></details>`;
   }
+  if (backend) root.querySelector('.welcome-layout > .panel').insertAdjacentHTML('beforeend', `<p>${button('forget-server', 'Forget saved server', '', 'small')}</p>`);
 }
 async function getFirebase() {
   if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs')).firebase;
@@ -79,6 +112,7 @@ async function enterFirebase() {
   if (health?.auth === 'firebase') return enter();
   user = { name: auth.user.displayName || 'Student', role: 'student' };
   root.innerHTML = `<main class="welcome" id="content">${brand}<h1>Welcome, ${esc(user.name.split(' ')[0])}.</h1><p>You are signed in securely with Firebase. Your classroom server connects you to your instructor’s shared session.</p><section class="panel"><h2>Connect your classroom</h2><form id="backend-form">${field('backend', 'Classroom server URL', backend || 'http://127.0.0.1:3000', 'url')}${button('submit', 'Connect server', '', 'primary')}<div class="error" role="alert"></div></form></section><div class="toolbar">${button('solo', 'Try the solo sandbox')} ${button('logout', 'Sign out')}</div><p class="form-note">The sandbox is a separate single-browser rehearsal. It does not submit decisions to your classroom.</p></main>`;
+  if (backend) root.querySelector('main').insertAdjacentHTML('beforeend', button('forget-server', 'Forget saved server', '', 'small'));
 }
 function renderLobby() { root.innerHTML = `<main class="welcome" id="content">${brand}<h1>Your classroom.</h1><p>Welcome, ${esc(user.name)}. ${user.role === 'instructor' ? 'Create a session to begin.' : 'Join a company with the code your instructor provided.'}</p>${button(user.role === 'instructor' ? 'create' : 'join', user.role === 'instructor' ? 'Create session' : 'Join company', '', 'primary')} ${button('logout', 'Sign out')}</main>`; }
 const pages = { overview: 'Overview', orders: 'Sales & dispatch', supply: 'Supply & inventory', production: 'Production', finance: 'Finance', energy: 'Energy & growth', reports: 'Reports', messages: 'Messages', admin: 'Session control' };
@@ -91,6 +125,8 @@ function render() {
   const titles = { overview: c ? `Let's make progress, ${c.name.split(' ')[0]}.` : 'A classroom in motion.', orders: 'From offer to arrival.', supply: 'Keep your business moving.', production: 'Make capacity count.', finance: 'Follow the money.', energy: 'Build a better footprint.', reports: 'See the whole picture.', messages: 'Better decisions, together.', admin: 'Set the pace of learning.' };
   const subtitles = { overview: 'Your business, at a glance. Every decision has a next step.', orders: 'Accepted terms stay with each order, from first dispatch to final payment.', supply: 'Balance availability, working capital, and the footprint of every component.', production: 'Coordinate materials, people, machines, and the hours they work.', finance: 'Cash is available money. Profit is revenue earned less costs incurred.', energy: 'Invest now. Track activation and the results over time.', reports: 'Comparable daily results, with every reporting boundary clearly marked.', messages: 'A shared space for announcements, questions, and team decisions.', admin: 'Control the shared clock, classroom access, and teaching parameters.' };
   root.innerHTML = `<div class="layout"><aside class="sidebar">${brand}<div class="nav-label">${admin ? 'Instructor workspace' : 'Your company'}</div><nav class="nav" aria-label="Workspace">${menu.map(([key, title]) => `<button data-action="nav" data-id="${key}" class="${page === key ? 'active' : ''}" ${page === key ? 'aria-current="page"' : ''}>${icon(key)}${title}</button>`).join('')}</nav><div class="sidebar-bottom"><p>Learn by running it.<br>One decision at a time.</p><a href="notes/model.md" target="_blank" rel="noopener">Model & teaching guide ↗</a><p>Independent simulation<br>by Konstantinos Stouras</p></div></aside><div class="workspace"><header class="topbar"><div class="breadcrumb">Workspace &nbsp; / &nbsp; <strong>${pages[page]}</strong></div><div class="top-actions"><span id="connection" class="connection">${solo ? 'Single-browser sandbox' : online ? '<span class="status-dot"></span>Connected · shared server' : 'Reconnecting…'}</span><div class="identity"><span class="avatar">${esc(actor.name.slice(0, 2).toUpperCase())}</span><span>${esc(actor.name)}<br><small>${admin ? 'Instructor' : 'Student'}</small></span></div>${button('logout', 'Exit', '', 'small')}</div></header>${solo ? `<div class="mode-banner"><span><strong>Solo sandbox</strong> · Saved in this browser. Switch roles to rehearse; no other people are connected.</span>${button('switch-solo', admin ? 'Play a company' : 'Instructor view')}</div>` : health?.demo ? '<div class="mode-banner"><span><strong>Local classroom demo</strong> · Synthetic accounts share durable server state. Demo sign-in is enabled on this computer.</span></div>' : ''}<main id="content" class="content"><div class="page-heading"><div><div class="eyebrow">${esc(state.name)}${c ? ` &nbsp; / &nbsp; ${esc(c.name)}` : ''}</div><h1>${esc(titles[page])}</h1><p>${subtitles[page]}</p></div><div class="timebox"><span class="badge ${state.status === 'running' ? '' : 'amber'}">● ${esc(state.status)}</span><strong>${simDate(state.hour)} · simulation</strong><small>Day ${Math.floor(state.hour / 24) + 1} · ends ${simDate(state.endHour)}</small></div></div>${state.status === 'completed' ? `<div class="advice warning"><strong>Session complete. ${state.events.filter(e => e.status === 'pending').length} scheduled events remain.</strong>Pending deliveries, payments, and investments are preserved. The instructor can extend the end date to settle them.</div>` : ''}${admin && page !== 'admin' ? `<div class="toolbar">${select('preview', 'Company preview · read-only', [['', 'All companies'], ...state.companies.map(x => [x.id, x.name])], preview || '')}${button('nav', 'Session control', 'admin', 'small')}</div>` : ''}${pageBody()}<div class="footer-note">All amounts are simulated EUR · Emissions in kg CO₂e · Simulation dates use UTC · Live state at ${simDate(state.hour)} · Model v${state.schema}<br>Original teaching model. No RealGame services, code, credentials, or assets are used.</div></main></div></div>`;
+  const pending = !solo && sessionStorage.getItem(`studio-pending:${backend}:${actor.id}:${sessionId}`);
+  if (pending) root.querySelector('#content').insertAdjacentHTML('afterbegin', `<div class="advice warning"><strong>A decision is awaiting confirmation.</strong>The response was interrupted. Retry with the same request key to confirm the outcome safely. ${button('retry-decision', 'Retry pending decision', '', 'small')}</div>`);
 }
 function pageBody() {
   if (page === 'admin') return adminPage();
@@ -144,7 +180,8 @@ function financePage() {
 }
 function energyPage() {
   const c = company();
-  return `<div class="advice"><strong>Carbon information and demand effects are separate.</strong>Carbon is always measured. Customer preference for lower carbon is currently <b>${state.effects.carbonDemand ? 'enabled' : 'disabled'}</b>. A new energy contract changes future production; existing inventory keeps its embodied footprint.</div>${panel('Choose your electricity', 'Tariffs are EUR/kWh by 8-hour shift. Standing charge is EUR/day.', table(['Provider', '00–08 / 08–16 / 16–24', 'Standing charge', 'Switch fee / delay', 'kg CO₂e/kWh', ''], state.catalog.energy.filter(e => e.enabled || e.id === c.energy).map(e => [esc(e.name), e.rates.map(r => exactMoney(r)).join(' / '), exactMoney(e.daily), `${money(e.fee)} / ${e.delay} h`, number(e.carbon), e.id === c.energy ? '<span class="badge">Current contract</span>' : button('energy-switch', 'Switch', e.id, 'small', !permitted('energy'))])))}<div class="grid3">${Object.entries(INVESTMENTS).map(([key, inv]) => { const contract = c.investments.filter(x => x.kind === key).at(-1), active = contract?.activeAt !== null && contract?.activeAt !== undefined; return `<section class="panel investment"><div class="invest-icon">${icon(key === 'efficiency' ? 'energy' : 'production')}</div><h2>${esc(inv.name)}</h2><p>${({ delivery: 'Dispatch oldest orders using the cheapest route that can meet the promise, with a delay buffer.', purchasing: 'Reorder components hourly when stock plus incoming supply reaches your policy threshold.', machine: 'Add six modules per hour of machine capacity. Materials and staff still limit output.', warehouse: 'Expand every stock location by 50%. Reduce pressure on storage space.', efficiency: 'Reduce production electricity per module by 25% after commissioning.' })[key]}</p><div class="price">${money(inv.cost)}</div><p>${inv.delay} h to activate · prepaid<br>${contract ? (active ? `Active since ${simDate(contract.activeAt)}` : 'Installation pending') : 'Not installed'}</p>${button('invest', contract && !active ? 'Pending' : active && !['machine', 'warehouse'].includes(key) ? 'Active' : 'Invest', key, 'small', !permitted('investments') || (contract && (!active || !['machine', 'warehouse'].includes(key))))}</section>`; }).join('')}</div>${panel('Research & market presence', 'Daily recurring budgets · diminishing quality and marketing effects.', `<div class="value-list"><div><span>Quality multiplier</span><strong>${c.quality.toFixed(3)}</strong></div><div><span>Daily research</span><strong>${money(c.research)}</strong></div><div><span>Daily marketing</span><strong>${money(c.marketing)}</strong></div></div>${button('budget', 'Edit daily budgets', '', '', !permitted('investments'))}`)}`;
+  const energyOptions = state.catalog.energy.filter(e => e.enabled || e.id === c.energy).map(e => e.id === c.energy && c.energyTerms ? { ...e, ...c.energyTerms } : e);
+  return `<div class="advice"><strong>Carbon information and demand effects are separate.</strong>Carbon is always measured. Customer preference for lower carbon is currently <b>${state.effects.carbonDemand ? 'enabled' : 'disabled'}</b>. A new energy contract changes future production; existing inventory keeps its embodied footprint.</div>${panel('Choose your electricity', 'Tariffs are EUR/kWh by 8-hour shift. Standing charge is EUR/day.', table(['Provider', '00–08 / 08–16 / 16–24', 'Standing charge', 'Switch fee / delay', 'kg CO₂e/kWh', ''], energyOptions.map(e => [esc(e.name), e.rates.map(r => exactMoney(r)).join(' / '), exactMoney(e.daily), `${money(e.fee)} / ${e.delay} h`, precise(e.carbon), e.id === c.energy ? '<span class="badge">Current contract</span>' : button('energy-switch', 'Switch', e.id, 'small', !permitted('energy'))])))}<div class="grid3">${Object.entries(INVESTMENTS).map(([key, inv]) => { const contract = c.investments.filter(x => x.kind === key).at(-1), active = contract?.activeAt !== null && contract?.activeAt !== undefined; return `<section class="panel investment"><div class="invest-icon">${icon(key === 'efficiency' ? 'energy' : 'production')}</div><h2>${esc(inv.name)}</h2><p>${({ delivery: 'Dispatch oldest orders using the cheapest route that can meet the promise, with a delay buffer.', purchasing: 'Reorder components hourly when stock plus incoming supply reaches your policy threshold.', machine: 'Add six modules per hour of machine capacity. Materials and staff still limit output.', warehouse: 'Expand every stock location by 50%. Reduce pressure on storage space.', efficiency: 'Reduce production electricity per module by 25% after commissioning.' })[key]}</p><div class="price">${money(inv.cost)}</div><p>${inv.delay} h to activate · prepaid<br>${contract ? (active ? `Active since ${simDate(contract.activeAt)}` : 'Installation pending') : 'Not installed'}</p>${button('invest', contract && !active ? 'Pending' : active && !['machine', 'warehouse'].includes(key) ? 'Active' : 'Invest', key, 'small', !permitted('investments') || (contract && (!active || !['machine', 'warehouse'].includes(key))))}</section>`; }).join('')}</div>${panel('Research & market presence', 'Daily recurring budgets · diminishing quality and marketing effects.', `<div class="value-list"><div><span>Quality multiplier</span><strong>${c.quality.toFixed(3)}</strong></div><div><span>Daily research</span><strong>${money(c.research)}</strong></div><div><span>Daily marketing</span><strong>${money(c.marketing)}</strong></div></div>${button('budget', 'Edit daily budgets', '', '', !permitted('investments'))}`)}`;
 }
 const reportTypes = { profit: ['Cumulative profit', 'EUR'], dailySales: ['Daily revenue earned', 'EUR'], dailyProduction: ['Daily production', 'modules'], cash: ['Cash balance', 'EUR'], inventory: ['Finished inventory', 'modules'], energyCost: ['Cumulative energy cost', 'EUR'], energyKwh: ['Cumulative electricity', 'kWh'], emissions: ['Cumulative carbon', 'kg CO₂e'], marketShare: ['Cumulative delivered market share', '%'], dispatched: ['Cumulative dispatches', 'modules'], received: ['Cumulative customer receipts', 'modules'] };
 function reportsPage() {
@@ -183,7 +220,9 @@ function openDispatch(id) {
 async function action(name, id) {
   const c = company();
   if (name === 'submit') return;
-  if (name === 'close') return dialog.close();
+  if (name === 'forget-server') { backend = ''; localStorage.removeItem('studio-backend'); health = null; state = null; if (firebaseClient?.user) await enterFirebase(); else renderWelcome(); return; }
+  if (name === 'retry-decision') { const pending = JSON.parse(sessionStorage.getItem(`studio-pending:${backend}:${actor.id}:${sessionId}`) || 'null'); if (pending) await command(pending.command); render(); return; }
+  if (name === 'close') { dialog.close(); if (state) render(); return; }
   if (name === 'nav') { page = id; render(); return; }
   if (name === 'solo') { solo = (await import('./src/solo.mjs')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
@@ -240,7 +279,7 @@ document.addEventListener('submit', async event => {
     if (form.id === 'register-form') await signIn(await api('/register', Object.fromEntries(f)));
     if (form.id === 'firebase-login-form') { await (await getFirebase()).login(f.get('email'), f.get('password')); await enterFirebase(); }
     if (form.id === 'firebase-register-form') { await (await getFirebase()).register(f.get('name'), f.get('email'), f.get('password')); await enterFirebase(); }
-    if (form.id === 'backend-form') { const url = new URL(f.get('backend')); if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.pathname !== '/') throw new Error('Use an http(s) server origin without credentials or a path.'); backend = url.origin; token = ''; sessionStorage.removeItem('studio-token'); localStorage.setItem('studio-backend', backend); health = await api('/health'); if (firebaseClient?.user && health.auth === 'firebase') await enterFirebase(); else renderWelcome(); }
+    if (form.id === 'backend-form') await connectBackend(f.get('backend'));
     if (form.id === 'shifts-form') { await command({ type: 'shifts', shifts: [0, 1, 2].map(i => f.has(`shift${i}`)) }); render(); }
     if (form.id === 'effects-form') { await command({ type: 'configure', carbonDemand: f.has('carbonDemand') }); render(); }
     if (form.dataset.feature) { await command({ type: 'configure', feature: form.dataset.feature, visible: f.has('visible'), allowed: f.has('allowed') }); render(); }

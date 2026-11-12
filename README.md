@@ -45,7 +45,7 @@ docker run --name sustainability-studio -p 3000:3000 \
   sustainability-studio
 ```
 
-Use an HTTPS reverse proxy for internet classrooms and persistent storage for `/data`. Set `ALLOWED_ORIGIN` to the exact separately hosted frontend origin. The frontend's Server connection form selects this backend origin. Firebase Authentication and static Firebase Hosting are configured; **a remote multiplayer Node backend is not deployed by static hosting**. A backend on ephemeral/serverless local disk would lose state and is unsupported. The public site has a clearly labelled solo sandbox that uses the same engine but only browser-local state.
+Use an HTTPS reverse proxy for internet classrooms and persistent storage for `/data`. Set `ALLOWED_ORIGIN` to a comma-separated list of permitted frontend origins. Include the backend public origin when it is behind an HTTPS proxy. The frontend's Server connection form selects this backend origin. Firebase Authentication and static Firebase Hosting are configured; **a remote multiplayer Node backend is not deployed by static hosting**. A backend on ephemeral/serverless local disk would lose state and is unsupported. The public site has a clearly labelled solo sandbox that uses the same engine but only browser-local state.
 
 ## Checks and publication
 

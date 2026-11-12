@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { randomBytes, scryptSync, timingSafeEqual, createHash, randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { createSession, applyCommand, tick, assertInvariants, fail, cleanText } from '../src/engine.mjs';
+import { createSession, applyCommand, tick, assertInvariants, fail, cleanText, canMessage } from '../src/engine.mjs';
 
 const hash = token => createHash('sha256').update(token).digest('hex');
 export class Store {
@@ -120,8 +120,13 @@ export class Store {
     });
   }
   replay(user, id) {
-    this.actor(user, id); if (user.role !== 'instructor') fail('Instructor access required.', 403);
-    return { initial: JSON.parse(this.db.prepare('SELECT initial FROM sessions WHERE id=?').get(id).initial), commands: this.db.prepare('SELECT actor,command,realAt FROM commands WHERE sessionId=? ORDER BY seq').all(id).map(x => ({ actor: JSON.parse(x.actor), command: JSON.parse(x.command), realAt: x.realAt })) };
+    const viewer = this.actor(user, id); if (user.role !== 'instructor') fail('Instructor access required.', 403);
+    const current = this.session(id);
+    return { note: 'Economic replay. Private chat text is redacted; administrative membership metadata is stored separately.', initial: JSON.parse(this.db.prepare('SELECT initial FROM sessions WHERE id=?').get(id).initial), commands: this.db.prepare('SELECT actor,command,realAt FROM commands WHERE sessionId=? ORDER BY seq').all(id).map(x => {
+      const command = JSON.parse(x.command);
+      if (command.type === 'message' && !canMessage(current, viewer, command.channel)) command.text = '[private message redacted]';
+      return { actor: JSON.parse(x.actor), command, realAt: x.realAt };
+    }) };
   }
   seedDemo() {
     const found = this.db.prepare("SELECT id FROM users WHERE username='demo-instructor'").get();

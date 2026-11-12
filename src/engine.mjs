@@ -127,6 +127,9 @@ function requireCompany(s, actor, a) {
 }
 export function applyCommand(s, actor, a, realAt = '2026-01-01T00:00:00.000Z') {
   if (!a || typeof a.type !== 'string') fail('A command type is required.');
+  // Preserve contracts when opening sessions saved before energy-term snapshots were added.
+  for (const c of s.companies) c.energyTerms ||= structuredClone(s.catalog.energy.find(x => x.id === c.energy));
+  for (const e of s.events) if (e.type === 'energy' && e.status === 'pending') e.data.terms ||= structuredClone(s.catalog.energy.find(x => x.id === e.data.energyId));
   let result;
   if (['step', 'clock', 'configure', 'catalog', 'renameCompany'].includes(a.type)) {
     if (actor.role !== 'instructor') fail('Instructor access required.', 403);
@@ -189,7 +192,7 @@ export function applyCommand(s, actor, a, realAt = '2026-01-01T00:00:00.000Z') {
       const energy = s.catalog.energy.find(x => x.id === a.energyId && x.enabled); if (!energy) fail('Choose an enabled energy supplier.');
       if (c.energy === energy.id || s.events.some(e => e.companyId === c.id && e.type === 'energy' && e.status === 'pending')) fail('Already selected or a switch is pending.');
       available(c, energy.fee); post(s, c, 'Energy agreement fee', { expense: energy.fee, cash: -energy.fee });
-      schedule(s, c, 'energy', s.hour + energy.delay, { energyId: energy.id }, `Switch to ${energy.name}`); result = `Switch accepted. Current provider remains effective for ${energy.delay} h.`;
+      schedule(s, c, 'energy', s.hour + energy.delay, { energyId: energy.id, terms: structuredClone(energy) }, `Switch to ${energy.name}`); result = `Switch accepted. Current provider remains effective for ${energy.delay} h.`;
     }
     if (a.type === 'invest') {
       const inv = INVESTMENTS[a.kind]; if (!inv) fail('Unknown investment.');
@@ -265,7 +268,7 @@ function executeEvent(s, e) {
   }
   if (e.type === 'shifts') c.shifts = d.shifts;
   if (e.type === 'staff') c.workers += d.delta;
-  if (e.type === 'energy') c.energy = d.energyId;
+  if (e.type === 'energy') { c.energy = d.energyId; c.energyTerms = d.terms || structuredClone(s.catalog.energy.find(x => x.id === d.energyId)); }
   if (e.type === 'investment') {
     const inv = c.investments.find(x => x.id === d.investmentId); inv.activeAt = s.hour;
     post(s, c, `Investment commissioned ${inv.id}`, { fixedAssets: inv.cost, construction: -inv.cost });
@@ -293,7 +296,7 @@ function executeEvent(s, e) {
 function production(s, c) {
   const shift = Math.floor(((s.hour - 1) % 24) / 8);
   if (!c.shifts[shift]) { c.lastBottleneck = 'Shift inactive'; return; }
-  const energy = s.catalog.energy.find(x => x.id === c.energy);
+  const energy = c.energyTerms || s.catalog.energy.find(x => x.id === c.energy);
   const machineLimit = c.machines * 6, staffLimit = c.workers * 2, capacity = c.inventory.panel.capacity - c.inventory.panel.qty;
   const materials = Object.entries(RECIPE).map(([item, count]) => [item, Math.floor(c.inventory[item].qty / count)]);
   const wage = c.workers * 1350, perUnitEnergy = Math.round(3 * c.efficiency * energy.rates[shift]);
@@ -366,7 +369,7 @@ function automated(s, c) {
 function dailyClose(s) {
   for (const sup of s.catalog.suppliers) sup.stock = Math.min(sup.stock + sup.replenish, sup.replenish * 30 + 10000);
   for (const c of s.companies) {
-    const energy = s.catalog.energy.find(e => e.id === c.energy);
+    const energy = c.energyTerms || s.catalog.energy.find(e => e.id === c.energy);
     const overflow = sum(Object.values(c.inventory).map(x => Math.max(0, x.qty - x.capacity) * 5));
     const overhead = 35000 + energy.daily + overflow + c.marketing + c.research;
     // Contractual overhead is expensed even if cash is exhausted; arrears are explicit.

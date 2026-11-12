@@ -7,18 +7,18 @@ import { publicView, fail } from '../src/engine.mjs';
 import { firebaseVerifier } from './firebase-auth.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
-export function createApp({ store = new Store(process.env.DATA_PATH || '.data/simulation.sqlite'), demo = false, allowedOrigin = process.env.ALLOWED_ORIGIN || '', projectId = process.env.FIREBASE_PROJECT_ID || '', verifyFirebase = projectId ? firebaseVerifier(projectId, { checkRevoked: process.env.FIREBASE_CHECK_REVOKED === 'true' }) : null } = {}) {
+export function createApp({ store = new Store(process.env.DATA_PATH || '.data/simulation.sqlite'), demo = false, allowedOrigin = process.env.ALLOWED_ORIGIN || '', projectId = demo ? '' : (process.env.FIREBASE_PROJECT_ID || 'stouras-sustainability-2026'), verifyFirebase = projectId ? firebaseVerifier(projectId, { checkRevoked: process.env.FIREBASE_CHECK_REVOKED === 'true' }) : null } = {}) {
   if (demo) store.seedDemo();
-  if (!store.db.prepare("SELECT id FROM users WHERE role='instructor'").get() && process.env.ADMIN_PASSWORD) store.addUser(process.env.ADMIN_USERNAME || 'instructor', process.env.ADMIN_NAME || 'Instructor', process.env.ADMIN_PASSWORD, 'instructor');
   const attempts = new Map();
+  const origins = allowedOrigin.split(',').map(x => x.trim()).filter(Boolean);
   const server = http.createServer(async (req, res) => {
     const send = (code, value, type = 'application/json; charset=utf-8') => { res.writeHead(code, { 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin' }); res.end(type.startsWith('application/json') ? JSON.stringify(value) : value); };
     try {
       const url = new URL(req.url, 'http://localhost');
       const origin = req.headers.origin;
       const ownOrigin = `${req.socket.encrypted ? 'https' : 'http'}://${req.headers.host}`;
-      if (origin && origin !== ownOrigin && origin !== allowedOrigin) fail('This origin is not allowed.', 403);
-      if (origin === allowedOrigin) { res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Vary', 'Origin'); }
+      if (origin && origin !== ownOrigin && !origins.includes(origin)) fail('This origin is not allowed.', 403);
+      if (origins.includes(origin)) { res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Vary', 'Origin'); }
       if (req.method === 'OPTIONS') { res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type'); res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'); res.writeHead(204); res.end(); return; }
       if (url.pathname === '/api/health') return send(200, { ok: true, demo, version: 1, auth: verifyFirebase ? 'firebase' : 'local-demo', projectId });
       if (!url.pathname.startsWith('/api/')) {

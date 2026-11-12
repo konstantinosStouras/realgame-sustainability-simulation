@@ -92,3 +92,17 @@ test('automation includes incoming stock and does not repeatedly reorder', () =>
   const s = quiet(), c = s.companies[0]; act(s, { type: 'invest', kind: 'purchasing' }); act(s, { type: 'reorder', supplierId: 'frame-circular', point: 600, qty: 300, enabled: true });
   advance(s, 60); assert.equal(c.purchases.length, 1); assert.match(c.autoStatus.purchasing, /above/); assertInvariants(s);
 });
+test('early, exact-window and late receipts change satisfaction only at receipt', () => {
+  for (const [dueAt, expected] of [[100, 0.98], [18, 1.025], [5, 0.92]]) {
+    const s = quiet(), c = order(s); c.orders[0].dueAt = dueAt;
+    s.catalog.routes.find(r => r.id === 'road').reliability = 100;
+    act(s, { type: 'dispatch', orderId: 'test-order', qty: 10, routeId: 'road' }); assert.equal(c.satisfaction, 1);
+    advance(s, 18); assert.equal(c.satisfaction, expected);
+  }
+});
+test('active and pending energy contracts preserve their accepted standing charges', () => {
+  const s = quiet(), c = s.companies[0]; act(s, { type: 'energy', energyId: 'wind' });
+  act(s, { type: 'catalog', collection: 'energy', id: 'grid', patch: { daily: 999999 } }, teacher);
+  act(s, { type: 'catalog', collection: 'energy', id: 'wind', patch: { daily: 999999 } }, teacher);
+  assert.equal(c.energyTerms.daily, 1800); advance(s, 48); assert.equal(c.energyTerms.daily, 3200); assertInvariants(s);
+});
