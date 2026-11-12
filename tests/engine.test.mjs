@@ -77,6 +77,19 @@ test('two-week annuity matches the observed funding delay and rounded weekly quo
   advance(s, 168); assert.equal(loan.paidAt, 384);
   assert.equal(balance(c, 'debt'), 0); assertInvariants(s);
 });
+test('new annuity terms count repayment weeks from the request while funding remains delayed', () => {
+  const s = quiet(), c = s.companies[0];
+  advance(s, 24);
+  act(s, { type: 'loan', plan: 'annuity', repaymentAnchor: 'request', amount: 1000000, weeks: 2 });
+  const loan = c.loans[0];
+  advance(s, 48);
+  assert.equal(loan.fundedAt, 72);
+  assert.deepEqual(s.events.filter(e => e.type === 'loanRepayment').map(e => e.at), [192, 360]);
+  advance(s, 119); assert.equal(loan.installments[0].paidAt, undefined);
+  advance(s, 1); assert.equal(loan.installments[0].paidAt, 192);
+  advance(s, 168); assert.equal(loan.paidAt, 360);
+  assert.equal(balance(c, 'debt'), 0); assertInvariants(s);
+});
 test('weekly deposits deduct cash immediately and accept the observed 26-week limit', () => {
   const s = quiet(), c = s.companies[0], opening = balance(c, 'cash');
   for (const weeks of [0, 1.5, 27]) assert.throws(() => act(s, { type: 'deposit', amount: 100000, weeks }));

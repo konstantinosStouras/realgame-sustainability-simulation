@@ -226,6 +226,7 @@ export function applyCommand(s, actor, a, realAt = '2026-01-01T00:00:00.000Z') {
     if (a.type === 'budget') { c.marketing = integer(a.marketing, 'Daily marketing cents', 0, 100000); c.research = integer(a.research, 'Daily research cents', 0, 100000); result = 'Budgets saved. Daily costs and quality effects apply at each daily close.'; }
     if (a.type === 'loan') {
       if (a.plan === 'annuity') {
+        if (a.repaymentAnchor !== undefined && a.repaymentAnchor !== 'request') fail('Invalid annuity repayment anchor.');
         const amount = integer(a.amount, 'Principal in cents', 100000, 15000000);
         const weeks = integer(a.weeks, 'Term in weeks', 1, 20);
         if (sum(c.loans.filter(x => x.paidAt === null).map(x => x.amount)) + amount > 15000000) fail('Total loan limit is €150,000 including pending funding.');
@@ -240,6 +241,7 @@ export function applyCommand(s, actor, a, realAt = '2026-01-01T00:00:00.000Z') {
           remaining -= principal;
         }
         const loan = { id: uid(s, 'loan'), amount, term: weeks * 168, plan: 'annuity', installments, interest: sum(installments.map(i => i.interest)), requestedAt: s.hour, fundedAt: null, paidAt: null };
+        if (a.repaymentAnchor === 'request') loan.repaymentAnchor = 'request';
         c.loans.push(loan);
         schedule(s, c, 'loanFunding', s.hour + 48, { loanId: loan.id }, `Loan ${loan.id} funding: €${amount / 100}`);
         result = `Annuity loan accepted. Funding in 48 h. Weekly payment €${(weeklyPayment / 100).toFixed(2)}.`;
@@ -322,7 +324,8 @@ function executeEvent(s, e) {
     const l = c.loans.find(x => x.id === d.loanId); l.fundedAt = s.hour;
     post(s, c, `Loan funding ${l.id}`, { cash: l.amount, debt: -l.amount });
     if (l.installments) {
-      l.installments.forEach((_, index) => schedule(s, c, 'loanRepayment', s.hour + (index + 1) * 168, { loanId: l.id, installment: index }, `Loan ${l.id} weekly payment ${index + 1}`));
+      const anchor = l.repaymentAnchor === 'request' ? l.requestedAt : s.hour;
+      l.installments.forEach((_, index) => schedule(s, c, 'loanRepayment', anchor + (index + 1) * 168, { loanId: l.id, installment: index }, `Loan ${l.id} weekly payment ${index + 1}`));
     } else schedule(s, c, 'loanRepayment', s.hour + l.term, { loanId: l.id }, `Repay loan ${l.id} plus interest`);
   }
   if (e.type === 'loanRepayment') {

@@ -1,5 +1,5 @@
-import { ITEMS, INVESTMENTS, FEATURES } from './src/engine.mjs?v=7951f988fa53';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=7951f988fa53';
+import { ITEMS, INVESTMENTS, FEATURES } from './src/engine.mjs?v=a05861575dd4';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=a05861575dd4';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -108,7 +108,7 @@ function renderWelcome() {
   if (localStorage.getItem('studio-backend')) root.querySelector('.welcome-layout > .panel').insertAdjacentHTML('beforeend', `<p>${button('forget-server', 'Reset server connection', '', 'small')}</p>`);
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=7951f988fa53')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=a05861575dd4')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -238,7 +238,7 @@ async function action(name, id) {
   if (name === 'retry-decision') { const pending = JSON.parse(sessionStorage.getItem(`studio-pending:${backend}:${actor.id}:${sessionId}`) || 'null'); if (pending) await command(pending.command); render(); return; }
   if (name === 'close') { dialog.close(); if (state) render(); return; }
   if (name === 'nav') { page = id; render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=7951f988fa53')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=a05861575dd4')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); renderWelcome(); return; }
@@ -258,7 +258,7 @@ async function action(name, id) {
     const update = () => { const qty = Number(dialog.querySelector('[name=qty]').value); dialog.querySelector('#purchase-quote').textContent = `${exactMoney(qty * sup.price + sup.fee)} committed payable · ${number(qty * (sup.carbon + sup.freight))} kg CO₂e. Cash is paid after receipt, not now.`; }; dialog.querySelector('form').addEventListener('input', update); update();
   }
   if (name === 'staff') modal('Change staffing', `<p class="form-note">${c.workers} current workers. Enter a positive number to recruit or negative to reduce. Recruitment costs €250 per worker; severance €500. Effective in 48 h.</p>${field('delta', 'Change in workers', 1, 'number', 'min="-20" max="20"')}`, f => command({ type: 'staff', delta: value(f, 'delta') }));
-  if (name === 'annuity') modal('Request annuity loan', '<p class="form-note">Funding in 48 simulation hours. Weekly payments at 8% annual interest.</p>' + field('amount', 'Principal (EUR)', 10000, 'number', 'min="1000" max="150000" step="0.01"') + field('weeks', 'Term (weeks)', 2, 'number', 'min="1" max="20"'), f => command({ type: 'loan', plan: 'annuity', amount: Math.round(value(f, 'amount') * 100), weeks: value(f, 'weeks') }));
+  if (name === 'annuity') modal('Request annuity loan', '<p class="form-note">Funding in 48 simulation hours. The first weekly payment is due one week after the request. Annual interest is 8%.</p>' + field('amount', 'Principal (EUR)', 10000, 'number', 'min="1000" max="150000" step="0.01"') + field('weeks', 'Term (weeks)', 2, 'number', 'min="1" max="20"'), f => command({ type: 'loan', plan: 'annuity', repaymentAnchor: 'request', amount: Math.round(value(f, 'amount') * 100), weeks: value(f, 'weeks') }));
   if (name === 'loan') modal('Request bullet loan', '<p class="form-note">Funds arrive in 24 simulation hours. Principal and 9% simple annual interest are repaid at maturity.</p>' + field('amount', 'Principal (EUR)', 10000, 'number', 'min="1000" max="150000" step="0.01"') + field('days', 'Term (days)', 7, 'number', 'min="7" max="90"'), f => command({ type: 'loan', amount: Math.round(value(f, 'amount') * 100), term: value(f, 'days') * 24 }));
   if (name === 'deposit') modal('Place term deposit', '<p class="form-note">Cash is deducted immediately. Principal and 4% simple annual interest return at maturity.</p>' + field('amount', 'Principal (EUR)', 1000, 'number', 'min="100" max="100000" step="0.01"') + field('weeks', 'Term (weeks)', 1, 'number', 'min="1" max="26"'), f => command({ type: 'deposit', amount: Math.round(value(f, 'amount') * 100), weeks: value(f, 'weeks') }));
   if (name === 'invest') { const inv = INVESTMENTS[id]; modal(inv.name, `<p>${money(inv.cost)} is prepaid now. The investment becomes operational after ${inv.delay} simulation hours, at ${simDate(state.hour + inv.delay)}.</p><p class="form-note">This accepted contract will remain pending if the session ends before activation.</p>`, () => command({ type: 'invest', kind: id }), 'Confirm investment'); }
