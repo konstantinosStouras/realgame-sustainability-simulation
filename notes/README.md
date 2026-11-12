@@ -12,3 +12,7 @@ Create a workspace for investigating sustainable supply chain simulation, develo
 - Develop supporting experiments as requirements become clear.
 
 Only add notes suitable for a public repository. Keep login details and private source materials outside Git.
+
+## Inspection records
+
+- [RealGame inspection status, 12 November 2026](realgame-inspection.md)
