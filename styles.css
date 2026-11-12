@@ -256,3 +256,19 @@ td { line-height: 1.5; }
   .timebox { align-items: flex-start; }
   .flow { grid-template-columns: 1fr; }
 }
+
+/* Keep instructor navigation aligned with the preview field. */
+.instructor-toolbar { align-items: flex-end; gap: 16px 24px; margin-bottom: 24px; }
+.instructor-toolbar > label { flex: 0 1 250px; font-size: .875rem; }
+.instructor-toolbar select { max-width: none; margin-top: 8px; height: 46px; }
+.instructor-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.instructor-links button { min-height: 46px; padding: 10px 14px; font-size: .875rem; line-height: 1.4; }
+.clock-controls { gap: 10px; }
+.clock-controls button { min-height: 46px; padding: 11px 16px; line-height: 1.4; }
+.clock-note { display: grid; gap: 4px; margin: 18px 0 20px; font-size: .875rem; line-height: 1.6; }
+.clock-note strong { font-weight: 600; color: var(--text); }
+@media (max-width: 700px) {
+  .instructor-toolbar > label { flex-basis: 100%; }
+  .instructor-links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .clock-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
