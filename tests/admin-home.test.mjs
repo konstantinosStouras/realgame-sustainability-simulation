@@ -36,3 +36,10 @@ test('account actions are role-aware and theme slot precedes the name', () => {
   assert.match(html,/Student &lt;name&gt;/);assert.match(html,/Join a company/);
   assert.doesNotMatch(html,/Create a session|Student directory/);
 });
+
+test('creation form offers familiar cities and a separate custom ID', () => {
+ const h=setup('instructor');const html=h.run('createSessionFields()');
+ assert.match(html,/name="sessionCity"/);assert.match(html,/value="london"/);
+ assert.match(html,/name="customSessionId"/);assert.match(html,/data-custom-session hidden/);
+ assert.match(html,/name="name"/);assert.match(html,/session-setup/);
+});

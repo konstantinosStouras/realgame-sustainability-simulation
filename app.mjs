@@ -151,10 +151,11 @@ async function enterFirebase() {
 function accountControls(person = user || actor) {
   return `<div class="account-controls"><span data-theme-slot></span><details class="account-menu"><summary><span class="avatar">${esc(person.name.slice(0, 2).toUpperCase())}</span><span class="account-name">${esc(person.name)}</span><span aria-hidden="true">⌄</span></summary><div class="account-dropdown"><strong>${esc(person.name)}</strong><small>${esc(person.role)}</small><hr>${button('profile', 'My profile & statistics')}${button('sessions', 'My sessions')}${person.role === 'instructor' ? button('create', 'Create a session', '', '', !!solo) : button('join', 'Join a company', '', '', !!solo)}${person.role === 'instructor' && state ? button('nav', 'Session settings', 'admin') + button('roster', 'Student directory', '', '', !!solo) : ''}<hr>${button('logout', 'Log out', '', 'danger')}</div></details></div>`;
 }
-function createSessionFields() { return `${field('name', 'Session name', 'Sustainability challenge', 'text')}<div class="form-grid">${field('seed', 'Random seed', 42, 'number', 'min="0" max="4294967295"')}${field('days', 'Duration (days)', 30, 'number', 'min="1" max="180"')}</div><label>Company names (one per line)<textarea name="companies" required>Helio Works
+const sessionCities = ["athens", "berlin", "cairo", "dubai", "lima", "lisbon", "london", "madrid", "miami", "oslo", "paris", "rome", "seoul", "sydney", "tokyo"];
+function createSessionFields() { return `<div class="session-setup"><p class="form-note">Give your class a name and a memorable session ID.</p>${field('name', 'Session name', 'Sustainability challenge', 'text', 'maxlength="120"')}${select('sessionCity', 'Session ID', [...sessionCities.map(city => [city, city]), ['custom', 'Choose my own ID…']], 'athens')}<label data-custom-session hidden>Custom session ID<input name="customSessionId" disabled minlength="3" maxlength="32" pattern="[A-Za-z0-9]+(-[A-Za-z0-9]+)*" placeholder="e.g. london-2026" autocapitalize="none" spellcheck="false"></label><p class="form-note">Choose a city or your own ID: 3–32 letters, numbers or hyphens. IDs must be unique. Students still use company join codes.</p><div class="form-grid">${field('seed', 'Random seed', 42, 'number', 'min="0" max="4294967295"')}${field('days', 'Duration (days)', 30, 'number', 'min="1" max="180"')}</div><label>Company names (one per line)<textarea name="companies" required>Helio Works
 Northstar Solar
-Verdant Energy</textarea></label>${health?.classroomAccounting ? `<div class="form-grid">${select('revenueAt', 'Recognize sales revenue at', [['receipt', 'Customer receipt'], ['dispatch', 'Dispatch']], 'receipt')}${field('corporateOverhead', 'Additional corporate overhead (€ per day, per company)', 0, 'number', 'min="0" max="1000000" step="0.01"')}</div><p class="form-note">Customer payment is due after receipt. Corporate overhead is charged at each daily close.</p>` : ''}`; }
-async function createClassroom(f) {  const r = await api('/sessions', { ...(health?.classroomAccounting ? { revenueAt: f.get('revenueAt'), dailyCorporateOverhead: Math.round(value(f, 'corporateOverhead') * 100) } : {}), name: f.get('name'), seed: value(f, 'seed'), days: value(f, 'days'), companyNames: f.get('companies').split('\n').map(x => x.trim()).filter(Boolean) }); sessionStorage.setItem('studio-session', r.id); page = 'admin'; await enter(true); }
+Verdant Energy</textarea></label>${health?.classroomAccounting ? `<div class="form-grid">${select('revenueAt', 'Recognize sales revenue at', [['receipt', 'Customer receipt'], ['dispatch', 'Dispatch']], 'receipt')}${field('corporateOverhead', 'Additional corporate overhead (€ per day, per company)', 0, 'number', 'min="0" max="1000000" step="0.01"')}</div><p class="form-note">Customer payment is due after receipt. Corporate overhead is charged at each daily close.</p>` : ''}</div>`; }
+async function createClassroom(f) {  const r = await api('/sessions', { ...(health?.classroomAccounting ? { revenueAt: f.get('revenueAt'), dailyCorporateOverhead: Math.round(value(f, 'corporateOverhead') * 100) } : {}), id: f.get('sessionCity') === 'custom' ? f.get('customSessionId') : f.get('sessionCity'), name: f.get('name'), seed: value(f, 'seed'), days: value(f, 'days'), companyNames: f.get('companies').split('\n').map(x => x.trim()).filter(Boolean) }); sessionStorage.setItem('studio-session', r.id); page = 'admin'; await enter(true); }
 function renderAdminHome() {
   const active = sessions.filter(s => s.status !== 'completed'), past = sessions.filter(s => s.status === 'completed');
   const cards = list => list.map(s => `<article class="session-card"><div class="session-card-heading"><code>${esc(s.id)}</code><span class="badge">${esc(s.status)}</span></div><h3>${esc(s.name)}</h3><p class="form-note">Simulation hour ${number(s.hour)}</p><div class="toolbar">${button('open-session', 'Open', s.id, 'primary')}${button('session-export', 'Export data', s.id)}${button('session-codes', 'Company join codes', s.id)}${button('copy-session', 'Copy session code', s.id)}</div></article>`).join('') || '<p class="empty">No sessions here yet.</p>';
@@ -526,6 +527,13 @@ document.addEventListener('submit', async event => {
 });
 document.addEventListener('change', async event => {
   const target = event.target;
+  if (target.name === 'sessionCity') {
+    const label = target.form.querySelector('[data-custom-session]');
+    const input = label.querySelector('input'), custom = target.value === 'custom';
+    label.hidden = !custom; input.disabled = !custom; input.required = custom;
+    if (custom) input.focus();
+    return;
+  }
   try {
     if (target.name === 'stock-finished' || target.name === 'stock-component') {
       const category = target.name.slice(6);

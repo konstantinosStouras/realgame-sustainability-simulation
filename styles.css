@@ -195,3 +195,16 @@
   .studio-solar { display: none; }
   .studio-landing .welcome-foot { margin-top: 24px; }
 }
+
+/* Session controls remain legible in the narrow instructor sidebar. */
+.session-setup { display: grid; gap: 4px; }
+.session-setup label { font-size: 13px; margin-bottom: 18px; }
+.session-setup input, .session-setup select, .session-setup textarea { min-height: 46px; padding: 12px 14px; border-radius: 10px; font-size: 14px; }
+.session-setup .form-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
+.session-setup .form-note { font-size: 12px; margin: 0 0 20px; }
+.session-setup [hidden] { display: none; }
+#create-session-form > button.primary { width: 100%; min-height: 48px; margin-top: 8px; border-radius: 10px; font-size: 15px; }
+.session-card .toolbar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.session-card .toolbar button { min-height: 44px; white-space: normal; }
+.session-card .toolbar .primary { grid-column: 1 / -1; }
+@media (max-width: 420px) { .session-card .toolbar { grid-template-columns: 1fr; } }

@@ -1,3 +1,4 @@
+import { sessionId } from '../src/session-id.mjs';
 import { DatabaseSync } from 'node:sqlite';
 import { randomBytes, scryptSync, timingSafeEqual, createHash, randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
@@ -68,7 +69,8 @@ export class Store {
   create(user, opts = {}) {
     if (user.role !== 'instructor') fail('Instructor access required.', 403);
     return this.transaction(() => {
-      const s = createSession({ ...opts, id: randomUUID() });
+      const s = createSession({ ...opts, id: sessionId(opts.id, randomUUID) });
+      if (this.db.prepare('SELECT 1 FROM sessions WHERE id=?').get(s.id)) fail('Session ID is already taken. Choose another city or a custom ID.', 409);
       const json = JSON.stringify(s); this.db.prepare('INSERT INTO sessions VALUES (?,?,?)').run(s.id, json, json);
       this.db.prepare('INSERT INTO members VALUES (?,?,NULL)').run(s.id, user.id);
       for (const c of s.companies) this.db.prepare('INSERT INTO invites VALUES (?,?,?)').run(randomBytes(9).toString('base64url'), s.id, c.id);
