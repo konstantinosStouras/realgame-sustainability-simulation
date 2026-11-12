@@ -1,9 +1,9 @@
 /* Appearance stays outside the game root so live renders never reset it. */
-.theme-bar{position:sticky;top:0;z-index:30;min-height:48px;display:flex;justify-content:flex-end;align-items:center;padding:4px clamp(12px,3vw,38px);background:var(--paper);border-bottom:1px solid var(--line)}
-.theme-toggle{min-height:40px;font-size:12px;white-space:nowrap}
-.workspace-nav{top:49px}
-.sidebar{top:49px;height:calc(100vh - 49px)}
-#dialog>.theme-toggle{display:flex;margin-top:20px}
+.theme-bar{position:sticky;top:0;z-index:30;min-height:52px;display:flex;justify-content:flex-end;align-items:center;padding:4px clamp(12px,3vw,38px);background:var(--paper);border-bottom:1px solid var(--line)}
+.theme-toggle{min-height:44px;font-size:12px;white-space:nowrap}
+.workspace-nav{top:53px}
+.sidebar{top:53px;height:calc(100vh - 53px)}
+#dialog>.theme-toggle{position:sticky;top:0;z-index:2;display:flex;margin:0 44px 18px 0;box-shadow:0 0 0 6px var(--paper)}
 :root[data-theme="dark"]{color-scheme:dark;--paper:#161f1b;--ink:#e1eddc;--text:#d4e0d7;--muted:#a7b9ad;--line:#3d5145;--green:#b5d893;--lime:#d0e6a5;--soft:#2b3c30;--red:#ffa58e}
 [data-theme="dark"] :is(button,.button,.skip,.timebox,.metric,.panel,.student-pane,dialog){background:#222e27;color:var(--text)}
 [data-theme="dark"] :is(button,.button):hover{background:#344b39;border-color:#819d70}
