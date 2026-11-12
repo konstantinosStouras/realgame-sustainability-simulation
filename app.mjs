@@ -1,5 +1,5 @@
-import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=8336f9332acd';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=8336f9332acd';
+import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=da83fc15f13b';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=da83fc15f13b';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -195,7 +195,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=8336f9332acd')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=da83fc15f13b')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -244,15 +244,21 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=8336f9332acd')).testClient();
+      const client = (await import('./src/test-client.mjs?v=da83fc15f13b')).testClient();
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
 }
 
 function accountControls(person = user || actor) {
-  if (testRoom) return `<div class="account-controls"><span data-theme-slot></span><details class="account-menu"><summary>${esc(person.name)} ⌄</summary><div class="account-dropdown"><strong>${esc(person.name)}</strong><p>Simulated ${esc(person.role)}</p>${person.role === 'instructor' ? button('test-students','Test students') : ''}${button('test-leave','Leave test')}</div></details></div>`;
-  return `<div class="account-controls"><span data-theme-slot></span><details class="account-menu"><summary><span class="avatar">${esc(person.name.slice(0, 2).toUpperCase())}</span><span class="account-name">${esc(person.name)}</span><span aria-hidden="true">⌄</span></summary><div class="account-dropdown"><strong>${esc(person.name)}</strong><small>${esc(person.role)}</small><hr>${button('profile', 'My profile & statistics')}${button('sessions', 'My sessions')}${person.role === 'instructor' ? button('create', 'Create a session', '', '', !!solo) : button('join', 'Join a company', '', '', !!solo)}${person.role === 'instructor' && state ? button('nav', 'Session settings', 'admin') + button('roster', 'Student directory', '', '', !!solo) : ''}<hr>${button('logout', 'Log out', '', 'danger')}</div></details></div>`;
+  const name = person.name?.trim() || 'Your account';
+  const words = name.split(/\s+/);
+  const initials = (words[0][0] + (words.length > 1 ? words.at(-1)[0] : '')).toUpperCase();
+  const role = person.role === 'instructor' ? 'Instructor' : 'Student';
+  const actions = testRoom
+    ? (person.role === 'instructor' ? button('test-students', 'Test students') : '')
+    : `${button('profile', 'My profile & statistics')}${button('sessions', 'My sessions')}${person.role === 'instructor' ? button('create', 'Create a session', '', '', !!solo) : button('join', 'Join a company', '', '', !!solo)}${person.role === 'instructor' && state ? button('nav', 'Session settings', 'admin') + button('roster', 'Student directory', '', '', !!solo) : ''}`;
+  return `<div class="account-controls"><span data-theme-slot></span><details class="account-menu"><summary aria-label="Account options for ${esc(name)}"><span class="avatar" aria-hidden="true">${esc(initials)}</span><span class="account-name">${esc(name)}</span><svg class="account-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></summary><div class="account-dropdown"><div class="account-heading"><strong>${esc(name)}</strong><small>${testRoom ? 'Practice · ' : ''}${role}</small></div><div class="account-links">${actions}</div><div class="account-footer">${testRoom ? button('test-leave', 'Leave test', '', 'danger') : button('logout', 'Log out', '', 'danger')}</div></div></details></div>`;
 }
 const sessionCities = ["athens", "berlin", "cairo", "dubai", "lima", "lisbon", "london", "madrid", "miami", "oslo", "paris", "rome", "seoul", "sydney", "tokyo"];
 function createSessionFields() { return `<div class="session-setup"><fieldset class="session-details"><legend>Session details</legend><p class="form-note">Give your class a name and a memorable session ID.</p>${field('name', 'Session name', 'Sustainability challenge', 'text', 'maxlength="120"')}${select('sessionCity', 'Session ID', [...sessionCities.map(city => [city, city]), ['custom', 'Choose my own ID…']], 'athens')}<label data-custom-session hidden>Custom session ID<input name="customSessionId" disabled minlength="3" maxlength="32" pattern="[A-Za-z0-9]+(-[A-Za-z0-9]+)*" placeholder="e.g. london-2026" autocapitalize="none" spellcheck="false"></label><p class="form-note">Choose a city or your own ID: 3–32 letters, numbers or hyphens. IDs must be unique. Students enter this ID, then their company code when joining for the first time.</p></fieldset><fieldset><legend>Class setup</legend><div class="form-grid">${field('days', 'Duration (days)', 30, 'number', 'min="1" max="180"')}</div><label>Company names (one per line)<textarea name="companies" required rows="4">Helio Works
@@ -606,7 +612,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=8336f9332acd')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=da83fc15f13b')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -648,8 +654,37 @@ async function action(name, id) {
   if (name === 'report-csv') csv('daily-report.csv', [['Simulation time (UTC)', 'Company', `${reportTypes[report][0]} (${reportTypes[report][1]})`], ...reportRows(state.snapshots.filter(s => s.hour >= state.hour - reportRange * 24))]);
   if (name === 'ledger-csv') csv('transaction-journal.csv', [['Hour', 'Simulation time (UTC)', 'Transaction', 'Account', 'Debit positive / credit negative (EUR)'], ...c.ledger.flatMap(l => Object.entries(l.lines).map(([a, n]) => [l.hour, simDate(l.hour), l.description, a, n / 100]))]);
 }
-document.addEventListener('keydown', event => { if (event.key === 'Escape') document.querySelectorAll('.account-menu[open]').forEach(menu => { menu.open = false; menu.querySelector('summary').focus(); }); });
-document.addEventListener('click', event => { document.querySelectorAll('.account-menu[open]').forEach(menu => { if (!menu.contains(event.target) || event.target.closest('button')) menu.open = false; }); });
+// Native disclosure supports Enter/Space and Tab; arrows add a quick shortcut.
+document.addEventListener('keydown', event => {
+  const menu = event.target.closest?.('.account-menu');
+  if (!menu) return;
+  const summary = menu.querySelector('summary');
+  if (event.key === 'Escape' && menu.open) {
+    event.preventDefault(); menu.open = false; summary.focus(); return;
+  }
+  if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+  if (!menu.open && event.target !== summary) return;
+  event.preventDefault(); menu.open = true;
+  const items = [...menu.querySelectorAll('button:not(:disabled)')];
+  if (!items.length) return;
+  const index = items.indexOf(document.activeElement);
+  const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1
+    : event.key === 'ArrowDown' ? (index + 1) % items.length
+    : (index < 0 ? items.length - 1 : (index - 1 + items.length) % items.length);
+  items[next].focus();
+});
+document.addEventListener('focusin', event => {
+  document.querySelectorAll('.account-menu[open]').forEach(menu => {
+    if (!menu.contains(event.target)) menu.open = false;
+  });
+});
+document.addEventListener('click', event => {
+  document.querySelectorAll('.account-menu[open]').forEach(menu => {
+    const action = event.target.closest('button');
+    if (!menu.contains(event.target)) menu.open = false;
+    else if (action && !action.disabled) { menu.open = false; menu.querySelector('summary').focus(); }
+  });
+});
 document.addEventListener('click', async event => {
   const b = event.target.closest('[data-action]'); if (!b || b.disabled || b.dataset.action === 'submit') return;
   event.preventDefault();
@@ -712,7 +747,7 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=8336f9332acd')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    try { const client = (await import('./src/test-client.mjs?v=da83fc15f13b')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p>' + button('test-leave','Return to classroom') + '</main>'; }
     return;
   }
