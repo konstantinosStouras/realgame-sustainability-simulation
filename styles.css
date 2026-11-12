@@ -8,34 +8,35 @@
   z-index: 10;
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 4px clamp(12px, 2vw, 24px);
-  background: var(--ink);
-  color: #f0f4e9;
+  padding: 4px 12px;
+  border-top: 4px solid #3a3a3a;
+  background: #767676;
+  color: white;
 }
-.workspace-nav .brand { padding: 0; gap: 8px; font-size: 16px; }
-.workspace-nav .brand-mark { width: 30px; height: 30px; border-radius: 8px; font-size: 22px; }
-.workspace-nav .brand small { margin-top: 1px; font-size: 9px; }
 .workspace-tools {
   display: flex;
-  width: min(100%, 560px);
+  width: min(100%, 798px);
   min-width: 0;
 }
-.workspace-tools button {
+.workspace-tools > :is(button, a) {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: 1 1 0;
   min-width: 0;
-  min-height: 44px;
+  min-height: 64px;
   padding: 0;
   border: 0;
   border-radius: 7px;
   background: transparent;
-  color: #e4eee7;
+  color: inherit;
+  text-decoration: none;
 }
-.workspace-tools .icon { width: 22px; height: 22px; }
-.workspace-tools button:focus-visible { outline-offset: -2px; }
-.workspace-tools button[aria-current="page"],
-.workspace-tools button[aria-pressed="true"] { background: var(--lime); color: var(--ink); }
+.workspace-tools .icon { width: 40px; height: 40px; }
+.workspace-tools > :focus-visible { outline: 2px solid white; outline-offset: -3px; }
+.workspace-tools > .active { background: #505050; }
+.workspace-tools > [aria-disabled="true"] { opacity: .65; cursor: default; }
 .workspace-tool-short { display: none; }
 .workspace-tool-label {
   display: none;
@@ -46,9 +47,9 @@
   width: 160px;
   transform: translateX(-50%);
   padding: 9px 10px;
-  border: 1px solid #537466;
+  border: 1px solid #5c5c5c;
   border-radius: 8px;
-  background: var(--ink);
+  background: #3a3a3a;
   color: white;
   box-shadow: 0 5px 15px #173a3140;
   font-size: 11px;
@@ -58,18 +59,19 @@
   pointer-events: none;
 }
 .workspace-tool-label strong { display: block; margin-bottom: 3px; font-size: 13px; }
-.workspace-tools button:nth-child(-n+4) .workspace-tool-label { left: 0; transform: none; }
-.workspace-tools button:nth-last-child(-n+4) .workspace-tool-label { left: auto; right: 0; transform: none; }
-.workspace-tools button:focus-visible .workspace-tool-label { display: block; }
+.workspace-tools > :nth-child(-n+3) .workspace-tool-label { left: 0; transform: none; }
+.workspace-tools > :nth-last-child(-n+3) .workspace-tool-label { left: auto; right: 0; transform: none; }
+.workspace-tools > :focus-visible .workspace-tool-label { display: block; }
 @media (hover: hover) {
-  .workspace-tools button:hover { box-shadow: inset 0 0 0 2px currentColor; }
-  .workspace-tools button:hover .workspace-tool-label { display: block; }
+  .workspace-tools > :hover { background: #505050; }
+  .workspace-tools > :hover .workspace-tool-label { display: block; }
 }
+.workspace-tool-choices { display: grid; gap: 8px; }
+.workspace-tool-choices button { justify-content: flex-start; min-height: 44px; }
 .workspace > .topbar { height: auto; min-height: 52px; padding-block: 8px; }
 @media (max-width: 700px) {
   .workspace-nav { justify-content: center; padding-inline: 2px; }
-  .workspace-nav .brand { display: none; }
-  .workspace-tools button { flex-direction: column; gap: 3px; min-height: 48px; }
+  .workspace-tools > :is(button, a) { flex-direction: column; gap: 4px; min-height: 48px; }
   .workspace-tool-short {
     display: block;
     font-size: clamp(8px, 2.25vw, 11px);
