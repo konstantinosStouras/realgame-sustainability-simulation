@@ -1,3 +1,3 @@
-# Supporting code
+# Original simulation code
 
-Add original project code and experiments here as they are developed. The initial public website lives at the repository root.
+`engine.mjs` is the environment-independent simulation model. The Node server owns shared classroom state; `solo.mjs` is the clearly labelled browser-only rehearsal adapter. `firebase-client.mjs` delegates sign-in to Firebase. See the root README and notes/model.md for setup and economic rules.

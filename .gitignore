@@ -10,3 +10,12 @@ node_modules/
 __pycache__/
 .DS_Store
 Thumbs.db
+.data/
+coverage/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+test-results/
+firebase-debug*.log
+.firebase/
+dist/

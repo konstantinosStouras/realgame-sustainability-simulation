@@ -1,0 +1,8 @@
+private
+.git
+.data
+.env*
+node_modules
+dist
+test-results
+firebase-debug*.log
