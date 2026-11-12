@@ -245,7 +245,11 @@ export function applyCommand(s, actor, a, realAt = '2026-01-01T00:00:00.000Z') {
       }
     }
     if (a.type === 'deposit') {
-      const amount = integer(a.amount, 'Deposit cents', 10000, 10000000), term = integer(a.term, 'Term hours', 24, 2160); available(c, amount);
+      const amount = integer(a.amount, 'Deposit cents', 10000, 10000000);
+      const term = a.weeks === undefined
+        ? integer(a.term, 'Term hours', 24, 2160)
+        : integer(a.weeks, 'Term in weeks', 1, 26) * 168;
+      available(c, amount);
       const d = { id: uid(s, 'deposit'), amount, term, interest: Math.round(amount * 0.04 * term / 8760), placedAt: s.hour, maturedAt: null }; c.deposits.push(d);
       post(s, c, `Term deposit ${d.id}`, { deposits: amount, cash: -amount }); schedule(s, c, 'depositMaturity', s.hour + term, { depositId: d.id }, `Deposit ${d.id} matures`); result = 'Deposit placed. Principal is locked until maturity; 4% simple annual interest.';
     }

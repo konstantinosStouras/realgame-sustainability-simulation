@@ -60,6 +60,19 @@ test('two-week annuity matches the observed funding delay and rounded weekly quo
   advance(s, 168); assert.equal(loan.paidAt, 384);
   assert.equal(balance(c, 'debt'), 0); assertInvariants(s);
 });
+test('weekly deposits deduct cash immediately and accept the observed 26-week limit', () => {
+  const s = quiet(), c = s.companies[0], opening = balance(c, 'cash');
+  for (const weeks of [0, 1.5, 27]) assert.throws(() => act(s, { type: 'deposit', amount: 100000, weeks }));
+  act(s, { type: 'deposit', amount: 100000, weeks: 1 });
+  act(s, { type: 'deposit', amount: 100000, weeks: 26 });
+  assert.equal(balance(c, 'cash'), opening - 200000);
+  assert.deepEqual(s.events.filter(e => e.type === 'depositMaturity').map(e => e.at), [168, 4368]);
+  advance(s, 168);
+  assert.equal(c.deposits[0].maturedAt, 168);
+  assert.equal(c.deposits[1].maturedAt, null);
+  assert.equal(balance(c, 'interestIncome'), -77);
+  assertInvariants(s);
+});
 test('unfunded repayment stays pending without duplicate interest or negative cash', () => {
   const s = quiet(), c = s.companies[0]; act(s, { type: 'loan', amount: 15000000, term: 168 }); advance(s, 24);
   // Test fixture: move all cash to deposits with balanced entry.

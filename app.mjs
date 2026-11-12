@@ -1,5 +1,5 @@
-import { ITEMS, INVESTMENTS, FEATURES } from './src/engine.mjs?v=0bcee82b9833';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=0bcee82b9833';
+import { ITEMS, INVESTMENTS, FEATURES } from './src/engine.mjs?v=32920fde6e8a';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=32920fde6e8a';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -108,7 +108,7 @@ function renderWelcome() {
   if (localStorage.getItem('studio-backend')) root.querySelector('.welcome-layout > .panel').insertAdjacentHTML('beforeend', `<p>${button('forget-server', 'Reset server connection', '', 'small')}</p>`);
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=0bcee82b9833')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=32920fde6e8a')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -238,7 +238,7 @@ async function action(name, id) {
   if (name === 'retry-decision') { const pending = JSON.parse(sessionStorage.getItem(`studio-pending:${backend}:${actor.id}:${sessionId}`) || 'null'); if (pending) await command(pending.command); render(); return; }
   if (name === 'close') { dialog.close(); if (state) render(); return; }
   if (name === 'nav') { page = id; render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=0bcee82b9833')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=32920fde6e8a')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); renderWelcome(); return; }
@@ -259,7 +259,8 @@ async function action(name, id) {
   }
   if (name === 'staff') modal('Change staffing', `<p class="form-note">${c.workers} current workers. Enter a positive number to recruit or negative to reduce. Recruitment costs €250 per worker; severance €500. Effective in 48 h.</p>${field('delta', 'Change in workers', 1, 'number', 'min="-20" max="20"')}`, f => command({ type: 'staff', delta: value(f, 'delta') }));
   if (name === 'annuity') modal('Request annuity loan', '<p class="form-note">Funding in 48 simulation hours. Weekly payments at 8% annual interest.</p>' + field('amount', 'Principal (EUR)', 10000, 'number', 'min="1000" max="150000" step="0.01"') + field('weeks', 'Term (weeks)', 2, 'number', 'min="1" max="20"'), f => command({ type: 'loan', plan: 'annuity', amount: Math.round(value(f, 'amount') * 100), weeks: value(f, 'weeks') }));
-  if (name === 'loan' || name === 'deposit') modal(name === 'loan' ? 'Request loan' : 'Place term deposit', `<p class="form-note">${name === 'loan' ? 'Funds arrive in 24 h. Principal and 9% simple annual interest are repaid together at maturity. Outstanding loan limit: €150,000.' : 'Cash leaves your available balance now. Principal and 4% simple annual interest return at maturity. No early withdrawal.'}</p><div class="form-grid">${field('amount', 'Principal (EUR)', 10000, 'number', `min="${name === 'loan' ? 1000 : 100}" max="${name === 'loan' ? 150000 : 100000}" step="0.01"`)}${field('days', 'Term (days)', 7, 'number', `min="${name === 'loan' ? 7 : 1}" max="90"`)}</div>`, f => command({ type: name, amount: Math.round(value(f, 'amount') * 100), term: value(f, 'days') * 24 }));
+  if (name === 'loan') modal('Request bullet loan', '<p class="form-note">Funds arrive in 24 simulation hours. Principal and 9% simple annual interest are repaid at maturity.</p>' + field('amount', 'Principal (EUR)', 10000, 'number', 'min="1000" max="150000" step="0.01"') + field('days', 'Term (days)', 7, 'number', 'min="7" max="90"'), f => command({ type: 'loan', amount: Math.round(value(f, 'amount') * 100), term: value(f, 'days') * 24 }));
+  if (name === 'deposit') modal('Place term deposit', '<p class="form-note">Cash is deducted immediately. Principal and 4% simple annual interest return at maturity.</p>' + field('amount', 'Principal (EUR)', 1000, 'number', 'min="100" max="100000" step="0.01"') + field('weeks', 'Term (weeks)', 1, 'number', 'min="1" max="26"'), f => command({ type: 'deposit', amount: Math.round(value(f, 'amount') * 100), weeks: value(f, 'weeks') }));
   if (name === 'invest') { const inv = INVESTMENTS[id]; modal(inv.name, `<p>${money(inv.cost)} is prepaid now. The investment becomes operational after ${inv.delay} simulation hours, at ${simDate(state.hour + inv.delay)}.</p><p class="form-note">This accepted contract will remain pending if the session ends before activation.</p>`, () => command({ type: 'invest', kind: id }), 'Confirm investment'); }
   if (name === 'energy-switch') { const e = state.catalog.energy.find(x => x.id === id); modal(`Switch to ${e.name}`, `<p>Agreement fee ${money(e.fee)} paid now. Switch effective at ${simDate(state.hour + e.delay)}. Standing charge ${exactMoney(e.daily)} per day. Existing inventory retains its original footprint.</p>`, () => command({ type: 'energy', energyId: id }), 'Confirm switch'); }
   if (name === 'budget') modal('Daily research & marketing', `<div class="form-grid">${field('research', 'Research (EUR per day)', c.research / 100, 'number', 'min="0" max="1000" step="0.01"')}${field('marketing', 'Marketing (EUR per day)', c.marketing / 100, 'number', 'min="0" max="1000" step="0.01"')}</div><p class="form-note">Costs recur at every daily close. Quality grows with the square root of research spending; marketing changes the demand score.</p>`, f => command({ type: 'budget', research: Math.round(value(f, 'research') * 100), marketing: Math.round(value(f, 'marketing') * 100) }));
