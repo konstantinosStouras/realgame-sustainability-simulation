@@ -8,9 +8,9 @@ import { itemName, productionRecipe } from '../src/engine.mjs';
 // Unit harness for the original UI functions. It does not open a browser or
 // access a real service. The coordinator separately verifies rendered behavior.
 const appSource = readFileSync(new URL(process.env.UI_TEST_SOURCE || '../app.mjs', import.meta.url), 'utf8');
-const definitions = appSource.replace(/^import .*;\r?\n/gm, '').split("\nconst testLink =")[0];
+const definitions = appSource.replace(/^import .*;\r?\n/gm, '').split("\nawait startWorkspace();")[0];
 const storage = () => { const values = new Map(); return { getItem: k => values.get(k) ?? null, setItem: (k, v) => values.set(k, String(v)), removeItem: k => values.delete(k) }; };
-function harness() {
+function harness(hostname = 'localhost') {
   const handlers = {}, root = {}, dialog = { open: false }, toast = {};
   const document = {
     activeElement: { closest: () => null },
@@ -21,7 +21,7 @@ function harness() {
     document, localStorage: storage(), sessionStorage: storage(), crypto: { randomUUID },
     setTimeout: () => 1, clearTimeout: () => {}, URL, AbortSignal,
     FormData: class extends Map { constructor(form) { super(form.values); } },
-    itemName, productionRecipe, INVESTMENTS: {}, FEATURES: [], firebaseConfig: {}, classroomBackend: 'https://classroom.example', location: { hostname: 'localhost', href: 'http://localhost/' }, renderCount: 0,
+    itemName, productionRecipe, INVESTMENTS: {}, FEATURES: [], firebaseConfig: {}, classroomBackend: 'https://classroom.example', location: { hostname, href: 'https://' + hostname + '/' }, renderCount: 0,
     activeTestForm: null
   });
   vm.runInContext(definitions, context);
@@ -177,4 +177,55 @@ test('pending energy and shift decisions retain the accepted choice and effectiv
   assert.match(shifts, /Effective 4 Jan/);
   assert.match(shifts, /name="shift1" type="checkbox" checked disabled/);
   assert.match(shifts, /Shift change pending/);
+});
+
+test('startup waits for restored authentication without showing login for either role', async () => {
+  for (const role of ['student', 'instructor']) {
+    const h = harness('classroom.example');
+    let resolveAuth;
+    h.context.restoreAuth = () => new Promise(resolve => { resolveAuth = resolve; });
+    h.run(`getFirebase = restoreAuth; api = async () => ({ auth: 'firebase' });
+      renderWelcome = () => { throw new Error('Login must not render'); };
+      enterFirebase = async () => { renderCount++; };`);
+    const started = h.run('startWorkspace()');
+    await Promise.resolve(); await Promise.resolve();
+    assert.equal(h.context.renderCount, 0);
+    resolveAuth({ user: { role } });
+    await started;
+    assert.equal(h.context.renderCount, 1);
+  }
+});
+
+test('confirmed signed-out startup shows login once', async () => {
+  const h = harness();
+  h.run(`api = async () => ({ auth: 'firebase' }); getFirebase = async () => ({ user: null });
+    renderWelcome = () => { renderCount++; };`);
+  await h.run('startWorkspace()');
+  assert.equal(h.context.renderCount, 1);
+});
+
+test('transient startup failures preserve the existing session', async () => {
+  const h = harness();
+  h.run(`token = 'test-token'; sessionStorage.setItem('studio-token', token);
+    api = async () => ({ auth: 'local' }); enter = async () => { throw new Error('Offline'); };
+    renderWelcome = () => { renderCount++; };`);
+  await h.run('startWorkspace()');
+  assert.equal(h.context.renderCount, 0);
+  assert.equal(h.run('token'), 'test-token');
+  assert.match(h.run('root.innerHTML'), /Try again/);
+});
+
+test('late refresh responses cannot overwrite newer state or a different preview', async () => {
+  const h = harness(), requests = [];
+  h.context.respond = () => new Promise(resolve => requests.push(resolve));
+  h.run('api = respond;');
+  const old = h.run('load(false)'), latest = h.run('load(false)');
+  requests[1]({ state: { revision: 3 }, actor: { role: 'instructor' } }); await latest;
+  requests[0]({ state: { revision: 2 }, actor: { role: 'instructor' } }); await old;
+  assert.equal(h.run('state.revision'), 3);
+  const previousPreview = h.run('load(false)');
+  h.run("preview = 'another-company';");
+  requests[2]({ state: { revision: 4 }, actor: { role: 'student' } }); await previousPreview;
+  assert.equal(h.run('state.revision'), 3);
+  assert.equal(h.run('pendingLoads'), 0);
 });

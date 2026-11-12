@@ -51,7 +51,19 @@ export async function checkCloudStore(db) {
     assert.equal(replayed.revision, final.revision); assert.equal(replayed.hour, final.hour);
     now += 100000; assert.equal((await second.view(student, session.id)).state.hour, 29);
     assert.equal((await first.list(student)).length, 1);
-    return { concurrentRetry: true, staleDecisionRejected: true, membership: true, privateChat: true, assignment: true, dailySnapshots: true, restartPersistence: true, clockDeduplicated: true, replay: true };
+    const setup = await first.testTemplate(teacher, session.id);
+    assert.equal(setup.companyNames.length,3); assert.ok(!('messages' in setup));
+    await assert.rejects(() => first.testTemplate(student,session.id),/Instructor/);
+    await send(teacher,{type:'closeSession'},'close-session-check');
+    assert.equal((await second.view(student,session.id)).state.status,'completed');
+    await assert.rejects(() => send(student,{type:'message',channel:'team:company-2',text:'Blocked after close'},'closed-message-check'),/read-only/);
+    const deletion = {key:'delete-session-check',revision:(await first.view(teacher,session.id)).state.revision,command:{type:'deleteSession'}};
+    const receipt = await first.command(teacher,session.id,deletion);
+    assert.deepEqual(await second.command(teacher,session.id,deletion),receipt);
+    assert.equal((await second.list(student)).length,0);
+    await assert.rejects(() => second.view(student,session.id),/not found/);
+    await assert.rejects(() => second.testTemplate(teacher,session.id),/not found/);
+    return { lifecycle:true, testTemplate:true, concurrentRetry: true, staleDecisionRejected: true, membership: true, privateChat: true, assignment: true, dailySnapshots: true, restartPersistence: true, clockDeduplicated: true, replay: true };
   } finally {
     // Delete only the random, test-owned namespace created by this invocation.
     assert.match(prefix, /^qa_\d+_[a-f0-9]{8}$/);

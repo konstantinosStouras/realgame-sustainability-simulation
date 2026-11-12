@@ -1,5 +1,5 @@
-import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=4e8dc8e29f2a';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=4e8dc8e29f2a';
+import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=687c0a538b1a';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=687c0a538b1a';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -17,6 +17,7 @@ let linkedSession = new URL(location.href).searchParams.get('session');
 let state, actor, user, sessions = [], sessionId, preview, page = 'overview', channel = 'announcements', report = 'profit', reportRange = 30, selectedCompanies = new Set(), solo = null, health = null, roster = null, busy = false, online = true, firebaseClient = null;
 let testRoom = null, testPending = null;
 const submittingForms = new Set();
+let loadSequence = 0, pendingLoads = 0;
 const isTeacher = () => actor?.role === 'instructor';
 const company = () => state?.company;
 const simDate = hour => { const date = new Date(Date.parse(state?.startDate || '2026-01-01T00:00:00Z') + hour * 3600000); return date.toLocaleString('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }); };
@@ -62,19 +63,21 @@ async function connectBackend(input) {
 async function load(force = true, afterCommand = false) {
   if (solo) { ({ state, actor } = solo.view(preview)); if (force) render(); return; }
   if (!sessionId) return;
-  const loadingSession = sessionId;
+  const loadingSession = sessionId, loadingPreview = preview, sequence = ++loadSequence;
+  pendingLoads++;
   try {
     const data = await api(`/sessions/${sessionId}${preview ? `?company=${encodeURIComponent(preview)}` : ''}`);
-    if (sessionId !== loadingSession) return;
+    if (sessionId !== loadingSession || preview !== loadingPreview || sequence !== loadSequence || solo) return;
     const changed = !state || data.state.revision !== state.revision || !online;
     // Keep the version that the student actually reviewed while editing a decision.
     if (!force && !afterCommand && (submittingForms.size || dialog.open || document.activeElement?.closest('form'))) { online = true; return; }
     state = data.state; actor = data.actor; online = true;
     if ((force || changed) && !dialog.open && (force || (!submittingForms.size && !document.activeElement?.closest('form, details[open]')))) render();
   } catch (e) {
+    if (sessionId !== loadingSession || preview !== loadingPreview || sequence !== loadSequence || solo) return;
     if (testRoom && e.status === 410) { state = null; root.innerHTML = '<main class="welcome"><h1>Test round ended</h1><p>Its temporary data has been discarded.</p>' + button('test-leave','Return to classroom') + '</main>'; return; }
     if (!testRoom && e.status === 404) { state = null; sessionId = null; toast('This session is no longer available.'); await enter(); return; }
-    online = false; if (force) throw e; const status = document.querySelector('#connection'); if (status) status.textContent = 'Connection interrupted · reconnecting'; }
+    online = false; if (force) throw e; const status = document.querySelector('#connection'); if (status) status.textContent = 'Connection interrupted · reconnecting'; } finally { pendingLoads--; }
 }
 async function command(cmd) {
   if (busy) throw new Error('Another decision is still being submitted. Please wait and try again.'); busy = true;
@@ -151,7 +154,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=4e8dc8e29f2a')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=687c0a538b1a')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -200,7 +203,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=4e8dc8e29f2a')).testClient();
+      const client = (await import('./src/test-client.mjs?v=687c0a538b1a')).testClient();
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -210,10 +213,11 @@ function accountControls(person = user || actor) {
   if (testRoom) return `<div class="account-controls"><span data-theme-slot></span><details class="account-menu"><summary>${esc(person.name)} ⌄</summary><div class="account-dropdown"><strong>${esc(person.name)}</strong><p>Simulated ${esc(person.role)}</p>${person.role === 'instructor' ? button('test-students','Test students') : ''}${button('test-leave','Leave test')}</div></details></div>`;
   return `<div class="account-controls"><span data-theme-slot></span><details class="account-menu"><summary><span class="avatar">${esc(person.name.slice(0, 2).toUpperCase())}</span><span class="account-name">${esc(person.name)}</span><span aria-hidden="true">⌄</span></summary><div class="account-dropdown"><strong>${esc(person.name)}</strong><small>${esc(person.role)}</small><hr>${button('profile', 'My profile & statistics')}${button('sessions', 'My sessions')}${person.role === 'instructor' ? button('create', 'Create a session', '', '', !!solo) : button('join', 'Join a company', '', '', !!solo)}${person.role === 'instructor' && state ? button('nav', 'Session settings', 'admin') + button('roster', 'Student directory', '', '', !!solo) : ''}<hr>${button('logout', 'Log out', '', 'danger')}</div></details></div>`;
 }
-function createSessionFields() { return `${field('name', 'Session name', 'Sustainability challenge', 'text')}<div class="form-grid">${field('seed', 'Random seed', 42, 'number', 'min="0" max="4294967295"')}${field('days', 'Duration (days)', 30, 'number', 'min="1" max="180"')}</div><label>Company names (one per line)<textarea name="companies" required>Helio Works
+const sessionCities = ["athens", "berlin", "cairo", "dubai", "lima", "lisbon", "london", "madrid", "miami", "oslo", "paris", "rome", "seoul", "sydney", "tokyo"];
+function createSessionFields() { return `<div class="session-setup"><p class="form-note">Give your class a name and a memorable session ID.</p>${field('name', 'Session name', 'Sustainability challenge', 'text', 'maxlength="120"')}${select('sessionCity', 'Session ID', [...sessionCities.map(city => [city, city]), ['custom', 'Choose my own ID…']], 'athens')}<label data-custom-session hidden>Custom session ID<input name="customSessionId" disabled minlength="3" maxlength="32" pattern="[A-Za-z0-9]+(-[A-Za-z0-9]+)*" placeholder="e.g. london-2026" autocapitalize="none" spellcheck="false"></label><p class="form-note">Choose a city or your own ID: 3–32 letters, numbers or hyphens. IDs must be unique. Students still use company join codes.</p><div class="form-grid">${field('seed', 'Random seed', 42, 'number', 'min="0" max="4294967295"')}${field('days', 'Duration (days)', 30, 'number', 'min="1" max="180"')}</div><label>Company names (one per line)<textarea name="companies" required>Helio Works
 Northstar Solar
-Verdant Energy</textarea></label>${health?.classroomAccounting ? `<div class="form-grid">${select('revenueAt', 'Recognize sales revenue at', [['receipt', 'Customer receipt'], ['dispatch', 'Dispatch']], 'receipt')}${field('corporateOverhead', 'Additional corporate overhead (€ per day, per company)', 0, 'number', 'min="0" max="1000000" step="0.01"')}</div><p class="form-note">Customer payment is due after receipt. Corporate overhead is charged at each daily close.</p>` : ''}`; }
-async function createClassroom(f) {  const r = await api('/sessions', { ...(health?.classroomAccounting ? { revenueAt: f.get('revenueAt'), dailyCorporateOverhead: Math.round(value(f, 'corporateOverhead') * 100) } : {}), name: f.get('name'), seed: value(f, 'seed'), days: value(f, 'days'), companyNames: f.get('companies').split('\n').map(x => x.trim()).filter(Boolean) }); sessionStorage.setItem('studio-session', r.id); page = 'admin'; await enter(true); }
+Verdant Energy</textarea></label>${health?.classroomAccounting ? `<div class="form-grid">${select('revenueAt', 'Recognize sales revenue at', [['receipt', 'Customer receipt'], ['dispatch', 'Dispatch']], 'receipt')}${field('corporateOverhead', 'Additional corporate overhead (€ per day, per company)', 0, 'number', 'min="0" max="1000000" step="0.01"')}</div><p class="form-note">Customer payment is due after receipt. Corporate overhead is charged at each daily close.</p>` : ''}</div>`; }
+async function createClassroom(f) {  const r = await api('/sessions', { ...(health?.classroomAccounting ? { revenueAt: f.get('revenueAt'), dailyCorporateOverhead: Math.round(value(f, 'corporateOverhead') * 100) } : {}), id: f.get('sessionCity') === 'custom' ? f.get('customSessionId') : f.get('sessionCity'), name: f.get('name'), seed: value(f, 'seed'), days: value(f, 'days'), companyNames: f.get('companies').split('\n').map(x => x.trim()).filter(Boolean) }); sessionStorage.setItem('studio-session', r.id); page = 'admin'; await enter(true); }
 const sessionHints = {
   'open-session': 'Open session controls, company previews and reports. Effect on students: opening a session does not change their access or decisions.',
   'copy-session': 'Copy a link to this session. Effect on students: they still need to sign in and belong to a company; the link does not grant access.',
@@ -526,6 +530,7 @@ async function action(name, id) {
   if (name === 'session-export') { download('session-' + id + '.json', await api('/sessions/' + encodeURIComponent(id) + '/replay')); return; }
   if (name === 'open-session' || name === 'session-codes') { sessionStorage.setItem('studio-session', id); page = 'admin'; await enter(true); if (name === 'session-codes') await action('roster'); return; }
   if (name === 'sessions' && user?.role === 'instructor') { solo = null; await enter(); return; }
+  if (name === 'retry-start') { await startWorkspace(); return; }
   if (name === 'forget-server') { backend = localWorkspace ? '' : classroomBackend; localStorage.removeItem('studio-backend'); health = null; state = null; try { health = await api('/health'); } catch {} if (firebaseClient?.user) await enterFirebase(); else renderWelcome(); return; }
   if (name === 'retry-decision') { const pending = JSON.parse(sessionStorage.getItem(`studio-pending:${backend}:${actor.id}:${sessionId}`) || 'null'); if (pending) await command(pending.command); render(); return; }
   if (name === 'close') { dialog.close(); if (state) render(); return; }
@@ -541,7 +546,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=4e8dc8e29f2a')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=687c0a538b1a')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); renderWelcome(); return; }
@@ -617,6 +622,13 @@ document.addEventListener('submit', async event => {
 });
 document.addEventListener('change', async event => {
   const target = event.target;
+  if (target.name === 'sessionCity') {
+    const label = target.form.querySelector('[data-custom-session]');
+    const input = label.querySelector('input'), custom = target.value === 'custom';
+    label.hidden = !custom; input.disabled = !custom; input.required = custom;
+    if (custom) input.focus();
+    return;
+  }
   try {
     if (target.name === 'stock-finished' || target.name === 'stock-component') {
       const category = target.name.slice(6);
@@ -632,16 +644,34 @@ document.addEventListener('change', async event => {
     if (target.name?.startsWith('series-')) { if (!selectedCompanies.size) selectedCompanies = new Set(state.companies.map(c => c.id)); if (target.checked) selectedCompanies.add(target.name.slice(7)); else selectedCompanies.delete(target.name.slice(7)); if (!selectedCompanies.size) { selectedCompanies.add(target.name.slice(7)); toast('Keep at least one company selected to display the report.'); } render(); }
   } catch (e) { toast(e.message); }
 });
-const testLink = new URLSearchParams(location.hash.slice(1));
-if (testLink.has('test')) {
-  try { const client = (await import('./src/test-client.mjs?v=4e8dc8e29f2a')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
-  catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p>' + button('test-leave','Return to classroom') + '</main>'; }
-} else {
-
-try { health = await api('/health'); } catch { health = null; }
-if (!health || health.auth === 'firebase') {
-  renderWelcome();
-  try { const auth = await getFirebase(); if (auth.user) await enterFirebase(); } catch (e) { toast('Sign-in could not load. Check your connection and refresh the page.'); }
-} else if (token && health) { try { await enter(); } catch { token = ''; sessionStorage.removeItem('studio-token'); renderWelcome(); } } else renderWelcome();
+async function startWorkspace() {
+  if (location.hash?.startsWith('#test=')) {
+    const testLink = new URLSearchParams(location.hash.slice(1));
+    try { const client = (await import('./src/test-client.mjs?v=687c0a538b1a')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p>' + button('test-leave','Return to classroom') + '</main>'; }
+    return;
+  }
+  // Restore authentication alongside discovery; never paint a speculative login.
+  const authReady = localWorkspace ? null : getFirebase().then(value => ({ value }), error => ({ error }));
+  try {
+    try { health = await api('/health'); } catch (error) {
+      if (token || !localWorkspace) throw error;
+      health = null;
+    }
+    if (!health || health.auth === 'firebase') {
+      const restored = authReady ? await authReady : { value: await getFirebase() };
+      if (restored.error) throw restored.error;
+      if (restored.value.user) await enterFirebase();
+      else renderWelcome();
+    } else if (token) {
+      try { await enter(); } catch (error) {
+        if (error.status !== 401) throw error;
+        token = ''; sessionStorage.removeItem('studio-token'); renderWelcome();
+      }
+    } else renderWelcome();
+  } catch (error) {
+    root.innerHTML = `<main class="welcome" id="content">${brand}<section class="panel" role="alert"><h1>Workspace temporarily unavailable</h1><p>We could not restore your workspace. Your sign-in has been kept. Check your connection and try again.</p>${button('retry-start', 'Try again', '', 'primary')}</section></main>`;
+  }
 }
-setInterval(() => { if (!solo && state && !busy) load(false); }, 3000);
+await startWorkspace();
+setInterval(() => { if (!solo && state && !busy && !pendingLoads && !document.hidden) load(false); }, 3000);

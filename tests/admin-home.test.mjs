@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 
 const source = readFileSync(new URL('../app.mjs', import.meta.url), 'utf8')
-  .replace(/^import .*;\r?\n/gm, '').split("\nconst testLink =")[0];
+  .replace(/^import .*;\r?\n/gm, '').split("\nawait startWorkspace();")[0];
 function setup(role) {
   const root = {}, values = new Map();
   const storage = { getItem: k => values.get(k), setItem: (k,v) => values.set(k,v) };
@@ -35,4 +35,11 @@ test('account actions are role-aware and theme slot precedes the name', () => {
   assert.ok(html.indexOf('data-theme-slot')<html.indexOf('account-menu'));
   assert.match(html,/Student &lt;name&gt;/);assert.match(html,/Join a company/);
   assert.doesNotMatch(html,/Create a session|Student directory/);
+});
+
+test('creation form offers familiar cities and a separate custom ID', () => {
+ const h=setup('instructor');const html=h.run('createSessionFields()');
+ assert.match(html,/name="sessionCity"/);assert.match(html,/value="london"/);
+ assert.match(html,/name="customSessionId"/);assert.match(html,/data-custom-session hidden/);
+ assert.match(html,/name="name"/);assert.match(html,/session-setup/);
 });

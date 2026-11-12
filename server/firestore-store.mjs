@@ -1,4 +1,5 @@
 import { testTemplate } from './test-template.mjs';
+import { sessionId } from '../src/session-id.mjs';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createSession, applyCommand, assertInvariants, publicView, canMessage, fail } from '../src/engine.mjs';
 import { encodeState, decodeState, digest, advanceCloudClock } from './cloud-state.mjs';
@@ -56,9 +57,10 @@ export class FirestoreStore {
   }
   async create(user, opts = {}) {
     if (user.role !== 'instructor') fail('Instructor access required.', 403);
-    const state = createSession({ ...opts, id: randomUUID() }), encoded = encodeState(state);
+    const state = createSession({ ...opts, id: sessionId(opts.id, randomUUID) }), encoded = encodeState(state);
     const ref = this.sessionRef(state.id), invites = state.companies.map(c => ({ code: randomBytes(12).toString('base64url'), companyId: c.id, sessionId: state.id }));
     await this.db.runTransaction(async tx => {
+      if ((await tx.get(ref)).exists) fail('Session ID is already taken. Choose another city or a custom ID.', 409);
       const metadata = { createdAt: this.now(), ownerId: user.id, initial: { codec: encoded.codec, bytes: encoded.bytes, digest: encoded.digest, chunkCount: encoded.chunks.length } };
       this.writeState(tx, ref, state, metadata, null);
       encoded.chunks.forEach((data, i) => tx.create(ref.collection('initialChunks').doc(String(i)), { data }));
