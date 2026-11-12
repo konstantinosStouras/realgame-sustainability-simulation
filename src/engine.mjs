@@ -109,15 +109,21 @@ function dispatch(s, c, a) {
   const qty = integer(a.qty, 'Dispatch quantity', 1, order.remaining);
   const route = s.catalog.routes.find(x => x.id === a.routeId && x.enabled);
   if (!route) fail('Choose an enabled route.');
-  const cost = route.fixed + qty * route.unit; available(c, cost);
+  const cost = route.fixed + qty * route.unit, freightTerm = route.term ?? 0;
+  if (!freightTerm) available(c, cost);
   const stock = takeStock(c, 'panel', qty);
   const shipment = { id: uid(s, 'shipment'), orderId: order.id, qty, cost, stockValue: stock.value, carbon: route.carbonFixed + qty * route.carbonUnit, route: route.name, dispatchedAt: s.hour, expectedAt: s.hour + route.hours, receivedAt: null, paidAt: null, revenue: qty * order.price };
   order.remaining -= qty; c.shipments.push(shipment); c.dispatched += qty; c.emissions += shipment.carbon;
   post(s, c, `Goods in transit: ${shipment.id}`, { transit: stock.value, inventory: -stock.value });
-  post(s, c, `Freight paid: ${shipment.id}`, { expense: cost, cash: -cost });
+  if (freightTerm) {
+    shipment.freightDueAt = s.hour + freightTerm;
+    shipment.freightPaidAt = null;
+    post(s, c, `Freight incurred: ${shipment.id}`, { expense: cost, payable: -cost });
+    schedule(s, c, 'freightPayment', shipment.freightDueAt, { shipmentId: shipment.id }, `Pay freight for ${shipment.id}`);
+  } else post(s, c, `Freight paid: ${shipment.id}`, { expense: cost, cash: -cost });
   schedule(s, c, 'customerReceipt', shipment.expectedAt + sampleDelay(s, route), { shipmentId: shipment.id }, `${qty} modules reach customer (${shipment.id})`);
   const early = order.dueAt - shipment.expectedAt;
-  return `Dispatched ${qty} of ${order.originalQty} original modules. ${order.remaining} remain. Freight €${(cost / 100).toFixed(2)} paid. ${early < 0 ? 'Expected late: customer satisfaction will fall at receipt.' : early > 24 ? 'Expected more than 24 h early: a small satisfaction penalty applies at receipt.' : 'Expected within the delivery window.'} Transit can be delayed by up to ${route.maxDelay} h.`;
+  return `Dispatched ${qty} of ${order.originalQty} original modules. ${order.remaining} remain. Freight €${(cost / 100).toFixed(2)} ${freightTerm ? `due in ${freightTerm} h` : 'paid'}. ${early < 0 ? 'Expected late: customer satisfaction will fall at receipt.' : early > 24 ? 'Expected more than 24 h early: a small satisfaction penalty applies at receipt.' : 'Expected within the delivery window.'} Transit can be delayed by up to ${route.maxDelay} h.`;
 }
 function requireCompany(s, actor, a) {
   if (actor.role !== 'student') fail('Instructor previews are read-only. Sign in as a student to make company decisions.', 403);
@@ -156,7 +162,7 @@ export function applyCommand(s, actor, a, realAt = '2026-01-01T00:00:00.000Z') {
     }
     if (a.type === 'renameCompany') { const c = s.companies.find(x => x.id === a.companyId); if (!c) fail('Company not found.'); c.name = cleanText(a.name, 'Company name', 60); result = 'Company renamed.'; }
     if (a.type === 'catalog') {
-      const editable = { suppliers: { price: [1, 1000000], stock: [0, 10000000], replenish: [0, 1000000], lead: [1, 720], term: [0, 720], reliability: [0, 100] }, routes: { hours: [1, 720], fixed: [0, 1000000], unit: [0, 100000], reliability: [0, 100] }, markets: { volume: [0, 1000], referencePrice: [100, 1000000], greenWeight: [0, 100] }, energy: { fee: [0, 10000000], daily: [0, 1000000], delay: [1, 720] } };
+      const editable = { suppliers: { price: [1, 1000000], stock: [0, 10000000], replenish: [0, 1000000], lead: [1, 720], term: [0, 720], reliability: [0, 100] }, routes: { hours: [1, 720], term: [0, 720], fixed: [0, 1000000], unit: [0, 100000], reliability: [0, 100] }, markets: { volume: [0, 1000], referencePrice: [100, 1000000], greenWeight: [0, 100] }, energy: { fee: [0, 10000000], daily: [0, 1000000], delay: [1, 720] } };
       const rules = editable[a.collection]; if (!rules) fail('Unknown catalog.');
       const row = s.catalog[a.collection].find(x => x.id === a.id); if (!row) fail('Catalog row not found.');
       if (!a.patch || typeof a.patch !== 'object') fail('Catalog changes required.');
@@ -284,6 +290,11 @@ function executeEvent(s, e) {
   if (e.type === 'purchasePayment') {
     const p = c.purchases.find(x => x.id === d.purchaseId);
     if (!settle(s, c, e, { payable: p.cost, cash: -p.cost }, p.cost, `Supplier payment ${p.id}`)) return; p.paidAt = s.hour;
+  }
+  if (e.type === 'freightPayment') {
+    const sh = c.shipments.find(x => x.id === d.shipmentId);
+    if (!settle(s, c, e, { payable: sh.cost, cash: -sh.cost }, sh.cost, `Freight payment ${sh.id}`)) return;
+    sh.freightPaidAt = s.hour;
   }
   if (e.type === 'customerReceipt') {
     const sh = c.shipments.find(x => x.id === d.shipmentId), order = c.orders.find(x => x.id === sh.orderId); sh.receivedAt = s.hour; order.received += sh.qty; c.received += sh.qty; c.receivedValue += sh.revenue;
@@ -445,6 +456,7 @@ export function forecast(s, c) {
   return s.events.filter(e => e.companyId === c.id && e.status === 'pending').map(e => {
     let amount = 0;
     if (e.type === 'purchasePayment') amount = -c.purchases.find(x => x.id === e.data.purchaseId).cost;
+    if (e.type === 'freightPayment') amount = -c.shipments.find(x => x.id === e.data.shipmentId).cost;
     if (e.type === 'customerPayment') amount = c.shipments.find(x => x.id === e.data.shipmentId).revenue;
     if (e.type === 'loanFunding') amount = c.loans.find(x => x.id === e.data.loanId).amount;
     if (e.type === 'loanRepayment') { const l = c.loans.find(x => x.id === e.data.loanId); const part = l.installments?.[e.data.installment]; amount = part ? -part.principal - part.interest : -l.amount - l.interest; }

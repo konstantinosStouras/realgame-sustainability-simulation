@@ -16,6 +16,23 @@ test('partial dispatch preserves original order and recognizes revenue only at r
   assert.equal(c.orders[0].received, 20); assert.equal(balance(c, 'revenue'), -600000); assert.equal(balance(c, 'receivable'), 600000);
   advance(s, 24); assert.equal(balance(c, 'receivable'), 0); assert.equal(c.shipments[0].paidAt, s.hour); assertInvariants(s);
 });
+test('partial dispatch can defer freight for seven days without changing accepted terms', () => {
+  const s = quiet(), c = order(s, 160);
+  advance(s, 49);
+  act(s, { type: 'catalog', collection: 'routes', id: 'rail', patch: { term: 168, hours: 132, reliability: 100 } }, teacher);
+  const cash = balance(c, 'cash');
+  act(s, { type: 'dispatch', orderId: 'test-order', qty: 70, routeId: 'rail' });
+  const shipment = c.shipments[0];
+  assert.equal(c.orders[0].remaining, 90);
+  assert.equal(c.orders[0].originalQty, 160);
+  assert.equal(balance(c, 'cash'), cash);
+  assert.equal(balance(c, 'payable'), -shipment.cost);
+  assert.equal(shipment.freightDueAt, 217);
+  act(s, { type: 'catalog', collection: 'routes', id: 'rail', patch: { term: 0, fixed: 0 } }, teacher);
+  advance(s, 167); assert.equal(shipment.freightPaidAt, null);
+  advance(s, 1); assert.equal(shipment.freightPaidAt, 217);
+  assert.equal(balance(c, 'payable'), 0); assertInvariants(s);
+});
 test('stock, quantity, funds and role validation rejects invalid decisions', () => {
   const s = quiet(), c = order(s, 1000);
   for (const qty of [0, -1, NaN, Infinity, 1.5, 181]) assert.throws(() => act(s, { type: 'dispatch', orderId: 'test-order', qty, routeId: 'road' }));
