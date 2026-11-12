@@ -1,5 +1,5 @@
-import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=109b222f697a';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=109b222f697a';
+import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=0790fa4de063';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=0790fa4de063';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -135,7 +135,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=109b222f697a')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=0790fa4de063')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -439,7 +439,7 @@ async function action(name, id) {
   if (name === 'session-test') {
     const replay = await api('/sessions/' + encodeURIComponent(id) + '/replay');
     modal('Start a test round?', '<p>Rehearse this session’s initial setup in a private browser sandbox. Classroom progress and student accounts are not copied or changed.</p>', async () => {
-      solo = (await import('./src/solo.mjs?v=109b222f697a')).soloAdapter(replay.initial); solo.switchRole('instructor'); sessionId = 'solo'; preview = undefined; page = 'admin'; await load();
+      solo = (await import('./src/solo.mjs?v=0790fa4de063')).soloAdapter(replay.initial); solo.switchRole('instructor'); sessionId = 'solo'; preview = undefined; page = 'admin'; await load();
     }, 'Start test round'); return;
   }
   if (['session-close', 'session-delete', 'sessions-delete'].includes(name)) {
@@ -471,7 +471,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=109b222f697a')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=0790fa4de063')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); renderWelcome(); return; }
