@@ -1,5 +1,5 @@
-import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=fec0bd07aa43';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=fec0bd07aa43';
+import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=2b1a5bce39df';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=2b1a5bce39df';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -96,10 +96,31 @@ async function enter() {
 function renderLocalWelcome() {
   const currentYear = new Date().getFullYear();
   const footerYear = currentYear > 2026 ? '2026–' + currentYear : '2026';
-  root.innerHTML = `<main class="welcome" id="content"><div class="welcome-nav">${brand}</div><div class="welcome-layout"><section><p class="eyebrow">A living business classroom</p><h1>Good business.<br>A better footprint.</h1><p class="lead">Run a solar company. Balance ambition with resources. See how every decision travels through your business—and the world around it.</p></section><section class="panel"><p class="eyebrow">Classroom workspace</p><h2>${health ? 'Join your simulation' : 'Connect your classroom'}</h2>${health?.demo ? `<p class="form-note">Local demonstration · independent roles, one shared simulation.</p><div class="demo-choices">${button('demo', 'Open instructor workspace', 'demo-instructor', 'primary')}${[1, 2, 3].map(i => button('demo', `Student · ${['Helio', 'Northstar', 'Verdant'][i - 1]}`, `demo-student-${i}`)).join('')}</div><hr>` : ''}${health ? `<form id="login-form">${field('username', 'Username', '', 'text', 'autocomplete="username"')}${field('password', 'Password', '', 'password', 'autocomplete="current-password"')}${button('submit', 'Sign in', '', 'primary')}<div class="error" role="alert"></div></form><details><summary>New student? Join with a company code</summary><form id="register-form">${field('name', 'Display name', '', 'text', 'maxlength="80"')}${field('username', 'Username', '', 'text', 'autocomplete="username"')}${field('password', 'Password (at least 10 characters)', '', 'password', 'minlength="10" autocomplete="new-password"')}${field('code', 'Company join code', '', 'text')}${button('submit', 'Create student account', '', 'primary')}<div class="error" role="alert"></div></form></details>` : `<p class="muted">To play with a class, connect the address of a running Sustainability Studio server.</p><p class="form-note">For local shared play, run <code>npm run demo</code> in the project and open <a href="http://127.0.0.1:3000">the local workspace</a>.</p>`}<details ${health ? '' : 'open'}><summary>Server connection</summary><form id="backend-form">${field('backend', 'Server URL', backend || location.origin, 'url', 'placeholder="https://your-classroom.example"')}${button('submit', 'Connect server')}<div class="error" role="alert"></div></form></details></section></div><footer class="welcome-foot"><span><a href="https://www.stouras.com/">Konstantinos Stouras</a> · ${footerYear}</span></footer></main>`;
+  root.innerHTML = `<main class="welcome studio-landing" id="content"><header class="welcome-nav">${brand}</header><div class="welcome-layout"><section class="studio-intro" aria-labelledby="studio-title"><p class="eyebrow">A living business classroom</p><h1 id="studio-title">Good business.<br><span>A better footprint.</span></h1><p class="lead">Run a solar company and see how your decisions shape cash, customer service and carbon emissions.</p><div class="studio-solar" aria-hidden="true"></div></section><section class="panel studio-access"><p class="eyebrow">Classroom workspace</p><h2>${health ? 'Join your simulation' : 'Connect your classroom'}</h2>${health?.demo ? `<p class="form-note">Local demonstration · independent roles, one shared simulation.</p><div class="demo-choices">${button('demo', 'Open instructor workspace', 'demo-instructor', 'primary')}${[1, 2, 3].map(i => button('demo', `Student · ${['Helio', 'Northstar', 'Verdant'][i - 1]}`, `demo-student-${i}`)).join('')}</div><hr>` : ''}${health ? `<form id="login-form">${field('username', 'Username', '', 'text', 'autocomplete="username"')}${field('password', 'Password', '', 'password', 'autocomplete="current-password"')}${button('submit', 'Sign in', '', 'primary')}<div class="error" role="alert"></div></form><details><summary>New student? Join with a company code</summary><form id="register-form">${field('name', 'Display name', '', 'text', 'maxlength="80"')}${field('username', 'Username', '', 'text', 'autocomplete="username"')}${field('password', 'Password (at least 10 characters)', '', 'password', 'minlength="10" autocomplete="new-password"')}${field('code', 'Company join code', '', 'text')}${button('submit', 'Create student account', '', 'primary')}<div class="error" role="alert"></div></form></details>` : `<p class="muted">To play with a class, connect the address of a running Sustainability Studio server.</p><p class="form-note">For local shared play, run <code>npm run demo</code> in the project and open <a href="http://127.0.0.1:3000">the local workspace</a>.</p>`}<details ${health ? '' : 'open'}><summary>Server connection</summary><form id="backend-form">${field('backend', 'Server URL', backend || location.origin, 'url', 'placeholder="https://your-classroom.example"')}${button('submit', 'Connect server')}<div class="error" role="alert"></div></form></details></section></div><footer class="welcome-foot"><span><a href="https://www.stouras.com/">Konstantinos Stouras</a> · ${footerYear}</span></footer></main>`;
 }
 function firebaseForm() {
-  return `<p class="eyebrow">Welcome to the studio</p><h2>Pick up where you left off</h2><p class="form-note">Sign in, then enter the company code from your instructor.</p><form id="firebase-login-form">${field('email', 'Email', '', 'email', 'autocomplete="username"')}${field('password', 'Password', '', 'password', 'autocomplete="current-password"')}${button('submit', 'Sign in', '', 'primary')}<div class="error" role="alert"></div></form><p class="form-note">or</p>${button('google-signin', 'Continue with Google', '', 'primary')}<details><summary>New here? Create an account</summary><form id="firebase-register-form">${field('name', 'Display name', '', 'text', 'maxlength="80"')}${field('email', 'Email', '', 'email', 'autocomplete="username"')}${field('password', 'Password (10 characters minimum)', '', 'password', 'minlength="10" autocomplete="new-password"')}${button('submit', 'Create account', '', 'primary')}<div class="error" role="alert"></div></form></details><p>${button('reset-password', 'Forgot your password?', '', 'small')}</p>`;
+  return `<h2>Sign in to your studio</h2>
+    <p class="studio-access-note">Use the company code from your instructor after you sign in.</p>
+    <form id="firebase-login-form">
+      ${field('email', 'Email', '', 'email', 'autocomplete="username"')}
+      ${field('password', 'Password', '', 'password', 'autocomplete="current-password"')}
+      ${button('submit', 'Sign in', '', 'primary studio-signin')}
+      <div class="error" role="alert"></div>
+    </form>
+    <div class="studio-divider">or</div>
+    ${button('google-signin', '<img src="google-g.png" width="18" height="18" alt="">Continue with Google', '', 'studio-google')}
+    <div class="studio-account-options">
+      <details><summary>Create an account</summary>
+        <form id="firebase-register-form">
+          ${field('name', 'Display name', '', 'text', 'maxlength="80" autocomplete="name"')}
+          ${field('email', 'Email', '', 'email', 'autocomplete="username"')}
+          ${field('password', 'Password (10 characters minimum)', '', 'password', 'minlength="10" autocomplete="new-password"')}
+          ${button('submit', 'Create account', '', 'primary studio-signin')}
+          <div class="error" role="alert"></div>
+        </form>
+      </details>
+      ${button('reset-password', 'Forgot your password?', '', 'studio-reset')}
+    </div>`;
 }
 function renderWelcome() {
   renderLocalWelcome();
@@ -109,7 +130,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=fec0bd07aa43')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=2b1a5bce39df')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -409,7 +430,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=fec0bd07aa43')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=2b1a5bce39df')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); renderWelcome(); return; }
@@ -501,6 +522,6 @@ document.addEventListener('change', async event => {
 try { health = await api('/health'); } catch { health = null; }
 if (!health || health.auth === 'firebase') {
   renderWelcome();
-  try { const auth = await getFirebase(); if (auth.user) await enterFirebase(); } catch (e) { toast('Google sign-in could not load. Check your connection, or explore the solo sandbox.'); }
+  try { const auth = await getFirebase(); if (auth.user) await enterFirebase(); } catch (e) { toast('Sign-in could not load. Check your connection and refresh the page.'); }
 } else if (token && health) { try { await enter(); } catch { token = ''; sessionStorage.removeItem('studio-token'); renderWelcome(); } } else renderWelcome();
 setInterval(() => { if (!solo && state && !busy) load(false); }, 3000);

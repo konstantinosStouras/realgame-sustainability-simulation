@@ -125,3 +125,73 @@
 @media (max-width: 980px) {
   .student-panels { grid-template-columns: minmax(0, 1fr); }
 }
+
+.studio-landing { max-width: 1200px; padding: 28px 32px 24px; }
+.studio-landing .welcome-nav { margin-bottom: 32px; padding-bottom: 22px; border-bottom: 1px solid var(--line); }
+.studio-landing .brand small { color: var(--green); }
+.studio-landing .welcome-layout { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.studio-intro {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 510px;
+  padding: clamp(28px, 5vw, 60px);
+  border-radius: 22px;
+  background: linear-gradient(145deg, #173a31, #214c3c);
+  color: var(--paper);
+}
+.studio-intro .eyebrow { color: var(--lime); font-size: 11px; }
+.studio-intro h1 { margin: 24px 0 20px; font-size: clamp(42px, 5.2vw, 70px); letter-spacing: -.045em; }
+.studio-intro h1 span { color: var(--lime); }
+.studio-intro .lead { max-width: 34ch; margin: 0; color: #e1ebdf; font-size: 16px; }
+.studio-solar { position: absolute; inset: 0; z-index: -1; overflow: hidden; }
+.studio-solar::before, .studio-solar::after { content: ''; position: absolute; }
+.studio-solar::before {
+  width: 160px;
+  height: 160px;
+  right: 7%;
+  bottom: 13%;
+  border-radius: 50%;
+  background: #a4c67e;
+  opacity: .24;
+}
+.studio-solar::after {
+  width: 360px;
+  height: 150px;
+  bottom: -25px;
+  right: -35px;
+  transform: skewX(-32deg) rotate(-9deg);
+  border: 1px solid #a4c67e;
+  border-radius: 6px;
+  background: repeating-linear-gradient(90deg, transparent 0 59px, #a4c67e 59px 60px),
+    repeating-linear-gradient(0deg, #2a5746 0 36px, #a4c67e 36px 37px);
+  opacity: .65;
+}
+.studio-landing .studio-access { margin: 0; padding: clamp(24px, 4vw, 42px); border-radius: 22px; box-shadow: 0 12px 36px #183e3509; }
+.studio-access h2 { margin-bottom: 8px; font-size: 26px; color: var(--ink); letter-spacing: -.035em; }
+.studio-access-note { margin-bottom: 24px; color: var(--muted); }
+.studio-access label { font-size: 13px; color: var(--text); }
+.studio-access input { min-height: 46px; font-size: 16px; }
+.studio-signin, .studio-google { width: 100%; min-height: 46px; }
+.studio-google { gap: 10px; border-color: #747775; background: #fff; color: #1f1f1f; font: 500 14px/20px "Google Sans", Arial, sans-serif; }
+.studio-google:hover { background: #f5f8ff; border-color: #747775; }
+.studio-google img { flex: none; object-fit: contain; }
+.studio-divider { display: flex; align-items: center; gap: 12px; margin: 17px 0; color: var(--muted); font-size: 13px; }
+.studio-divider::before, .studio-divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.studio-account-options { display: grid; gap: 4px; margin-top: 16px; }
+.studio-access .studio-account-options details { margin: 0; }
+.studio-account-options summary, .studio-reset { font-size: 13px; color: var(--green); }
+.studio-account-options summary { padding: 8px 0; }
+.studio-reset, .studio-reset:hover { justify-self: start; border: 0; background: transparent; padding: 8px 0; text-decoration: underline; text-underline-offset: 3px; }
+.studio-access .error:empty { display: none; }
+.studio-landing .welcome-foot { justify-content: center; margin-top: 36px; padding-top: 20px; font-size: 13px; }
+@media (max-width: 760px) {
+  .studio-landing { padding: 20px 16px; }
+  .studio-landing .welcome-nav { margin-bottom: 20px; padding-bottom: 16px; }
+  .studio-landing .welcome-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .studio-intro { min-height: 0; }
+  .studio-intro h1 { font-size: clamp(36px, 8vw, 54px); margin: 14px 0 12px; }
+  .studio-intro .lead { font-size: 15px; }
+  .studio-solar { display: none; }
+  .studio-landing .welcome-foot { margin-top: 24px; }
+}
