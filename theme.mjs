@@ -56,7 +56,7 @@
     if (dialog) new MutationObserver(() => {
       for (const button of buttons) if (!button.isConnected) buttons.delete(button);
       if (dialog.open && !dialog.querySelector('.theme-toggle')) {
-        dialog.append(makeButton());
+        dialog.prepend(makeButton());
         apply();
       }
     }).observe(dialog, { childList: true, attributes: true, attributeFilter: ['open'] });

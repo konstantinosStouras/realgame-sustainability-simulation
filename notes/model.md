@@ -71,7 +71,7 @@ All ledger postings are integer EUR cents, double-entry, with debits positive an
 | Supplier receipt | Debit inventory; credit inbound asset |
 | Supplier paid | Debit payable; credit cash |
 | Customer dispatch | Debit goods in transit; credit inventory; freight expensed and paid |
-| Customer receipt | Debit receivable; credit revenue; debit cost of goods sold; credit goods in transit |
+| Sale recognized (receipt or dispatch, depending on session setting) | Debit receivable; credit revenue; debit cost of goods sold; credit goods in transit |
 | Customer paid | Debit cash; credit receivable |
 | Investment ordered | Debit construction/prepaid asset; credit cash |
 | Investment activated | Debit fixed assets; credit construction |
@@ -87,13 +87,19 @@ Daily overhead includes €350 rent, the active energy supplier's standing fee, 
 
 Carbon includes newly received purchased components and their inbound transport, production electricity, and dispatched customer freight. Opening stock's embodied carbon remains in stock intensity but is excluded from new operational emissions. Material conversion transfers carbon without double-counting it. This teaching footprint is not a certified corporate GHG inventory. There is no carbon price or offset system in v1.
 
+### Classroom accounting settings
+
+When creating a classroom, the instructor can recognize sales at customer receipt (the default) or at dispatch. Dispatch accounting posts revenue and the associated cost of goods sold together. Customer receipts and their service effects still follow actual arrival, and the payment term still starts at receipt. Existing classrooms keep their original accounting policy.
+
+An optional corporate overhead amount per company posts at each midnight close, in addition to operating costs. Unpaid overhead accrues as a liability. Use this setting to compare overhead assumptions across otherwise identical runs. The Finance page itemizes expenses from the journal. Reports list dispatches and customer receipts separately.
+
 ## Reports, roles, and durability
 
 Live metrics and the transaction journal update after each committed command/tick. Daily chart records are immutable midnight snapshots. Cumulative measures include cash, profit, revenue, output, electricity, energy expense, stock, dispatches, receipts, and emissions; daily sales/production are differences between successive snapshots. Delivered market share is cumulative received modules divided by all received modules, zero before any receipts. CSV exports include units and simulation time. The committed cash forecast only contains already scheduled monetary events: it excludes future trading, wages and overhead, and purchase/sale settlements not yet scheduled by physical receipt. It is not a projected bank balance.
 
 The server stores state, accounts, memberships, hashed session tokens (local demonstration only), invitations, requests and replay commands in SQLite WAL transactions. Optimistic revisions reject stale decisions. The client preserves the reviewed version while a form is open and retains uncertain requests for safe retry. Per-user idempotency keys return the original result on retry and reject reuse with a different command. Server checks enforce ownership and permissions on every action. Firebase ID tokens are verified for the configured project with the official Admin SDK. Verified emails are required. Production can additionally enable revocation checks with application-default credentials.
 
-Announcements are instructor-to-all. Global messages are visible to the class. Teacher conversations include that company and instructors. Team messages include only the company's students, and peer messages include only the two companies. Instructor previews do not grant access to private team or peer messages. User-supplied sender fields are ignored. Instructor configuration and company decisions are auditable. Replay exports are instructor-only; private team/peer message text is replaced by a placeholder, preserving economic replay and sequence numbers. Assignment audit transitions are replayed, while user accounts and SQL membership tables are not recreated. Older sessions with unlogged assignment transitions explicitly report incomplete replay. Exports still contain identities and permitted communication; treat them as private class records. Never commit them.
+Announcements are posted by the instructor and visible to the class. Private instructor conversations include that company and instructors. Internal team messages are visible only to the company's students. Legacy class-wide and peer chats are hidden. User-supplied sender fields are ignored. Instructor configuration and company decisions are auditable. Replay exports are instructor-only; internal team and legacy class-wide and peer message text is replaced by a placeholder, preserving economic replay and sequence numbers. Assignment audit transitions are replayed, while user accounts and SQL membership tables are not recreated. Older sessions with unlogged assignment transitions explicitly report incomplete replay. Exports still contain identities and permitted communication; treat them as private class records. Never commit them.
 
 ## Limits and next iterations
 

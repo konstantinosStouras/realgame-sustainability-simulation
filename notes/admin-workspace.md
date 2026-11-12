@@ -8,4 +8,5 @@ Company tools appear only for students or an explicit instructor company preview
 
 The theme uses one persisted preference across welcome, admin, company and dialog views. Its main button moves into the header beside the account menu. Mobile layouts stack the setup and session columns and constrain the dropdown to the viewport. Browser inspection verified a 376 CSS-pixel viewport without horizontal overflow, theme persistence across navigation and reload, and explicit company preview navigation.
 
-Validation: 61 automated tests, JavaScript syntax checks, browser release fingerprint verification, and diff review. Only synthetic demonstration data was used for UI checks.
+Validation: 63 automated tests, JavaScript syntax checks, browser release fingerprint verification, and diff review. Only synthetic demonstration data was used for UI checks.
+

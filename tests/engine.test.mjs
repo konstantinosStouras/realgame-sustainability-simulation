@@ -1,6 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createSession, applyCommand, advance, assertInvariants, publicView, canMessage, balance } from '../src/engine.mjs';
+
+test('dispatch accounting books the sale once while receipt controls collection', () => {
+  const s = createSession({ revenueAt: 'dispatch', dailyCorporateOverhead: 200000 });
+  const c = s.companies[0];
+  c.orders.push({ id: 'recognition-order', originalQty: 10, remaining: 10, received: 0, dueAt: 48, price: 28500, payment: 72 });
+  act(s, { type: 'dispatch', orderId: 'recognition-order', qty: 10, routeId: 'air' });
+  assert.equal(balance(c, 'revenue'), -285000);
+  assert.equal(balance(c, 'cogs'), 130000);
+  assert.equal(balance(c, 'transit'), 0);
+  assert.equal(c.received, 0);
+  const receiptAt = s.events.find(e => e.type === 'customerReceipt').at;
+  advance(s, 24);
+  assert.equal(c.received, 10);
+  assert.equal(balance(c, 'revenue'), -285000);
+  assert.equal(balance(c, 'cogs'), 130000);
+  assert.equal(s.events.find(e => e.type === 'customerPayment').at, receiptAt + 72);
+  assert.equal(c.ledger.find(e => e.description === 'Daily corporate overhead').lines.expense, 200000);
+  advance(s, receiptAt + 72 - 24);
+  assert.equal(balance(c, 'receivable'), 0);
+  assertInvariants(s);
+});
 const teacher = { id: 't', role: 'instructor', name: 'Teacher' };
 const student = { id: 's', role: 'student', companyId: 'company-1', name: 'Student' };
 const act = (s, a, who = student) => applyCommand(s, who, a);
@@ -142,7 +163,12 @@ test('messaging scope and authoritative identity are preserved in views', () => 
   assert.equal(publicView(s, { ...student, companyId: 'company-2' }).messages.length, 0);
   assert.equal(publicView(s, teacher).messages.length, 0);
   assert.throws(() => act(s, { type: 'message', channel: 'announcements', text: 'spoof' }), /access/);
-  assert.equal(canMessage(s, student, 'peer:company-1:company-2'), true);
+  for (const channel of ['peer:company-1:company-2', 'global']) {
+    const command = { type: 'message', channel, text: 'Legacy message' };
+    assert.throws(() => act(s, command), { status: 403 });
+    applyCommand(s, student, command, undefined, { replay: true });
+  }
+  assert.equal(publicView(s, student).messages.length, 1);
   assert.equal(canMessage(s, student, 'peer:company-2:company-3'), false);
   assert.equal(publicView(s, student, 'company-2').company.id, 'company-1');
   assert.equal(publicView(s, student).companies[1].accounts, undefined);

@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-const files = ['index.html', 'styles.css', 'theme.css', 'theme.mjs', 'app.mjs', 'firebase-config.mjs', 'src/engine.mjs', 'src/solo.mjs', 'src/firebase-client.mjs'];
+const files = ['index.html', 'theme.css', 'theme.mjs', 'styles.css', 'app.mjs', 'firebase-config.mjs', 'src/engine.mjs', 'src/solo.mjs', 'src/firebase-client.mjs'];
 const normalize = text => text.replace(/\?v=[a-z0-9-]+/g, '').replace(/\r\n/g, '\n');
 const sources = await Promise.all(files.map(file => readFile(new URL(`../${file}`, import.meta.url), 'utf8')));
 const hash = createHash('sha256');

@@ -138,7 +138,7 @@ test('settings that complete a session do not attempt a rejected follow-up clock
   assert.equal(h.run('submitted[0].type'), 'configure');
 });
 
-test('student workspace groups tools and shows filtered live stock with one Inventory heading', () => {
+test('student workspace exposes nine categories and shows filtered live stock with one Inventory heading', () => {
   const h = harness();
   h.run(`actor.role = 'student'; page = 'workspace';
     state.recipe = {cell:32,frame:1,controller:2};
@@ -148,7 +148,8 @@ test('student workspace groups tools and shows filtered live stock with one Inve
     };
     openPanels.add('inventory');`);
   const navigation = h.run('workspaceNavigation(false, () => true)');
-  assert.match(navigation, /<summary>Information<\/summary>[\s\S]*data-id="inventory"[\s\S]*<summary>Decisions<\/summary>[\s\S]*data-id="orders"/);
+  assert.equal((navigation.match(/data-action="workspace-tool"/g) || []).length, 8);
+  assert.match(navigation, /data-id="operations"[\s\S]*data-id="logistics"[\s\S]*href="notes\/model.md"[\s\S]*data-id="help"/);
   const workspace = h.run('studentWorkspace(() => true)');
   assert.equal((workspace.match(/<h2[^>]*>Inventory<\/h2>/g) || []).length, 1);
   assert.match(workspace, /Solar panel[\s\S]*Photo cell[\s\S]*240/);
