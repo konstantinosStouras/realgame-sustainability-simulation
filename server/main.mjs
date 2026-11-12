@@ -1,3 +1,4 @@
+import { readExportForm, sendExport } from './export-download.mjs';
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -20,14 +21,19 @@ export function createApp({ store = new Store(process.env.DATA_PATH || '.data/si
       if (origin && origin !== ownOrigin && !origins.includes(origin)) fail('This origin is not allowed.', 403);
       if (origins.includes(origin)) { res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Vary', 'Origin'); }
       if (req.method === 'OPTIONS') { res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type'); res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'); res.writeHead(204); res.end(); return; }
-      if (url.pathname === '/api/health') return send(200, { ok: true, demo, version: 1, classroomAccounting: true, sessionLifecycle: true, testClassroom: true, auth: verifyFirebase ? 'firebase' : 'local-demo', projectId });
+      if (url.pathname === '/api/health') return send(200, { ok: true, demo, version: 1, classroomAccounting: true, sessionLifecycle: true, attachmentExport: true, testClassroom: true, auth: verifyFirebase ? 'firebase' : 'local-demo', projectId });
       if (!url.pathname.startsWith('/api/')) {
         if (req.method !== 'GET' && req.method !== 'HEAD') fail('Method not allowed.', 405);
         const files = { '/': 'index.html', '/index.html': 'index.html', '/styles.css': 'styles.css', '/theme.css': 'theme.css', '/theme.mjs': 'theme.mjs', '/google-g.png': 'google-g.png', '/app.mjs': 'app.mjs', '/src/engine.mjs': 'src/engine.mjs', '/src/solo.mjs': 'src/solo.mjs', '/src/test-client.mjs': 'src/test-client.mjs', '/src/test-worker.mjs': 'src/test-worker.mjs', '/src/test-classroom.mjs': 'src/test-classroom.mjs', '/src/firebase-client.mjs': 'src/firebase-client.mjs', '/firebase-config.mjs': 'firebase-config.mjs', '/notes/model.md': 'notes/model.md' };
         const file = files[url.pathname]; if (!file) fail('Not found.', 404);
         const type = file.endsWith('.mjs') ? 'text/javascript; charset=utf-8' : file.endsWith('.css') ? 'text/css; charset=utf-8' : file.endsWith('.png') ? 'image/png' : file.endsWith('.md') ? 'text/plain; charset=utf-8' : 'text/html; charset=utf-8';
-        res.setHeader('Content-Security-Policy', "default-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; img-src 'self' data: https://*.googleusercontent.com; style-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com; frame-src https://*.firebaseapp.com https://accounts.google.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+        res.setHeader('Content-Security-Policy', "default-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; img-src 'self' data: https://*.googleusercontent.com; style-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com; frame-src 'self' https://*.firebaseapp.com https://accounts.google.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
         return send(200, await readFile(resolve(ROOT, file)), type);
+      }
+      if (url.pathname === '/api/export-download') {
+        const credentials = await readExportForm(req);
+        const user = verifyFirebase ? store.firebaseUser(await verifyFirebase(credentials.token), (process.env.FIREBASE_INSTRUCTOR_UIDS || '').split(',').filter(Boolean)) : store.authenticate(credentials.token);
+        return sendExport(res, credentials.id, await store.replay(user, credentials.id));
       }
       let body = {};
       if (req.method === 'POST') {
