@@ -46,7 +46,7 @@ export async function checkCloudStore(db) {
     assert.equal(view.state.hour, 29);
     await send(teacher, { type: 'clock', status: 'paused' }, 'pause-durable-clock');
     const exported = await first.replay(teacher, session.id), replayed = structuredClone(exported.initial);
-    for (const record of exported.commands) { if (record.command.type === 'tick') tick(replayed); else applyCommand(replayed, record.actor, record.command, record.realAt); }
+    for (const record of exported.commands) { if (record.command.type === 'tick') tick(replayed); else applyCommand(replayed, record.actor, record.command, record.realAt, { replay: true }); }
     const final = (await first.view(teacher, session.id)).state;
     assert.equal(replayed.revision, final.revision); assert.equal(replayed.hour, final.hour);
     now += 100000; assert.equal((await second.view(student, session.id)).state.hour, 29);

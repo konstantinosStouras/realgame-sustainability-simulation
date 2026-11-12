@@ -27,7 +27,7 @@ test('persistence, tokens, scoped membership and deterministic command export su
   try {
     let { store, t, s, u } = fixture(path); const login = store.login('student', password);
     store.command(t, s.id, { key: 'advance-1', revision: 0, command: { type: 'step', hours: 24 } });
-    const replay = store.replay(t, s.id); for (const record of replay.commands) record.command.type === 'tick' ? tick(replay.initial) : applyCommand(replay.initial, record.actor, record.command, record.realAt);
+    const replay = store.replay(t, s.id); for (const record of replay.commands) record.command.type === 'tick' ? tick(replay.initial) : applyCommand(replay.initial, record.actor, record.command, record.realAt, { replay: true });
     assert.equal(JSON.stringify(replay.initial), JSON.stringify(store.session(s.id)));
     const other = store.addUser('outsider', 'Outsider', password); assert.throws(() => store.actor(other, s.id), /not a member/); store.close();
     store = new Store(path); assert.equal(store.session(s.id).hour, 24); assert.equal(store.authenticate(login.token).id, u.id); store.logout(login.token); assert.throws(() => store.authenticate(login.token), /Sign in/); store.close();
@@ -79,15 +79,15 @@ test('private messages are absent from instructor replay exports', () => {
   store.command(u, s.id, { key: 'private-team-msg', revision: 0, command: { type: 'message', channel: 'team:company-1', text: 'private content' } });
   const exported = JSON.stringify(store.replay(t, s.id)); assert.equal(exported.includes('private content'), false); assert.ok(exported.includes('[private message redacted]')); store.close();
 });
-test('team and peer messages reach their participants but not another company', () => {
+test('team and instructor messages respect company membership', () => {
   const { store, t, s, u } = fixture();
   const second = store.addUser('teammate', 'Teammate', password), peer = store.addUser('peer-user', 'Peer', password), other = store.addUser('other-user', 'Other', password);
   const invites = store.roster(t, s.id).invites;
   store.join(second, invites[0].code); store.join(peer, invites[1].code); store.join(other, invites[2].code);
   store.command(u, s.id, { key: 'team-roundtrip', revision: 0, command: { type: 'message', channel: 'team:company-1', text: 'Internal team plan' } });
-  store.command(u, s.id, { key: 'peer-roundtrip', revision: 1, command: { type: 'message', channel: 'peer:company-1:company-2', text: 'Peer question' } });
+  store.command(u, s.id, { key: 'teacher-roundtrip', revision: 1, command: { type: 'message', channel: 'teacher:company-1', text: 'Instructor question' } });
   const { publicView } = engineForView;
   const view = who => publicView(store.session(s.id), store.actor(who, s.id));
-  assert.equal(view(second).messages.length, 2); assert.equal(view(peer).messages.length, 1); assert.equal(view(other).messages.length, 0); assert.equal(view(t).messages.length, 0);
+  assert.equal(view(second).messages.length, 2); assert.equal(view(peer).messages.length, 0); assert.equal(view(other).messages.length, 0); assert.equal(view(t).messages.length, 1);
   store.assign(t, s.id, second.id, 'company-3'); assert.equal(view(second).messages.length, 0); store.close();
 });

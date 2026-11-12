@@ -17,7 +17,7 @@ function run(exported) {
   const replayed = structuredClone(exported.initial);
   for (const record of exported.commands) {
     if (record.command.type === 'tick') tick(replayed);
-    else applyCommand(replayed, record.actor, record.command, record.realAt);
+    else applyCommand(replayed, record.actor, record.command, record.realAt, { replay: true });
   }
   return replayed;
 }
@@ -32,7 +32,7 @@ test('assignment replay preserves revision and audit while keeping private chat 
   const { store, teacher, student, state, send } = fixture();
   try {
     send(student, { type: 'message', channel: 'team:company-1', text: 'PRIVATE-TEAM-ONE' });
-    send(student, { type: 'message', channel: 'peer:company-1:company-2', text: 'PRIVATE-PEER' });
+
     store.assign(teacher, state.id, student.id, 'company-2');
     send(student, { type: 'message', channel: 'team:company-2', text: 'PRIVATE-TEAM-TWO' });
     send(student, { type: 'message', channel: 'teacher:company-2', text: 'Teacher-visible question' });
@@ -43,7 +43,7 @@ test('assignment replay preserves revision and audit while keeping private chat 
     assert.equal(exported.complete, true);
     assert.equal(exported.missingAssignments, 0);
     assert.equal(exported.commands.filter(x => x.command.type === 'assignment').length, 2);
-    assert.doesNotMatch(JSON.stringify(exported), /PRIVATE-TEAM-ONE|PRIVATE-PEER|PRIVATE-TEAM-TWO/);
+    assert.doesNotMatch(JSON.stringify(exported), /PRIVATE-TEAM-ONE|PRIVATE-TEAM-TWO/);
     assert.match(JSON.stringify(exported), /Teacher-visible question/);
     const final = store.session(state.id);
     // Persistence uses JSON, which intentionally normalizes JavaScript -0 to 0.

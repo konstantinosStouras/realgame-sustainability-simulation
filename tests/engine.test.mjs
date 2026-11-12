@@ -142,7 +142,12 @@ test('messaging scope and authoritative identity are preserved in views', () => 
   assert.equal(publicView(s, { ...student, companyId: 'company-2' }).messages.length, 0);
   assert.equal(publicView(s, teacher).messages.length, 0);
   assert.throws(() => act(s, { type: 'message', channel: 'announcements', text: 'spoof' }), /access/);
-  assert.equal(canMessage(s, student, 'peer:company-1:company-2'), true);
+  for (const channel of ['peer:company-1:company-2', 'global']) {
+    const command = { type: 'message', channel, text: 'Legacy message' };
+    assert.throws(() => act(s, command), { status: 403 });
+    applyCommand(s, student, command, undefined, { replay: true });
+  }
+  assert.equal(publicView(s, student).messages.length, 1);
   assert.equal(canMessage(s, student, 'peer:company-2:company-3'), false);
   assert.equal(publicView(s, student, 'company-2').company.id, 'company-1');
   assert.equal(publicView(s, student).companies[1].accounts, undefined);

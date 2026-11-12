@@ -137,7 +137,7 @@ function requireCompany(s, actor, a) {
   const c = s.companies.find(x => x.id === actor.companyId);
   if (!c) fail('Join a company first.', 403); return c;
 }
-export function applyCommand(s, actor, a, realAt = '2026-01-01T00:00:00.000Z') {
+export function applyCommand(s, actor, a, realAt = '2026-01-01T00:00:00.000Z', { replay = false } = {}) {
   if (!a || typeof a.type !== 'string') fail('A command type is required.');
   // Preserve contracts when opening sessions saved before energy-term snapshots were added.
   for (const c of s.companies) c.energyTerms ||= structuredClone(s.catalog.energy.find(x => x.id === c.energy));
@@ -178,7 +178,9 @@ export function applyCommand(s, actor, a, realAt = '2026-01-01T00:00:00.000Z') {
   } else if (a.type === 'message') {
     if (!s.features.messaging.allowed) fail('Messaging is disabled.', 403);
     const channel = cleanText(a.channel, 'Channel');
-    if (!canMessage(s, actor, channel, true)) fail('You do not have access to this channel.', 403);
+    // Keep the sequence and revision of previously accepted messages during replay.
+    const legacyMessage = replay && (channel === 'global' || channel.startsWith('peer:'));
+    if (!legacyMessage && !canMessage(s, actor, channel, true)) fail('You do not have access to this channel.', 403);
     const message = { id: uid(s, 'message'), channel, text: cleanText(a.text, 'Message', 2000), senderId: actor.id, senderName: actor.name, role: actor.role, companyId: actor.companyId || null, hour: s.hour, realAt };
     s.messages.push(message); result = 'Message sent.';
   } else {
@@ -274,13 +276,13 @@ export function applyCommand(s, actor, a, realAt = '2026-01-01T00:00:00.000Z') {
 }
 export function canMessage(s, actor, channel, sending = false) {
   if (!['instructor', 'student'].includes(actor.role)) return false;
-  if (channel === 'global') return true;
+
   if (channel === 'announcements') return !sending || actor.role === 'instructor';
   const [kind, ...ids] = channel.split(':');
   if (ids.some(id => !s.companies.some(c => c.id === id))) return false;
   if (kind === 'teacher' && ids.length === 1) return actor.role === 'instructor' || ids[0] === actor.companyId;
   if (kind === 'team' && ids.length === 1) return actor.role === 'student' && ids[0] === actor.companyId;
-  if (kind === 'peer' && ids.length === 2 && ids[0] < ids[1]) return actor.role === 'student' && ids.includes(actor.companyId);
+
   return false;
 }
 function settle(s, c, e, lines, required, description) {

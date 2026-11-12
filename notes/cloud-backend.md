@@ -14,7 +14,7 @@ All direct Firestore client access is denied, including authenticated clients. T
 - `studioSessions`: clock, revision and snapshot metadata. Subcollections contain compressed current/initial state chunks and ordered replay commands.
 - `studioRequests`: per-user idempotency receipts, committed atomically with decisions.
 
-Private team and peer messages stay within their participants. Instructor replay exports redact their text. Records may still contain participant names and permitted messages; exports are private teaching records and must not be committed to this public repository.
+Students can message their own team and the instructor, and can read instructor announcements. Instructor replay exports redact internal team messages and legacy class-wide and peer messages. Records may still contain participant names and permitted messages; exports are private teaching records and must not be committed to this public repository.
 
 ## Consistency and clock
 
