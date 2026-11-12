@@ -1,5 +1,5 @@
-import { ITEMS, INVESTMENTS, FEATURES } from './src/engine.mjs?v=b6adb3295473';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=b6adb3295473';
+import { ITEMS, INVESTMENTS, FEATURES } from './src/engine.mjs?v=a8ecf4c9df98';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=a8ecf4c9df98';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -7,7 +7,7 @@ const exactMoney = n => new Intl.NumberFormat('en-IE', { style: 'currency', curr
 const number = n => new Intl.NumberFormat('en-GB', { maximumFractionDigits: 1 }).format(n || 0);
 const precise = n => new Intl.NumberFormat('en-GB', { maximumFractionDigits: 3 }).format(n || 0);
 const total = (list, key) => list.reduce((sum, x) => sum + (x[key] || 0), 0);
-const icon = name => `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">${({ overview: '<path d="M3 10 12 3l9 7v11h-7v-7h-4v7H3Z"/>', orders: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/>', supply: '<path d="m3 7 9-4 9 4v11l-9 4-9-4ZM3 7l9 5 9-5M12 12v10"/>', production: '<path d="M3 21V10l6 4V8l6 5V3h5v18ZM7 18h1m4 0h1m4 0h1"/>', finance: '<rect x="3" y="5" width="18" height="15" rx="2"/><path d="M3 9h18m-6 5h6"/>', energy: '<path d="m13 2-9 12h7l-1 8 10-13h-7Z"/>', reports: '<path d="M4 20V12h4v8m4 0V4h4v16m4 0v-9M2 21h20"/>', messages: '<path d="M4 4h16v12H9l-5 5Z"/><path d="M8 8h8m-8 4h5"/>', admin: '<circle cx="12" cy="12" r="3"/><path d="m9 3 1-1h4l1 3 3 1 3-1 1 5-3 2 1 3 1 2-4 4-3-2-3 1-2 1-4-4 2-3-1-3-1-2 4-4Z"/>' })[name] || '<path d="M12 3v18M3 12h18"/>'}</svg>`;
+const icon = (name, graphic) => `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">${graphic || ({ overview: '<path d="M3 10 12 3l9 7v11h-7v-7h-4v7H3Z"/>', orders: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/>', supply: '<path d="m3 7 9-4 9 4v11l-9 4-9-4ZM3 7l9 5 9-5M12 12v10"/>', production: '<path d="M3 21V10l6 4V8l6 5V3h5v18ZM7 18h1m4 0h1m4 0h1"/>', finance: '<rect x="3" y="5" width="18" height="15" rx="2"/><path d="M3 9h18m-6 5h6"/>', energy: '<path d="m13 2-9 12h7l-1 8 10-13h-7Z"/>', reports: '<path d="M4 20V12h4v8m4 0V4h4v16m4 0v-9M2 21h20"/>', messages: '<path d="M4 4h16v12H9l-5 5Z"/><path d="M8 8h8m-8 4h5"/>', admin: '<circle cx="12" cy="12" r="3"/><path d="m9 3 1-1h4l1 3 3 1 3-1 1 5-3 2 1 3 1 2-4 4-3-2-3 1-2 1-4-4 2-3-1-3-1-2 4-4Z"/>' })[name] || '<path d="M12 3v18M3 12h18"/>'}</svg>`;
 const brand = `<div class="brand"><span class="brand-mark">s</span><span>Sustainability<small>Studio</small></span></div>`;
 const localWorkspace = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
 const savedBackend = localStorage.getItem('studio-backend') || '';
@@ -108,7 +108,7 @@ function renderWelcome() {
   if (localStorage.getItem('studio-backend')) root.querySelector('.welcome-layout > .panel').insertAdjacentHTML('beforeend', `<p>${button('forget-server', 'Reset server connection', '', 'small')}</p>`);
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=b6adb3295473')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=a8ecf4c9df98')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -135,29 +135,26 @@ const studentPanels = {
 };
 const openPanels = new Set();
 const primaryPages = ['overview', 'production', 'finance', 'energy', 'reports'];
+const panelIcons = {
+  suppliers: '<circle cx="8" cy="6" r="3"/><path d="M2 18v-2a6 6 0 0 1 9-5M14 13l4-2 4 2v6l-4 2-4-2ZM14 13l4 2 4-2m-4 2v6"/>',
+  logistics: '<path d="M4 17H2V5h13v4h4l3 4v4h-3M8 17h7m0-8v5"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
+  offers: '<path d="M3 4h8l10 10-7 7L3 10Z"/><circle cx="7.5" cy="8" r="1"/>'
+};
 
 function workspaceNavigation(admin, visible) {
-  const pageButton = key => `<button type="button" data-action="nav" data-id="${key}" ${page === key ? 'class="active" aria-current="page"' : ''}>${icon(key)}${pages[key]}</button>`;
-  const primary = primaryPages.filter(visible).map(pageButton).join('');
-  const extraPages = ['orders', 'supply', 'messages', 'admin'];
-  const secondary = admin ? extraPages.filter(visible).map(pageButton).join('') :
-    Object.entries(studentPanels).filter(([id]) => studentPanelVisible(id, visible)).map(([id, [label, iconKey]]) =>
-      `<button type="button" data-action="panel" data-id="${id}" aria-pressed="${page === 'workspace' && openPanels.has(id)}">${icon(iconKey)}${label}</button>`
-    ).join('');
-  const label = admin ? 'Classroom' : 'Decision panels';
-  const secondaryActive = admin ? extraPages.includes(page) : page === 'workspace';
+  const tool = (action, id, label, state, graphic) =>
+    `<button type="button" data-action="${action}" data-id="${id}" aria-label="${esc(label)}" ${state}>${graphic}<span class="workspace-tool-label" aria-hidden="true">${esc(label)}</span></button>`;
+  const pageKeys = admin ? [...primaryPages, 'orders', 'supply', 'messages', 'admin'] : primaryPages;
+  const pageTools = pageKeys.filter(visible).map(key =>
+    tool('nav', key, pages[key], page === key ? 'aria-current="page"' : '', icon(key))
+  );
+  const panelTools = admin ? [] : Object.entries(studentPanels)
+    .filter(([id]) => studentPanelVisible(id, visible))
+    .map(([id, [label, iconKey]]) =>
+      tool('panel', id, label, `aria-pressed="${page === 'workspace' && openPanels.has(id)}"`, icon(iconKey, panelIcons[id]))
+    );
   return `<header class="workspace-nav">${brand}
-    <nav class="nav workspace-nav-desktop" aria-label="Workspace">
-      ${primary}
-      ${secondary ? `<details class="workspace-menu"><summary class="${secondaryActive ? 'active' : ''}">${label}</summary><div class="workspace-menu-items">${secondary}</div></details>` : ''}
-    </nav>
-    <details class="workspace-menu workspace-nav-mobile">
-      <summary>Menu</summary>
-      <nav class="nav workspace-menu-items" aria-label="Workspace">
-        ${primary}
-        ${secondary ? `<div class="workspace-menu-label">${label}</div>${secondary}` : ''}
-      </nav>
-    </details>
+    <nav class="workspace-tools" aria-label="Workspace">${[...pageTools, ...panelTools].join('')}</nav>
   </header>`;
 }
 
@@ -166,7 +163,7 @@ function studentPanelVisible(id, visible) {
 }
 function studentWorkspace(visible) {
   const panels = [...openPanels].filter(id => studentPanelVisible(id, visible));
-  if (!panels.length) return '<p class="empty">Choose a panel from the top menu to open it here.</p>';
+  if (!panels.length) return '<p class="empty">Choose a tool from the top bar to open its panel here.</p>';
   return '<div class="student-panels">' + panels.map(id => {
     const [label, , renderPanel] = studentPanels[id];
     return '<section class="student-pane" aria-label="' + label + ' panel"><div class="pane-title"><h2>' + label + '</h2>' +
@@ -327,7 +324,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=b6adb3295473')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=a8ecf4c9df98')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); renderWelcome(); return; }
@@ -373,22 +370,12 @@ Verdant Energy</textarea></label>`, async f => { const r = await api('/sessions'
   if (name === 'ledger-csv') csv('transaction-journal.csv', [['Hour', 'Simulation time (UTC)', 'Transaction', 'Account', 'Debit positive / credit negative (EUR)'], ...c.ledger.flatMap(l => Object.entries(l.lines).map(([a, n]) => [l.hour, simDate(l.hour), l.description, a, n / 100]))]);
 }
 document.addEventListener('click', async event => {
-  for (const menu of root.querySelectorAll('.workspace-menu[open]')) {
-    if (!menu.contains(event.target)) menu.open = false;
-  }
   const b = event.target.closest('[data-action]'); if (!b || b.disabled || b.dataset.action === 'submit') return;
   event.preventDefault();
   try {
     await action(b.dataset.action, b.dataset.id);
     if (b.dataset.action === 'nav' && b.closest('.workspace-nav')) root.querySelector('.page-heading h1')?.focus();
   } catch (e) { toast(e.message); }
-});
-document.addEventListener('keydown', event => {
-  if (event.key !== 'Escape' || dialog.open) return;
-  const menu = root.querySelector('.workspace-menu[open]');
-  if (!menu) return;
-  menu.open = false;
-  menu.querySelector('summary').focus();
 });
 document.addEventListener('submit', async event => {
   const form = event.target; if (form.id === 'modal-form') return;
