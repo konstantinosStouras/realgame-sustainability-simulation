@@ -1,5 +1,5 @@
-import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=86aeda64ea74';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=86aeda64ea74';
+import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=4cef1b414a71';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=4cef1b414a71';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -110,6 +110,34 @@ async function signIn(result) {
 }
 function sessionLink(id) { const url = new URL(location.href); url.searchParams.delete('session'); if (id) url.searchParams.set('session', id); url.hash = ''; return url.href; }
 function selectSession(id) { history.replaceState(null, '', sessionLink(id)); sessionId = id || null; }
+// Only navigation preferences are kept, scoped to this tab, account and classroom.
+// Simulation data and authorization always come from the server after refresh.
+function instructorViewKey() {
+  return !solo && !testRoom && user?.role === 'instructor' && user.id && sessionId
+    ? 'studio-view:' + JSON.stringify([backend, user.id, sessionId]) : null;
+}
+function restoreInstructorView() {
+  const key = instructorViewKey();
+  if (!key) return;
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(key) || 'null');
+    if (!saved || saved.version !== 1) return;
+    if (Object.hasOwn(pages, saved.page)) page = saved.page;
+    if (typeof saved.preview === 'string' && /^[A-Za-z0-9-]{1,100}$/.test(saved.preview)) preview = saved.preview;
+    if (typeof saved.channel === 'string') channel = saved.channel;
+    if (Object.hasOwn(reportTypes, saved.report)) report = saved.report;
+    if ([7, 30, 180].includes(saved.reportRange)) reportRange = saved.reportRange;
+    if (Array.isArray(saved.selectedCompanies)) selectedCompanies = new Set(saved.selectedCompanies.filter(id => typeof id === 'string'));
+  } catch { /* A blocked or malformed storage entry must not prevent sign-in. */ }
+}
+function rememberInstructorView() {
+  const key = instructorViewKey();
+  if (!key) return;
+  try {
+    sessionStorage.setItem(key, JSON.stringify({ version: 1, page, preview: preview || null,
+      channel, report, reportRange, selectedCompanies: [...selectedCompanies] }));
+  } catch { /* Navigation still works when browser storage is unavailable. */ }
+}
 async function enter() {
   sessionId = null; state = null; actor = null; root.innerHTML = '<main class="welcome"><p role="status">Loading your classroom…</p></main>';
   const me = await api('/me'); user = me.user; sessions = me.sessions;
@@ -122,7 +150,12 @@ async function enter() {
     try { const entry = await api('/enter', { sessionId: requested }); if (entry.requiresCompanyCode) { renderLobby('', requested, true); return; } }
     catch (error) { sessionId = null; renderLobby(error.message, requested); return; }
   }
-  try { page = user.role === 'instructor' ? 'admin' : 'overview'; await load(); }
+  try {
+    page = user.role === 'instructor' ? 'admin' : 'overview';
+    channel = 'announcements'; report = 'profit'; reportRange = 30; selectedCompanies.clear();
+    restoreInstructorView();
+    await load();
+  }
   catch (error) { sessionId = null; state = null; renderLobby(error.message, requested); }
 }
 function renderLocalWelcome() {
@@ -162,7 +195,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=86aeda64ea74')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=4cef1b414a71')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -211,7 +244,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=86aeda64ea74')).testClient();
+      const client = (await import('./src/test-client.mjs?v=4cef1b414a71')).testClient();
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -334,12 +367,17 @@ function studentWorkspace(visible) {
 }
 function render() {
   if (!state) return user?.role === 'instructor' && page === 'sessions' ? renderAdminHome() : user ? renderLobby() : renderWelcome();
+  if (isTeacher()) {
+    if (preview && !state.companies.some(c => c.id === preview)) preview = undefined;
+    selectedCompanies = new Set([...selectedCompanies].filter(id => state.companies.some(c => c.id === id)));
+  }
   const c = company(), admin = isTeacher();
   const visible = workspaceFeatureVisible;
   if (!visible(page) || (page === 'workspace' && admin)) page = 'overview';
   const titles = { workspace: 'Decision workspace', overview: c ? `Let's make progress, ${c.name.split(' ')[0]}.` : 'A classroom in motion.', orders: 'From offer to arrival.', supply: 'Keep your business moving.', production: 'Make capacity count.', finance: 'Follow the money.', energy: 'Build a better footprint.', reports: 'See the whole picture.', messages: 'Better decisions, together.', admin: 'Set the pace of learning.' };
   const subtitles = { workspace: 'Open the panels you need and compare them side by side.', overview: 'Your business, at a glance. Every decision has a next step.', orders: 'Accepted terms stay with each order, from first dispatch to final payment.', supply: 'Balance availability, working capital, and the footprint of every component.', production: 'Coordinate materials, people, machines, and the hours they work.', finance: 'Cash is available money. Profit is revenue earned less costs incurred.', energy: 'Invest now. Track activation and the results over time.', reports: 'Comparable daily results, with every reporting boundary clearly marked.', messages: 'A shared space for announcements, questions, and team decisions.', admin: 'Control the shared clock, classroom access, and teaching parameters.' };
   root.innerHTML = `<div class="layout">${!admin || preview ? workspaceNavigation(admin, visible) : ''}<div class="workspace"><header class="topbar"><div class="breadcrumb">Workspace &nbsp; / &nbsp; <strong>${pages[page] || "Decision workspace"}</strong></div><div class="top-actions">${user?.role === 'instructor' ? button('sessions', 'All sessions', '', 'small') : ''}${accountControls(actor)}</div></header>${testRoom ? `<div class="mode-banner"><span><strong>Temporary test round</strong> · ${esc(actor.name)} · Shared only across these browser tabs. No test data is saved.</span>${admin ? button('test-students', 'Open test student tabs') + button('test-end', 'End test round') : ''}${button('test-leave', 'Leave test')}</div>` : solo ? `<div class="mode-banner"><span><strong>Solo sandbox</strong> · ${solo.isTest ? 'Private test round · changes are discarded when you leave.' : 'Saved in this browser. Switch roles to rehearse; no other people are connected.'}</span>${button('switch-solo', admin ? 'Play a company' : 'Instructor view')}</div>` : health?.demo ? '<div class="mode-banner"><span><strong>Local classroom demo</strong> · Synthetic accounts share durable server state. Demo sign-in is enabled on this computer.</span></div>' : ''}<main id="content" class="content"><div class="page-heading"><div><div class="eyebrow">${esc(state.name)}${c ? ` &nbsp; / &nbsp; ${esc(c.name)}` : ''}</div><h1 tabindex="-1">${esc(titles[page])}</h1><p>${subtitles[page]}</p></div><div class="timebox"><span class="badge ${state.status === 'running' ? '' : 'amber'}">● ${esc(state.status)}</span><strong>${simDate(state.hour)} · simulation</strong><small>Day ${Math.floor(state.hour / 24) + 1} · ends ${simDate(state.endHour)}</small></div></div>${state.status === 'completed' ? `<div class="advice warning"><strong>Session complete. ${state.events.filter(e => e.status === 'pending').length} scheduled events remain.</strong>Pending deliveries, payments, and investments are preserved. The instructor can extend the end date to settle them.</div>` : ''}${admin ? `<div class="toolbar">${select('preview', 'Company preview · read-only', [['', 'All companies'], ...state.companies.map(x => [x.id, x.name])], preview || '')}${button('nav', 'Session control', 'admin', 'small')}${button('nav', 'Class overview', 'overview', 'small')}${button('nav', 'Reports', 'reports', 'small')}${button('nav', 'Announcements', 'messages', 'small')}</div>` : ''}${!admin && !solo && !testRoom ? `<div class="toolbar" aria-label="Classroom access">${button('join', 'Join another class', '', 'small')}${button('sessions', 'Switch session', '', 'small')}</div>` : ''}${page === "workspace" ? studentWorkspace(visible) : pageBody()}<div class="footer-note"><a href="notes/model.md" target="_blank" rel="noopener">Model & teaching guide ↗</a><br>All amounts are simulated EUR · Emissions in kg CO₂e · Simulation dates use UTC · Live state at ${simDate(state.hour)} · Model v${state.schema}<br>Original teaching model. No RealGame services, code, credentials, or assets are used.</div></main></div></div>`;
+  rememberInstructorView();
   const pending = !solo && !testRoom && sessionStorage.getItem(`studio-pending:${backend}:${actor.id}:${sessionId}`);
   if (pending) root.querySelector('#content').insertAdjacentHTML('afterbegin', `<div class="advice warning"><strong>A decision is awaiting confirmation.</strong>The response was interrupted. Retry with the same request key to confirm the outcome safely. ${button('retry-decision', 'Retry pending decision', '', 'small')}</div>`);
 }
@@ -568,7 +606,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=86aeda64ea74')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=4cef1b414a71')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -674,7 +712,7 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=86aeda64ea74')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    try { const client = (await import('./src/test-client.mjs?v=4cef1b414a71')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p>' + button('test-leave','Return to classroom') + '</main>'; }
     return;
   }
