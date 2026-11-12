@@ -1,8 +1,9 @@
-import { createSession, applyCommand, publicView, assertInvariants } from './engine.mjs?v=9d6abe6b7628';
+import { createSession, applyCommand, publicView, assertInvariants } from './engine.mjs?v=109b222f697a';
 const KEY = 'sustainability-studio-solo-v1';
-export function soloAdapter() {
+export function soloAdapter(initial) {
   let state;
   try { state = JSON.parse(localStorage.getItem(KEY)); if (state?.schema !== 1) state = null; } catch { state = null; }
+  if (initial) { state = structuredClone(initial); state.id = 'solo'; state.name = 'Test round · ' + state.name; state.status = 'paused'; state.messages = []; state.audit = []; }
   const teacher = { id: 'sandbox-instructor', role: 'instructor', name: 'Sandbox instructor' };
   if (!state) {
     state = createSession({ id: 'solo', name: 'Your sustainability sandbox' });
@@ -17,13 +18,14 @@ export function soloAdapter() {
   }
   let actor = { id: 'sandbox-0', role: 'student', name: 'You · Helio', companyId: 'company-1' };
   return {
+    isTest: !!initial,
     get actor() { return actor; },
     switchRole(role, companyId = 'company-1') { actor = role === 'instructor' ? teacher : { id: 'sandbox-player', name: 'Sandbox player', role: 'student', companyId }; },
     view(preview) { return { state: publicView(state, actor, preview), actor }; },
     command(command) {
       if (command.type === 'clock') throw new Error('The solo sandbox uses manual steps. Switch to instructor view and advance the clock.');
       const next = structuredClone(state), message = applyCommand(next, actor, command, new Date().toISOString());
-      assertInvariants(next); localStorage.setItem(KEY, JSON.stringify(next)); state = next; return { message };
+      assertInvariants(next); if (!initial) localStorage.setItem(KEY, JSON.stringify(next)); state = next; return { message };
     },
     reset() { localStorage.removeItem(KEY); },
     export() { return state; }

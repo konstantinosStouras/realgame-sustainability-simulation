@@ -57,14 +57,15 @@ export class Store {
     if (!row) fail('Sign in to continue.', 401); return this.user(row.userId);
   }
   logout(token) { this.db.prepare('DELETE FROM tokens WHERE hash=?').run(hash(token || '')); }
-  session(id) { const row = this.db.prepare('SELECT state FROM sessions WHERE id=?').get(id); if (!row) fail('Session not found.', 404); return JSON.parse(row.state); }
+  session(id) { const row = this.db.prepare('SELECT state FROM sessions WHERE id=?').get(id); if (!row) fail('Session not found.', 404); const state = JSON.parse(row.state); if (state.status === 'deleted') fail('Session not found.', 404); return state; }
   save(s) { this.db.prepare('UPDATE sessions SET state=? WHERE id=?').run(JSON.stringify(s), s.id); }
   actor(user, id) {
+    this.session(id);
     const member = this.db.prepare('SELECT companyId FROM members WHERE sessionId=? AND userId=?').get(id, user.id);
     if (!member) fail('You are not a member of this session.', 403);
     return { ...user, companyId: member.companyId };
   }
-  list(user) { return this.db.prepare('SELECT s.state,m.companyId FROM sessions s JOIN members m ON m.sessionId=s.id WHERE m.userId=? ORDER BY s.rowid DESC').all(user.id).map(row => { const s = JSON.parse(row.state); return { id: s.id, name: s.name, hour: s.hour, status: s.status, companyId: row.companyId }; }); }
+  list(user) { return this.db.prepare('SELECT s.state,m.companyId FROM sessions s JOIN members m ON m.sessionId=s.id WHERE m.userId=? ORDER BY s.rowid DESC').all(user.id).map(row => { const s = JSON.parse(row.state); return { id: s.id, name: s.name, hour: s.hour, status: s.status, companyId: row.companyId }; }).filter(s => s.status !== 'deleted'); }
   create(user, opts = {}) {
     if (user.role !== 'instructor') fail('Instructor access required.', 403);
     return this.transaction(() => {
@@ -79,6 +80,7 @@ export class Store {
     if (user.role !== 'student') fail('Only students join through company codes.', 403);
     const inv = this.db.prepare('SELECT * FROM invites WHERE code=?').get(typeof code === 'string' ? code.trim() : '');
     if (!inv) fail('Invalid company join code.');
+    if (this.session(inv.sessionId).status === 'completed') fail('This session is closed.', 409);
     if (this.db.prepare('SELECT 1 FROM members WHERE sessionId=? AND userId=?').get(inv.sessionId, user.id)) fail('Already a member. Ask the instructor to change your assignment.', 409);
     this.db.prepare('INSERT INTO members VALUES (?,?,?)').run(inv.sessionId, user.id, inv.companyId); return { sessionId: inv.sessionId };
   }

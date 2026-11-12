@@ -21,7 +21,7 @@ function harness() {
     document, localStorage: storage(), sessionStorage: storage(), crypto: { randomUUID },
     setTimeout: () => 1, clearTimeout: () => {}, URL, AbortSignal,
     FormData: class extends Map { constructor(form) { super(form.values); } },
-    itemName, productionRecipe, INVESTMENTS: {}, FEATURES: [], firebaseConfig: {}, classroomBackend: 'https://classroom.example', location: { hostname: 'localhost' }, renderCount: 0,
+    itemName, productionRecipe, INVESTMENTS: {}, FEATURES: [], firebaseConfig: {}, classroomBackend: 'https://classroom.example', location: { hostname: 'localhost', href: 'http://localhost/' }, renderCount: 0,
     activeTestForm: null
   });
   vm.runInContext(definitions, context);

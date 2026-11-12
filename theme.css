@@ -76,3 +76,23 @@
 @media(max-width:380px){.account-name{max-width:120px}.account-controls{gap:6px}.top-actions{gap:8px}.account-menu summary{gap:6px}}
 
 [data-theme="dark"] .studio-intro{color:#e1eddc}
+
+/* Session action hierarchy and responsive touch targets. */
+.session-card-heading h3{margin:0;font-size:18px;line-height:1.4;overflow-wrap:anywhere}
+.session-status{text-transform:uppercase;letter-spacing:.06em;border-radius:30px;font-size:10px}
+.session-meta{color:var(--muted);font-size:12px;margin:10px 0 18px}
+.session-actions{display:flex;flex-wrap:wrap;gap:8px}
+.session-actions button,.session-bulk{min-height:40px;padding:9px 13px;border-radius:8px;font-size:12px;font-weight:600;display:inline-flex;justify-content:center;align-items:center;gap:6px}
+.session-actions .session-open{background:#214f41;color:#fff;border-color:#214f41}
+.session-actions .session-export{background:#218345;color:#fff;border-color:#218345}
+.admin-home .session-danger{background:#fff1ec;color:#a52c15;border-color:#efbbae}
+.session-actions button:hover,.session-bulk:hover{filter:brightness(.94)}
+.session-actions button:focus-visible,.session-access-button:focus-visible,.session-bulk:focus-visible{outline:3px solid var(--green);outline-offset:3px}
+.session-actions button[aria-busy=true]{opacity:.6;cursor:wait}
+.session-access{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:18px;padding-top:12px;border-top:1px solid var(--line)}
+.session-access-button{border:0;background:transparent;padding:6px 0;font-size:11px;color:var(--green)}
+.session-access small{font-size:10px;overflow-wrap:anywhere;color:var(--muted)}
+[data-theme=dark] .session-actions .session-open{background:#c8dfa7;color:#15261d;border-color:#c8dfa7}
+[data-theme=dark] .session-actions .session-export{background:#287c48;color:#fff;border-color:#439c65}
+[data-theme=dark] .admin-home .session-danger{background:#3b2422;color:#ffb7a6;border-color:#855046}
+@media(max-width:480px){.session-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.session-actions button{min-height:44px;padding:9px 10px}.session-access{align-items:flex-start;flex-direction:column}}

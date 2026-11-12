@@ -1,0 +1,37 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { Store } from '../server/store.mjs';
+import { FirestoreStore } from '../server/firestore-store.mjs';
+import { MemoryFirestore } from './helpers/memory-firestore.mjs';
+import { createSession, applyCommand } from '../src/engine.mjs';
+import { soloAdapter } from '../src/solo.mjs';
+for (const kind of ['local','cloud']) test(kind + ': closing preserves results; deleting revokes access and hides sessions', async () => {
+ const store = kind === 'local' ? new Store(':memory:') : new FirestoreStore(new MemoryFirestore());
+ const teacher = kind === 'local' ? store.addUser('teacher','Teacher','test-password-only','instructor') : {id:'teacher',name:'Teacher',role:'instructor'};
+ const student = kind === 'local' ? store.addUser('student','Student','test-password-only') : {id:'student',name:'Student',role:'student'};
+ const session = await store.create(teacher), roster = await store.roster(teacher,session.id);
+ await store.join(student,roster.invites[0].code);
+ const send = (u,type,revision) => store.command(u,session.id,{key:type+'-request-key',revision,command:{type}});
+ await assert.rejects(async()=>send(student,'closeSession',0), /Instructor/);
+ await send(teacher,'closeSession',0);
+ assert.equal((await store.list(teacher))[0].status,'completed');
+ const replay = await store.replay(teacher,session.id); const restored=structuredClone(replay.initial);
+ for(const r of replay.commands) applyCommand(restored,r.actor,r.command,r.realAt);
+ assert.equal(restored.status,'completed'); assert.equal(restored.hour,0);
+ await send(teacher,'deleteSession',1);
+ assert.equal((await store.list(teacher)).length,0); assert.equal((await store.list(student)).length,0);
+ await assert.rejects(async()=>store.roster(teacher,session.id),/not found/);
+ await assert.rejects(async()=>store.replay(teacher,session.id),/not found/);
+ await assert.rejects(async()=>store.join(student,roster.invites[0].code),/not found/);
+ await assert.rejects(async()=>send(teacher,'clock',2),/not found/);
+ if(kind==='local') store.close();
+});
+test('test rounds are independent of their source and saved solo sandbox',()=>{
+ const values=new Map([['sustainability-studio-solo-v1','saved sandbox']]);
+ globalThis.localStorage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v)};
+ const initial=createSession({id:'original'}), before=JSON.stringify(initial), adapter=soloAdapter(initial);
+ adapter.switchRole('instructor');adapter.command({type:'step',hours:1});
+ assert.equal(adapter.view().state.hour,1);assert.equal(JSON.stringify(initial),before);
+ assert.equal(values.get('sustainability-studio-solo-v1'),'saved sandbox');
+ delete globalThis.localStorage;
+});

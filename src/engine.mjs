@@ -150,7 +150,7 @@ export function applyCommand(s, actor, a, realAt = '2026-01-01T00:00:00.000Z', {
   for (const c of s.companies) c.energyTerms ||= structuredClone(s.catalog.energy.find(x => x.id === c.energy));
   for (const e of s.events) if (e.type === 'energy' && e.status === 'pending') e.data.terms ||= structuredClone(s.catalog.energy.find(x => x.id === e.data.energyId));
   let result;
-  if (['step', 'clock', 'configure', 'catalog', 'renameCompany', 'assignment'].includes(a.type)) {
+  if (['step', 'clock', 'configure', 'catalog', 'renameCompany', 'assignment', 'closeSession', 'deleteSession'].includes(a.type)) {
     if (actor.role !== 'instructor') fail('Instructor access required.', 403);
     // Store.assign updates membership in the same transaction. This deterministic
     // transition preserves its audit record and revision in exported replay.
@@ -159,6 +159,8 @@ export function applyCommand(s, actor, a, realAt = '2026-01-01T00:00:00.000Z', {
       if (!s.companies.some(c => c.id === a.companyId)) fail('Company not found.');
       result = 'Student assignment updated.';
     }
+    if (a.type === 'closeSession') { s.status = 'completed'; s.endHour = s.hour; result = 'Session closed.'; }
+    if (a.type === 'deleteSession') { s.status = 'deleted'; result = 'Session deleted; stored records retained.'; }
     if (a.type === 'step') { if (s.status === 'running') fail('Pause before stepping the clock.'); advance(s, integer(a.hours, 'Hours', 1, 168)); result = `Advanced to simulation hour ${s.hour}.`; }
     if (a.type === 'clock') {
       if (!['running', 'paused'].includes(a.status)) fail('Invalid clock status.');

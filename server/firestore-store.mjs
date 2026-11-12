@@ -43,7 +43,7 @@ export class FirestoreStore {
   async list(user) {
     if (user.role === 'instructor') {
       const sessions = await this.sessions.orderBy('createdAt', 'desc').get();
-      return sessions.docs.map(doc => {
+      return sessions.docs.filter(doc => doc.data().status !== 'deleted').map(doc => {
         const { name, hour, status, createdAt } = doc.data();
         return { id: doc.id, name, hour, status, companyId: null, createdAt };
       });
@@ -51,7 +51,7 @@ export class FirestoreStore {
     const members = await this.members.where('userId', '==', user.id).get();
     if (members.empty) return [];
     const docs = await this.db.getAll(...members.docs.map(m => this.sessionRef(m.data().sessionId)));
-    return docs.flatMap((doc, i) => doc.exists ? [{ id: doc.id, name: doc.data().name, hour: doc.data().hour, status: doc.data().status, companyId: members.docs[i].data().companyId, createdAt: doc.data().createdAt }] : []).sort((a, b) => b.createdAt - a.createdAt);
+    return docs.flatMap((doc, i) => doc.exists && doc.data().status !== 'deleted' ? [{ id: doc.id, name: doc.data().name, hour: doc.data().hour, status: doc.data().status, companyId: members.docs[i].data().companyId, createdAt: doc.data().createdAt }] : []).sort((a, b) => b.createdAt - a.createdAt);
   }
   async create(user, opts = {}) {
     if (user.role !== 'instructor') fail('Instructor access required.', 403);
@@ -74,7 +74,8 @@ export class FirestoreStore {
       if (!invite.exists) fail('Invalid company join code.');
       const { sessionId, companyId } = invite.data(), member = this.memberRef(sessionId, user.id);
       const [old, session] = await tx.getAll(member, this.sessionRef(sessionId));
-      if (!session.exists) fail('Session not found.', 404);
+      if (!session.exists || session.data().status === 'deleted') fail('Session not found.', 404);
+      if (session.data().status === 'completed') fail('This session is closed.', 409);
       if (old.exists) fail('Already a member. Ask the instructor to change your assignment.', 409);
       tx.create(member, { sessionId, companyId, userId: user.id });
       return { sessionId };
@@ -83,7 +84,7 @@ export class FirestoreStore {
   async view(user, id, preview) {
     return this.db.runTransaction(async tx => {
       const actor = await this.actor(tx, user, id), ref = this.sessionRef(id), doc = await tx.get(ref);
-      if (!doc.exists) fail('Session not found.', 404);
+      if (!doc.exists || doc.data().status === 'deleted') fail('Session not found.', 404);
       const metadata = doc.data(), state = await this.readState(tx, ref, metadata);
       const clock = advanceCloudClock(state, metadata.nextTickAt, this.now());
       if (clock.records.length) {
@@ -97,7 +98,7 @@ export class FirestoreStore {
     if (user.role !== 'instructor') fail('Instructor access required.', 403);
     return this.db.runTransaction(async tx => {
       const session = await tx.get(this.sessionRef(id));
-      if (!session.exists) fail('Session not found.', 404);
+      if (!session.exists || session.data().status === 'deleted') fail('Session not found.', 404);
       const members = await tx.get(this.members.where('sessionId', '==', id));
       const invites = await tx.get(this.invites.where('sessionId', '==', id));
       const users = members.empty ? [] : await tx.getAll(...members.docs.map(m => this.userRef(m.data().userId)));
@@ -113,13 +114,13 @@ export class FirestoreStore {
       const actor = await this.actor(tx, user, id), previous = await tx.get(requestRef);
       if (previous.exists) { if (previous.data().payload !== payload) fail('Request key already used for a different decision.', 409); return { response: previous.data().response }; }
       const ref = this.sessionRef(id), doc = await tx.get(ref);
-      if (!doc.exists) fail('Session not found.', 404);
+      if (!doc.exists || doc.data().status === 'deleted') fail('Session not found.', 404);
       const metadata = doc.data();
       const state = await this.readState(tx, ref, metadata);
       const clockNow = this.now(), clock = advanceCloudClock(state, metadata.nextTickAt, clockNow);
       // A reviewed instructor pause may stop after catch-up in the same commit.
       // Requiring another round trip could make a one-second clock unpausable.
-      const pauseAfterCatchup = actor.role === 'instructor' && command?.type === 'clock' && command.status === 'paused' && revision === metadata.revision && state.status === 'running' && clock.nextTickAt > clockNow;
+      const pauseAfterCatchup = actor.role === 'instructor' && ((command?.type === 'clock' && command.status === 'paused') || ['closeSession', 'deleteSession'].includes(command?.type)) && revision === metadata.revision && state.status === 'running' && clock.nextTickAt > clockNow;
       if (clock.records.length && !pauseAfterCatchup) {
         this.writeState(tx, ref, state, metadata, clock.nextTickAt);
         for (const record of clock.records) this.log(tx, ref, record.actor, record.command, record.realAt, record.revision);
@@ -147,7 +148,7 @@ export class FirestoreStore {
     return this.db.runTransaction(async tx => {
       const actor = await this.actor(tx, user, id), ref = this.sessionRef(id);
       const [doc, student, member] = await tx.getAll(ref, this.userRef(userId), this.memberRef(id, userId));
-      if (!doc.exists) fail('Session not found.', 404);
+      if (!doc.exists || doc.data().status === 'deleted') fail('Session not found.', 404);
       if (!student.exists || student.data().role !== 'student' || !member.exists) fail('Student is not in this session.');
       const metadata = doc.data(), state = await this.readState(tx, ref, metadata);
       const command = { type: 'assignment', userId, companyId }, realAt = new Date(this.now()).toISOString();
@@ -163,7 +164,7 @@ export class FirestoreStore {
     if (user.role !== 'instructor') fail('Instructor access required.', 403);
     return this.db.runTransaction(async tx => {
       const ref = this.sessionRef(id), doc = await tx.get(ref);
-      if (!doc.exists) fail('Session not found.', 404);
+      if (!doc.exists || doc.data().status === 'deleted') fail('Session not found.', 404);
       const metadata = doc.data();
       const state = await this.readState(tx, ref, metadata), initial = await this.readState(tx, ref, metadata, true);
       const records = await tx.get(ref.collection('commands').orderBy('revision'));

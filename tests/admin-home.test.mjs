@@ -9,7 +9,7 @@ function setup(role) {
   const root = {}, values = new Map();
   const storage = { getItem: k => values.get(k), setItem: (k,v) => values.set(k,v) };
   const context = vm.createContext({ document: { querySelector: s => s === '#app' ? root : {}, addEventListener() {} },
-    localStorage: storage, sessionStorage: storage, location: { hostname: 'localhost' }, classroomBackend: '', FEATURES: [],
+    localStorage: storage, sessionStorage: storage, URL, location: { hostname: 'localhost', href: 'http://localhost/' }, classroomBackend: '', FEATURES: [],
     role, opened: 0, sampleSessions: [{id:'active-code',name:'Class <one>',status:'paused',hour:0},{id:'past-code',name:'Old class',status:'completed',hour:72}] });
   vm.runInContext(source, context);
   vm.runInContext("api = async () => ({user:{name:'Test instructor',role},sessions:sampleSessions}); load = async () => { opened++; };", context);
