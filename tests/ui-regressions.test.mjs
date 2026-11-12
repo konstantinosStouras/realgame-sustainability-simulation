@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 // Unit harness for the original UI functions. It does not open a browser or
 // access a real service. The coordinator separately verifies rendered behavior.
 const appSource = readFileSync(new URL(process.env.UI_TEST_SOURCE || '../app.mjs', import.meta.url), 'utf8');
-const definitions = appSource.replace(/^import .*;\r?\n/gm, '').split("try { health = await api('/health'); }")[0];
+const definitions = appSource.replace(/^import .*;\r?\n/gm, '').split("\ntry { health = await api('/health'); }")[0];
 const storage = () => { const values = new Map(); return { getItem: k => values.get(k) ?? null, setItem: (k, v) => values.set(k, String(v)), removeItem: k => values.delete(k) }; };
 function harness() {
   const handlers = {}, root = {}, dialog = { open: false }, toast = {};
@@ -20,7 +20,7 @@ function harness() {
     document, localStorage: storage(), sessionStorage: storage(), crypto: { randomUUID },
     setTimeout: () => 1, clearTimeout: () => {}, URL, AbortSignal,
     FormData: class extends Map { constructor(form) { super(form.values); } },
-    ITEMS: {}, INVESTMENTS: {}, FEATURES: [], firebaseConfig: {}, renderCount: 0,
+    ITEMS: {}, INVESTMENTS: {}, FEATURES: [], firebaseConfig: {}, classroomBackend: 'https://classroom.example', location: { hostname: 'localhost' }, renderCount: 0,
     activeTestForm: null
   });
   vm.runInContext(definitions, context);
@@ -79,6 +79,19 @@ test('unknown response keeps the draft and retry reuses the original request key
   assert.equal(keys.length, 2);
   assert.equal(keys[0], keys[1]);
   assert.equal(h.context.renderCount, 1);
+});
+
+test('a transient cloud 503 retains the decision key for a safe retry', async () => {
+  const h = harness(), keys = []; let unavailable = true;
+  h.context.apiImplementation = async (path, body) => {
+    if (path.endsWith('/command')) { keys.push(body.key); if (unavailable) throw Object.assign(new Error('Result not confirmed. Retry safely.'), {status: 503}); return {message:'Confirmed'}; }
+    return {state:{revision:2,hour:72},actor:{id:'test-user',role:'instructor'}};
+  };
+  h.run('api = apiImplementation;');
+  await h.handlers.submit({target:h.form,preventDefault(){}});
+  unavailable = false;
+  await h.handlers.submit({target:h.form,preventDefault(){}});
+  assert.equal(keys.length, 2); assert.equal(keys[0], keys[1]);
 });
 
 test('removing a chart series does not change the remaining company colors', () => {

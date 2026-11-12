@@ -1,7 +1,20 @@
 {
+  "firestore": {
+    "database": "(default)",
+    "location": "europe-west2",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "functions": [{
+    "source": ".cloud-functions",
+    "codebase": "classroom",
+    "predeploy": ["node scripts/build-functions.mjs"],
+    "ignore": ["node_modules", ".git", "firebase-debug.log"]
+  }],
   "hosting": {
     "public": "dist",
     "ignore": [".*", "**/node_modules/**"],
+    "rewrites": [{ "source": "/api/**", "function": { "functionId": "classroom", "region": "europe-west2" } }],
     "headers": [
       { "source": "**/*.mjs", "headers": [{ "key": "Content-Type", "value": "text/javascript; charset=utf-8" }] },
       { "source": "**", "headers": [{ "key": "Cache-Control", "value": "no-cache" }, { "key": "X-Content-Type-Options", "value": "nosniff" }, { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }] }

@@ -1,0 +1,14 @@
+// Backend-only data model: studioUsers stores verified identity/display name;
+// studioMembers and studioInvites store classroom/company access; studioSessions
+// stores clock/revision metadata with stateChunks, initialChunks and commands;
+// studioRequests stores idempotent decision receipts. No client SDK accesses
+// these documents. The Functions service account uses IAM; the API validates
+// identity, membership, role, input fields and economic invariants.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

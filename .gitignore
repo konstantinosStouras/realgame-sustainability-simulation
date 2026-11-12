@@ -19,3 +19,4 @@ test-results/
 firebase-debug*.log
 .firebase/
 dist/
+.cloud-functions/

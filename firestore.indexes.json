@@ -1,0 +1,9 @@
+{
+  "indexes": [],
+  "fieldOverrides": [
+    { "collectionGroup": "stateChunks", "fieldPath": "data", "indexes": [] },
+    { "collectionGroup": "initialChunks", "fieldPath": "data", "indexes": [] },
+    { "collectionGroup": "commands", "fieldPath": "actor", "indexes": [] },
+    { "collectionGroup": "commands", "fieldPath": "command", "indexes": [] }
+  ]
+}

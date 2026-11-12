@@ -24,7 +24,7 @@ If your npm shim is unavailable, run `node server/main.mjs --demo` after install
 
 Google sign-in supports Gmail and Google Workspace accounts. Email/password registration, verification, and password reset are handled by Firebase. Students sign in first, then enter a company join code. The server verifies Firebase ID tokens against the dedicated project and requires verified email. Google sign-in and email/password are enabled; website and loopback domains are authorized. The project owner's account is provisioned with an instructor custom claim.
 
-Firebase enforces the form's 10-character minimum for new passwords. Email-enumeration protection is enabled. These settings do not require usage-based billing; the project remains on the free plan until a paid backend is authorized.
+Firebase enforces the form's 10-character minimum for new passwords. Email-enumeration protection is enabled. The project uses the authorized Blaze plan for the shared classroom backend.
 
 ```sh
 # Copy .env.example to .env, then:
@@ -33,11 +33,17 @@ node --env-file=.env server/main.mjs
 
 The public Firebase web config is in `firebase-config.mjs`; it is an application identifier, not an admin credential. Never store service-account keys or login tokens in this repository. Instructor authority comes from a Firebase `instructor: true` custom claim, or `FIREBASE_INSTRUCTOR_UIDS` on the server. For another instructor, use the Admin SDK or Firebase administrative tooling to set the claim. Signing in again refreshes claims.
 
-`FIREBASE_CHECK_REVOKED=true` enables revocation/disabled-user checks and requires application-default credentials (for example an attached workload service account). Without this option, signed Firebase tokens are accepted until their normal expiry (approximately one hour), even if revoked. Email verification and signature/issuer/audience/expiry checks are always required. The server does not accept the client's requested role.
+The cloud backend always checks revoked tokens and disabled accounts through its attached service account. For the standalone local server, `FIREBASE_CHECK_REVOKED=true` enables the same checks and requires application-default credentials. Without that local option, signed tokens are accepted until their normal expiry (approximately one hour), even if revoked. Email verification and signature/issuer/audience/expiry checks are always required. The server does not accept the client's requested role.
 
 ## Persistence and deployment
 
-The full-stack server stores all state under `.data/`, ignored by Git. SQLite uses WAL and transactions. Keep the database, WAL, and SHM together; for consistent live backups use SQLite's backup facility or stop the server before copying. Run **one server process/clock owner** per database. There is no multi-instance clock lease or horizontal scaling in v1.
+The public website automatically connects to the shared Firebase backend. Firebase Hosting routes `/api/**` to the `classroom` function in London (`europe-west2`). Firestore Standard stores the authoritative sessions, membership, join codes, command history, and idempotent decision receipts. The browser cannot read or write Firestore directly; all access goes through verified Firebase identities and the server's role and membership checks.
+
+State snapshots use compressed chunks below Firestore's document size limit. Every decision atomically commits its snapshot, audit command and retry receipt. The persisted next-tick time and transaction lock prevent duplicate clock advances across function instances. Active browser polls reconcile due hours, and a scheduled function checks running classrooms each minute when no browser is open. A delayed clock catches up in bounded batches. Idle functions scale to zero; the API is limited to two instances and the clock worker to one. These limits are not a hard spending cap.
+
+See [cloud deployment and operations](notes/cloud-backend.md) for the storage model, verification, limits, and deployment procedure.
+
+The standalone local server remains available for demonstrations. It stores state under `.data/`, ignored by Git. SQLite uses WAL and transactions. Keep the database, WAL, and SHM together; for consistent live backups use SQLite's backup facility or stop the server before copying. Run **one local server process/clock owner** per SQLite database.
 
 ```sh
 docker build -t sustainability-studio .
@@ -47,7 +53,7 @@ docker run --name sustainability-studio -p 3000:3000 \
   sustainability-studio
 ```
 
-Use an HTTPS reverse proxy for internet classrooms and persistent storage for `/data`. Set `ALLOWED_ORIGIN` to a comma-separated list of permitted frontend origins. Include the backend public origin when it is behind an HTTPS proxy. The frontend's Server connection form selects this backend origin. Firebase Authentication and static Firebase Hosting are configured; **a remote multiplayer Node backend is not deployed by static hosting**. A backend on ephemeral/serverless local disk would lose state and is unsupported. The public site has a clearly labelled solo sandbox that uses the same engine but only browser-local state.
+The Docker alternative needs an HTTPS reverse proxy and persistent `/data`. Set `ALLOWED_ORIGIN` to the permitted frontend origins, including the backend public origin behind a proxy. The Firebase deployment uses Firestore instead of container-local SQLite. The public site also retains a labelled solo sandbox using browser-local state.
 
 ## Checks and publication
 
@@ -55,7 +61,7 @@ Use an HTTPS reverse proxy for internet classrooms and persistent storage for `/
 npm test
 npm run check
 node scripts/build-static.mjs
-firebase deploy --only hosting --project stouras-sustainability-2026
+npx -y firebase-tools@latest deploy --only firestore,functions:classroom,hosting --project stouras-sustainability-2026
 ```
 
 Tests cover ledger and inventory conservation, partial dispatch and receipt, purchases/payments, insufficient funds, delayed activation, loan/deposit maturity, daily cutoffs, completion, seeded replay, messaging/role boundaries, durable restart, duplicate/concurrent HTTP submissions, and private-file isolation. No proprietary test data are used.
@@ -65,7 +71,7 @@ GitHub Pages serves the root of `main` at the existing subpath. Assets are relat
 ## Layout
 
 - `src/engine.mjs`: original deterministic simulation, accounting, validation, and report snapshots.
-- `server/`: SQLite persistence, HTTP API, auth, authoritative clock.
+- `server/`: local SQLite server and cloud Firestore persistence, HTTP APIs, auth, and authoritative clocks.
 - `app.mjs`, `styles.css`, `index.html`: accessible browser workspace.
 - `src/firebase-client.mjs`: Google/email authentication.
 - `src/solo.mjs`: explicitly single-browser rehearsal adapter.

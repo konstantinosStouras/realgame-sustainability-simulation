@@ -25,7 +25,7 @@ The [original overview screenshot](screenshots/studio-overview.jpg) contains onl
 
 ## Deployment boundary
 
-Firebase Authentication and static Hosting are live. The Node/SQLite shared multiplayer server runs locally and has an explicit Docker/persistent-volume deployment configuration. It is **not hosted remotely**. A public HTTPS backend with persistent storage remains necessary before inviting a remote class. A browser may require local-network permission when a public HTTPS frontend connects to a loopback backend; opening the backend's own local URL avoids that cross-origin connection.
+The initial release used Firebase Authentication and static Hosting with a local Node/SQLite multiplayer server. The later cloud deployment below adds remote shared classrooms; the local demonstration remains separate.
 
 This is a functional first release for teaching trials. It has not undergone a large-class load test or a formal external security assessment. Model simplifications, persistence limits, and supported economic rules are documented in [model.md](model.md).
 
@@ -33,4 +33,14 @@ This is a functional first release for teaching trials. It has not undergone a l
 
 On 12 November 2026, read back the project's authentication configuration and confirmed Google sign-in, email/password registration, the website's authorized domains, and email-enumeration protection. Aligned the server password policy with the registration form's 10-character minimum. Live public sign-up API checks rejected a nine-character password and accepted a ten-character password; the temporary synthetic account was removed afterward. No test email was sent.
 
-Billing is disabled for this dedicated project. Usage-based billing has not been enabled. Remote classroom deployment still requires both an approved hosting arrangement and persistent shared storage; enabling billing alone does not deploy or migrate the current SQLite backend.
+Billing was disabled during the registration-only check. The user subsequently enabled Blaze and authorized the cloud deployment below.
+
+## Shared cloud deployment — 12 November 2026
+
+Provisioned Firestore Standard in London (`europe-west2`) and deployed the `classroom` HTTP API and `classroomClock` scheduled function using a keyless service account. Firebase Hosting routes API calls to the function, and both public frontends automatically select that backend. Browser asset URLs use a release hash to prevent old cached modules from mixing with the cloud release.
+
+50 automated tests pass, including snapshot integrity/chunking, bounded restart-safe clock catch-up, and preserving request keys after HTTP 503. Separate real-Firestore integration checks passed for duplicate/competing decisions across two store clients, membership, private chat, reassignment, daily snapshots, replay, restart persistence, and concurrent clock advancement. All disposable test namespaces were removed.
+
+Live deployed API checks used real Firebase-signed instructor, student, outsider and unverified identities. Confirmed joining, shared purchases, one result for simultaneous retries, a 24-hour advance and daily plot data, live clock movement, private-message export redaction, rejected outsider/instructor-escalation attempts, CORS, and rejected unverified identities. Authenticated direct Firestore read/list/update/delete requests and unauthenticated listing were denied. Temporary identities and sessions were removed after the checks.
+
+Function build-image retention is seven days. API instances scale from zero to at most two, and the clock worker to at most one; these are operational limits, not a spending cap. See [cloud operations](cloud-backend.md) for data handling and remaining class-size/history limits.
