@@ -1,5 +1,5 @@
-import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=f6d3467a0a52';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=f6d3467a0a52';
+import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=c000b830acff';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=c000b830acff';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -145,7 +145,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=f6d3467a0a52')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=c000b830acff')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -405,7 +405,11 @@ function adminPage() {
   if (!isTeacher()) return '';
   return `<div class="grid2">${panel('The shared clock', 'Pause for discussion. Step for a decision round. Run for continuous play.', `<div class="clock-controls">${button('clock', state.status === 'running' ? 'Pause clock' : 'Run clock', state.status === 'running' ? 'paused' : 'running', 'primary', state.status === 'completed' || !!solo)}${button('step', '+ 1 hour', '1', '', state.status !== 'paused')}${button('step', '+ 1 day', '24', '', state.status !== 'paused')}${button('step', 'Custom step', 'custom', '', state.status !== 'paused')}</div><p class="form-note">${solo ? 'Solo mode advances with manual steps.' : `Running speed: ${state.secondsPerHour} real seconds / simulation hour.`} No time is skipped during server downtime.</p>${button('settings', 'Session settings', '', 'small')}`)}${panel('Classroom access', 'Every student belongs to one company in this session.', `<div class="toolbar">${button('roster', 'Companies & join codes', '', 'primary', !!solo)}${button('create', 'New session', '', '', !!solo)}${button('sessions', 'Switch session', '', 'small', !!solo)}</div><p class="form-note">Company join codes grant student membership only. Instructor previews are read-only. Team messages are visible only to members of that company.</p>`)}</div>${panel('Teaching capabilities', 'Visibility controls navigation. Permission controls new decisions. Model effects are separate.', `<div class="toggle-row"><span>Feature</span><span>Visibility &nbsp; / &nbsp; Permission</span></div>${FEATURES.map(f => `<form class="toggle-row" data-feature="${f}"><span>${esc(f.charAt(0).toUpperCase() + f.slice(1))}</span><div class="toolbar">${check('visible', 'Show', state.features[f].visible)}${check('allowed', 'Allow decisions', state.features[f].allowed)}${button('submit', 'Apply', '', 'small')}</div><div class="error" role="alert"></div></form>`).join('')}<form id="effects-form" class="toggle-row"><span>Model effect</span><div class="toolbar">${check('carbonDemand', 'Customer preference for lower carbon', state.effects.carbonDemand)}${button('submit', 'Apply', '', 'small')}</div><div class="error" role="alert"></div></form>`)}${panel('Scenario catalogues', 'Change future supply, transport, demand, and energy conditions. Accepted contracts keep their terms.', `<div class="toolbar">${['suppliers', 'routes', 'markets', 'energy'].map(k => button('catalog-list', k.charAt(0).toUpperCase() + k.slice(1), k)).join('')}</div>`)}${panel('Upcoming outcomes across the class', 'Pending obligations remain visible beyond the configured end.', pendingEvents(10), button('events', 'All events', '', 'small'))}${panel('Audit trail', 'Accepted commands identify the actor and both clocks.', table(['Simulation / real time', 'Actor', 'Action', 'Result'], state.audit.slice(-30).reverse().map(a => [`${simDate(a.hour)}<small>${new Date(a.realAt).toLocaleString('en-GB')}</small>`, `${esc(a.actorName)}<small>${esc(a.role)}</small>`, esc(a.command.type), esc(a.result)])), button('replay', 'Export replay', '', 'small', !!solo))}`;
 }
+let exportDownloadUrl;
+function releaseExportDownload() { if (exportDownloadUrl) URL.revokeObjectURL(exportDownloadUrl); exportDownloadUrl = undefined; }
+document.addEventListener('close', event => { if (event.target === dialog) releaseExportDownload(); }, true);
 function modal(title, content, onSubmit, submitLabel = 'Confirm') {
+  releaseExportDownload();
   dialog.innerHTML = `<button class="close" data-action="close" aria-label="Close dialog">×</button><h2 id="dialog-title">${esc(title)}</h2>${onSubmit ? `<form id="modal-form">${content}<div class="error" role="alert"></div><div class="form-actions">${button('close', 'Cancel')}${button('submit', submitLabel, '', 'primary')}</div></form>` : content}`;
   dialog.querySelectorAll('button:not([data-action="submit"])').forEach(b => b.type = 'button');
   const form = dialog.querySelector('form');
@@ -452,7 +456,7 @@ async function action(name, id) {
   if (name === 'session-test') {
     const replay = await api('/sessions/' + encodeURIComponent(id) + '/replay');
     modal('Start a test round?', '<p>Rehearse this session’s initial setup in a private browser sandbox. Classroom progress and student accounts are not copied or changed.</p>', async () => {
-      solo = (await import('./src/solo.mjs?v=f6d3467a0a52')).soloAdapter(replay.initial); solo.switchRole('instructor'); sessionId = 'solo'; preview = undefined; page = 'admin'; await load();
+      solo = (await import('./src/solo.mjs?v=c000b830acff')).soloAdapter(replay.initial); solo.switchRole('instructor'); sessionId = 'solo'; preview = undefined; page = 'admin'; await load();
     }, 'Start test round'); return;
   }
   if (['session-close', 'session-delete', 'sessions-delete'].includes(name)) {
@@ -466,7 +470,13 @@ async function action(name, id) {
       await enter(); toast(done + (deleting ? ' sessions deleted.' : ' session closed.'));
     }, deleting ? 'Delete sessions' : 'Close session'); return;
   }
-  if (name === 'session-export') { download('session-' + id + '.json', await api('/sessions/' + encodeURIComponent(id) + '/replay')); return; }
+  if (name === 'session-export') {
+    const data = await api('/sessions/' + encodeURIComponent(id) + '/replay');
+    const filename = 'session-' + id + '.json';
+    modal('Export ready', '<p>Your session replay is ready. Save the JSON file to keep the initial setup and recorded decisions.</p><p><a class="button primary" id="session-download">Download JSON</a></p><p class="form-note">Keep this dialog open until the download starts. You can click the link again if needed.</p>');
+    exportDownloadUrl = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}));
+    const link = dialog.querySelector('#session-download'); link.href = exportDownloadUrl; link.download = filename; link.focus(); return;
+  }
   if (name === 'open-session' || name === 'session-codes') { selectSession(id); page = 'admin'; await enter(); if (name === 'session-codes') await action('roster'); return; }
   if (name === 'sessions') { solo = null; selectSession(null); await enter(); return; }
   if (name === 'retry-start') { await startWorkspace(); return; }
@@ -485,7 +495,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=f6d3467a0a52')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=c000b830acff')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }

@@ -24,6 +24,7 @@ function harness(hostname = 'localhost') {
     itemName, productionRecipe, INVESTMENTS: {}, FEATURES: [], firebaseConfig: {}, classroomBackend: 'https://classroom.example', location: { hostname, href: 'https://' + hostname + '/' }, renderCount: 0,
     activeTestForm: null
   });
+  context.history = { replaceState: (_, __, href) => { context.location.href = href; } };
   vm.runInContext(definitions, context);
   const run = code => vm.runInContext(code, context);
   run(`render = () => { renderCount++; if (activeTestForm) activeTestForm.isConnected = false; };
@@ -229,3 +230,48 @@ test('late refresh responses cannot overwrite newer state or a different preview
   assert.equal(h.run('state.revision'), 3);
   assert.equal(h.run('pendingLoads'), 0);
 });
+
+for (const mode of ['inline', 'modal']) for (const choice of ['oslo', 'custom']) {
+  test(mode + ' creation preserves every draft field after duplicate ' + choice + ' ID and retries', async () => {
+    const h = harness();
+    h.form.id = mode === 'modal' ? 'modal-form' : 'create-session-form';
+    h.form.values = [['name', 'Preserve class draft'], ['sessionCity', choice], ['customSessionId', 'QA-Custom-731'], ['days', '17'], ['companies', 'Draft Solar\nDraft Energy'], ['seed', '73'], ['revenueAt', 'dispatch'], ['corporateOverhead', '12.34']];
+    const original = structuredClone(h.form.values), requests = [];
+    let duplicate = true;
+    h.context.apiImplementation = async (path, body) => {
+      assert.equal(path, '/sessions'); requests.push(body);
+      if (duplicate) throw Object.assign(new Error('Session ID is already taken. Choose another city or a custom ID.'), { status: 409 });
+      return { id: body.id.toLowerCase() };
+    };
+    h.run('health = { classroomAccounting: true }; api = apiImplementation; enter = async () => {};');
+    let submit;
+    const dialog = h.document.querySelector('#dialog');
+    if (mode === 'modal') {
+      dialog.querySelectorAll = () => [];
+      dialog.querySelector = () => h.form;
+      dialog.showModal = () => { dialog.open = true; };
+      dialog.close = () => { dialog.open = false; };
+      h.run("modal('Create a classroom session', createSessionFields(), createClassroom, 'Create session')");
+      submit = () => h.form.onsubmit({ preventDefault() {} });
+    } else submit = () => h.handlers.submit({ target: h.form, preventDefault() {} });
+    await submit();
+    assert.deepEqual(h.form.values, original);
+    assert.equal(h.form.isConnected, true);
+    assert.equal(h.context.renderCount, 0);
+    assert.equal(h.form.submit.disabled, false);
+    assert.match(h.form.error.textContent, /already taken.*another city or a custom ID/);
+    assert.equal(h.document.activeElement, h.form.error);
+    if (mode === 'modal') assert.equal(dialog.open, true);
+    assert.equal(requests[0].id, choice === 'custom' ? 'QA-Custom-731' : 'oslo');
+    assert.equal(requests[0].dailyCorporateOverhead, 1234);
+    duplicate = false;
+    h.form.values.find(([key]) => key === 'sessionCity')[1] = 'custom';
+    h.form.values.find(([key]) => key === 'customSessionId')[1] = 'fresh-class-731';
+    await submit();
+    assert.equal(requests[1].id, 'fresh-class-731');
+    for (const key of ['name', 'seed', 'days', 'revenueAt', 'dailyCorporateOverhead']) assert.equal(requests[1][key], requests[0][key]);
+    assert.deepEqual(requests[1].companyNames, requests[0].companyNames);
+    assert.equal(h.run("new URL(location.href).searchParams.get('session')"), 'fresh-class-731');
+    if (mode === 'modal') assert.equal(dialog.open, false);
+  });
+}

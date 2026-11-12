@@ -9,7 +9,7 @@ function setup(role, query = '') {
   const root = {}, values = new Map();
   const storage = { getItem: k => values.get(k), setItem: (k,v) => values.set(k,v) };
   const location = { hostname: 'localhost', href: 'https://example.test/simulation/' + query };
-  const context = vm.createContext({ URL, history: { replaceState: (_, __, href) => { location.href = href; } }, document: { querySelector: s => s === '#app' ? root : {}, addEventListener() {} },
+  const context = vm.createContext({ URL, Blob, history: { replaceState: (_, __, href) => { location.href = href; } }, document: { querySelector: s => s === '#app' ? root : {}, addEventListener() {} },
     localStorage: storage, sessionStorage: storage, location, classroomBackend: '', FEATURES: [],
     role, opened: 0, sampleSessions: [{id:'active-code',name:'Class <one>',status:'paused',hour:0},{id:'past-code',name:'Old class',status:'completed',hour:72}] });
   vm.runInContext(source, context);
@@ -57,4 +57,18 @@ test('links preserve the deployment subpath and opening and leaving update the U
 test('unknown links never fall back to another membership', async () => {
  const h=setup('student','?session=missing'); h.run("api = async path => { if (path === '/enter') throw new Error('Session not found.'); return {user:{name:'Student',role},sessions:sampleSessions}; }");
  await h.run('enter()'); assert.equal(h.context.opened,0); assert.match(h.root.innerHTML,/Session not found/);
+});
+
+test('session export prepares a real download link with the fetched replay and cleans it up', async () => {
+ const h=setup('instructor');
+ h.context.replayData={initial:{id:'qa-export'},commands:[{command:{type:'step',hours:1}}]};
+ h.context.link={focus(){this.focused=true;}};
+ h.run("api = async path => { if(path !== '/sessions/qa-export/replay') throw new Error('Wrong session'); return replayData; }; modal = (title, body) => { releaseExportDownload(); }; dialog.querySelector = () => link;");
+ await h.run("action('session-export','qa-export')");
+ assert.equal(h.context.link.download,'session-qa-export.json');
+ assert.equal(h.context.link.focused,true);
+ const url=h.context.link.href;
+ assert.deepEqual(await (await fetch(url)).json(),h.context.replayData);
+ h.run('releaseExportDownload()');
+ await assert.rejects(fetch(url));
 });
