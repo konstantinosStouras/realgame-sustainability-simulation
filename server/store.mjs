@@ -1,3 +1,4 @@
+import { testTemplate } from './test-template.mjs';
 import { DatabaseSync } from 'node:sqlite';
 import { randomBytes, scryptSync, timingSafeEqual, createHash, randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
@@ -103,13 +104,13 @@ export class Store {
   }
   command(user, id, request) {
     return this.transaction(() => {
-      const actor = this.actor(user, id), { key, revision, command } = request;
+      const { key, revision, command } = request;
       if (command?.type === 'assignment') fail('Use the instructor assignment endpoint to change membership.', 403);
       if (typeof key !== 'string' || key.length < 8 || key.length > 100) fail('A unique request key is required.');
       const payload = JSON.stringify({ id, command });
       const previous = this.db.prepare('SELECT * FROM requests WHERE userId=? AND key=?').get(user.id, key);
       if (previous) { if (previous.payload !== payload) fail('Request key already used for a different decision.', 409); return JSON.parse(previous.response); }
-      const s = this.session(id);
+      const actor = this.actor(user, id), s = this.session(id);
       if (revision !== s.revision) fail('The session changed. Refreshed state is available; review and submit again.', 409);
       const realAt = new Date().toISOString(), message = applyCommand(s, actor, command, realAt); assertInvariants(s);
       this.save(s);
@@ -124,6 +125,11 @@ export class Store {
       tick(s); assertInvariants(s); this.save(s);
       this.db.prepare('INSERT INTO commands(sessionId,actor,command,realAt) VALUES (?,?,?,?)').run(id, '{}', '{"type":"tick"}', new Date().toISOString());
     });
+  }
+  testTemplate(user, id) {
+    if (user.role !== 'instructor') fail('Instructor access required.',403);
+    this.actor(user,id);
+    return testTemplate(JSON.parse(this.db.prepare('SELECT initial FROM sessions WHERE id=?').get(id).initial), this.session(id));
   }
   replay(user, id) {
     const viewer = this.actor(user, id); if (user.role !== 'instructor') fail('Instructor access required.', 403);

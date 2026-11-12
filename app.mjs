@@ -1,5 +1,5 @@
-import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=109b222f697a';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=109b222f697a';
+import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=4e8dc8e29f2a';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=4e8dc8e29f2a';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -15,6 +15,7 @@ const savedBackend = localStorage.getItem('studio-backend') || '';
 let backend = localWorkspace ? savedBackend : (/^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(savedBackend) ? classroomBackend : savedBackend || classroomBackend), token = sessionStorage.getItem('studio-token') || '';
 let linkedSession = new URL(location.href).searchParams.get('session');
 let state, actor, user, sessions = [], sessionId, preview, page = 'overview', channel = 'announcements', report = 'profit', reportRange = 30, selectedCompanies = new Set(), solo = null, health = null, roster = null, busy = false, online = true, firebaseClient = null;
+let testRoom = null, testPending = null;
 const submittingForms = new Set();
 const isTeacher = () => actor?.role === 'instructor';
 const company = () => state?.company;
@@ -34,6 +35,12 @@ function reportFormError(form, error) {
   else toast(error.message);
 }
 async function api(path, body) {
+  if (testRoom) {
+    const url = new URL(path, 'https://test.invalid');
+    if (url.pathname === '/sessions/' + sessionId) return testRoom.call('view',{preview:url.searchParams.get('company')});
+    if (url.pathname === '/sessions/' + sessionId + '/command') return testRoom.call('command',body);
+    throw new Error('This action is unavailable in a temporary test round.');
+  }
   if (firebaseClient?.user && health?.auth === 'firebase' && path !== '/health') token = await firebaseClient.token();
   let response;
   try { response = await fetch(`${backend}/api${path}`, { method: body === undefined ? 'GET' : 'POST', headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(token && path !== '/health' ? { Authorization: `Bearer ${token}` } : {}) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(15000) }); }
@@ -64,13 +71,22 @@ async function load(force = true, afterCommand = false) {
     if (!force && !afterCommand && (submittingForms.size || dialog.open || document.activeElement?.closest('form'))) { online = true; return; }
     state = data.state; actor = data.actor; online = true;
     if ((force || changed) && !dialog.open && (force || (!submittingForms.size && !document.activeElement?.closest('form, details[open]')))) render();
-  } catch (e) { online = false; if (force) throw e; const status = document.querySelector('#connection'); if (status) status.textContent = 'Connection interrupted · reconnecting'; }
+  } catch (e) {
+    if (testRoom && e.status === 410) { state = null; root.innerHTML = '<main class="welcome"><h1>Test round ended</h1><p>Its temporary data has been discarded.</p>' + button('test-leave','Return to classroom') + '</main>'; return; }
+    if (!testRoom && e.status === 404) { state = null; sessionId = null; toast('This session is no longer available.'); await enter(); return; }
+    online = false; if (force) throw e; const status = document.querySelector('#connection'); if (status) status.textContent = 'Connection interrupted · reconnecting'; }
 }
 async function command(cmd) {
   if (busy) throw new Error('Another decision is still being submitted. Please wait and try again.'); busy = true;
   const storageKey = `studio-pending:${backend}:${actor.id}:${sessionId}`;
   let request;
   try {
+    if (testRoom) {
+      if (testPending && JSON.stringify(testPending.command) !== JSON.stringify(cmd)) throw new Error('Retry the previous test decision before submitting another.');
+      testPending ||= {key:crypto.randomUUID(),revision:state.revision,command:cmd};
+      try { const response = await testRoom.call('command',testPending); testPending = null; toast(response.message); await load(false,true); return true; }
+      catch(e) { if(e.status >= 400 && e.status < 500) testPending = null; if(e.status === 409) await load(false,true); throw e; }
+    }
     if (!solo) {
       request = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
       if (request && JSON.stringify(request.command) !== JSON.stringify(cmd)) throw new Error('An earlier decision has an unknown response. Retry that same decision before starting another.');
@@ -135,7 +151,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=109b222f697a')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=4e8dc8e29f2a')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -150,17 +166,72 @@ async function enterFirebase() {
   root.innerHTML = `<main class="welcome" id="content">${brand}<h1>Welcome, ${esc(user.name.split(' ')[0])}.</h1><p>You are signed in securely with Firebase. Your classroom server connects you to your instructor’s shared session.</p><section class="panel"><h2>Connect your classroom</h2><form id="backend-form">${field('backend', 'Classroom server URL', backend || 'http://127.0.0.1:3000', 'url')}${button('submit', 'Connect server', '', 'primary')}<div class="error" role="alert"></div></form></section><div class="toolbar">${button('solo', 'Try the solo sandbox')} ${button('logout', 'Sign out')}</div><p class="form-note">The sandbox is a separate single-browser rehearsal. It does not submit decisions to your classroom.</p></main>`;
   if (localStorage.getItem('studio-backend')) root.querySelector('main').insertAdjacentHTML('beforeend', button('forget-server', 'Reset server connection', '', 'small'));
 }
+async function lifecycleRequest(id, type) {
+  const storageKey = 'studio-lifecycle:' + backend + ':' + user.id + ':' + id + ':' + type;
+  let request = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
+  if (!request) { const current = await api('/sessions/' + encodeURIComponent(id)); request = {key:crypto.randomUUID(),revision:current.state.revision,command:{type}}; sessionStorage.setItem(storageKey,JSON.stringify(request)); }
+  try { const response = await api('/sessions/' + encodeURIComponent(id) + '/command', request); sessionStorage.removeItem(storageKey); return response; }
+  catch(e) { if(e.status >= 400 && e.status < 500 && ![408,429].includes(e.status)) sessionStorage.removeItem(storageKey); throw e; }
+}
+function testTabUrl(key) {
+  const url = new URL(location.href); url.search = '';
+  url.hash = new URLSearchParams({test: testRoom.credentials.roomId, key}).toString(); return url.href;
+}
+async function enterTest(client) {
+  const view = await client.call('view'); testRoom = client; solo = null;
+  state = view.state; actor = view.actor; user = actor; sessionId = state.id; preview = undefined;
+  sessions = []; page = actor.role === 'instructor' ? 'admin' : 'overview';
+  history.replaceState(null, '', testTabUrl(client.credentials.key));
+  render();
+}
+function leaveTest() {
+  testRoom?.close(); const url = new URL(location.href); url.hash = ''; url.search = ''; location.replace(url.href);
+}
+async function testStudents() {
+  const people = await testRoom.call('roster');
+  modal('Test students', '<p>Each link opens a separate simulated student in this browser profile. No registration or sign-in is needed. Students in the same company share its decisions and results.</p>' + table(['Student', 'Company', ''], people.filter(p => p.role === 'student').map(p => [esc(p.name), esc(state.companies.find(c => c.id === p.companyId)?.name), `<a class="button" href="${esc(testTabUrl(p.key))}" target="_blank" rel="noopener">Open student tab ↗</a>`])));
+}
+async function startTestSetup(id) {
+  if (!health?.testClassroom) throw new Error('Refresh after the classroom server update to start multi-tab test rounds.');
+  if (!globalThis.SharedWorker) throw new Error('This browser does not support shared test tabs. Use a current desktop browser.');
+  const template = await api('/sessions/' + encodeURIComponent(id) + '/test-template');
+  modal('Set up a test round', '<p>Choose 1–12 companies, then assign simulated students to each. This round stays in memory in this browser; nothing is saved to Firebase.</p>' + field('companyCount', 'Number of competing companies', template.companyNames.length, 'number', 'min="1" max="12"'), async f => {
+    const count = value(f,'companyCount'); if (!Number.isInteger(count) || count < 1 || count > 12) throw new Error('Choose 1–12 companies.');
+    // The first modal closes before its next form is opened.
+    setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
+      const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
+      const client = (await import('./src/test-client.mjs?v=4e8dc8e29f2a')).testClient();
+      try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
+    }, 'Start test round'), 0);
+  }, 'Choose students');
+}
+
 function accountControls(person = user || actor) {
+  if (testRoom) return `<div class="account-controls"><span data-theme-slot></span><details class="account-menu"><summary>${esc(person.name)} ⌄</summary><div class="account-dropdown"><strong>${esc(person.name)}</strong><p>Simulated ${esc(person.role)}</p>${person.role === 'instructor' ? button('test-students','Test students') : ''}${button('test-leave','Leave test')}</div></details></div>`;
   return `<div class="account-controls"><span data-theme-slot></span><details class="account-menu"><summary><span class="avatar">${esc(person.name.slice(0, 2).toUpperCase())}</span><span class="account-name">${esc(person.name)}</span><span aria-hidden="true">⌄</span></summary><div class="account-dropdown"><strong>${esc(person.name)}</strong><small>${esc(person.role)}</small><hr>${button('profile', 'My profile & statistics')}${button('sessions', 'My sessions')}${person.role === 'instructor' ? button('create', 'Create a session', '', '', !!solo) : button('join', 'Join a company', '', '', !!solo)}${person.role === 'instructor' && state ? button('nav', 'Session settings', 'admin') + button('roster', 'Student directory', '', '', !!solo) : ''}<hr>${button('logout', 'Log out', '', 'danger')}</div></details></div>`;
 }
 function createSessionFields() { return `${field('name', 'Session name', 'Sustainability challenge', 'text')}<div class="form-grid">${field('seed', 'Random seed', 42, 'number', 'min="0" max="4294967295"')}${field('days', 'Duration (days)', 30, 'number', 'min="1" max="180"')}</div><label>Company names (one per line)<textarea name="companies" required>Helio Works
 Northstar Solar
 Verdant Energy</textarea></label>${health?.classroomAccounting ? `<div class="form-grid">${select('revenueAt', 'Recognize sales revenue at', [['receipt', 'Customer receipt'], ['dispatch', 'Dispatch']], 'receipt')}${field('corporateOverhead', 'Additional corporate overhead (€ per day, per company)', 0, 'number', 'min="0" max="1000000" step="0.01"')}</div><p class="form-note">Customer payment is due after receipt. Corporate overhead is charged at each daily close.</p>` : ''}`; }
 async function createClassroom(f) {  const r = await api('/sessions', { ...(health?.classroomAccounting ? { revenueAt: f.get('revenueAt'), dailyCorporateOverhead: Math.round(value(f, 'corporateOverhead') * 100) } : {}), name: f.get('name'), seed: value(f, 'seed'), days: value(f, 'days'), companyNames: f.get('companies').split('\n').map(x => x.trim()).filter(Boolean) }); sessionStorage.setItem('studio-session', r.id); page = 'admin'; await enter(true); }
+const sessionHints = {
+  'open-session': 'Open session controls, company previews and reports. Effect on students: opening a session does not change their access or decisions.',
+  'copy-session': 'Copy a link to this session. Effect on students: they still need to sign in and belong to a company; the link does not grant access.',
+  'session-export': 'Download the session replay and results. Effect on students: their session is unchanged. The export may contain participant names; keep it private.',
+  'session-test': 'Create a temporary practice round with simulated students, each assigned to one company, in separate browser tabs. Effect on students: real accounts and assessed results are unchanged. No test decisions are saved to Firebase.',
+  'session-close': 'Stop play and move the session to Past sessions, retaining results. Effect on students: students can no longer submit decisions; results remain available for read-only review.',
+  'session-delete': 'Archive the session and remove it from session lists. Stored records are retained. Effect on students: they lose access to this session; their accounts remain.',
+  'session-codes': 'View company join codes and the student directory. Effect on students: sharing a company code lets a signed-in student join that company.',
+  'sessions-delete': 'Archive all active sessions and remove them from session lists, retaining stored records. Effect on students: they lose access to those sessions; their accounts remain.'
+};
+function sessionButton(action, label, id = '', cls = '') {
+  const hintId = 'hint-' + action + '-' + id;
+  return '<span class="session-action-hint">' + button(action,label,id,cls).replace('<button ', '<button aria-describedby="' + esc(hintId) + '" ') + '<span class="session-tooltip" role="tooltip" id="' + esc(hintId) + '">' + esc(sessionHints[action]) + '</span></span>';
+}
 function renderAdminHome() {
   const active = sessions.filter(s => s.status !== 'completed'), past = sessions.filter(s => s.status === 'completed');
-  const cards = list => list.map(s => `<article class="session-card"><div class="session-card-heading"><h3>${esc(s.name)}</h3><span class="badge session-status">${esc(s.status === 'completed' ? 'Closed' : s.status)}</span></div><p class="session-meta">Simulation hour ${number(s.hour)}</p><div class="session-actions" role="group" aria-label="Actions for ${esc(s.name)}">${button('open-session', 'Open', s.id, 'session-open')}${button('copy-session', 'Copy link', s.id)}${button('session-export', '↓ Export data', s.id, 'session-export')}${button('session-test', '⚗ Test round', s.id)}${s.status !== 'completed' ? button('session-close', 'Close session', s.id) : ''}${button('session-delete', 'Delete', s.id, 'session-danger')}</div><div class="session-access">${button('session-codes', 'Company join codes ↗', s.id, 'session-access-button')}<small>Session ${esc(s.id)}</small></div></article>`).join('') || '<p class="empty">No sessions here yet.</p>';
-  root.innerHTML = `<div class="admin-home"><header class="admin-header">${brand}${accountControls(user)}</header><main id="content"><div class="page-heading"><div><p class="eyebrow">Instructor workspace</p><h1>Sustainability Studio admin</h1><p>Manage your sessions and set up each learning task.</p></div></div><div class="admin-columns"><aside><details class="panel"><summary>Options</summary><p class="form-note">Open a session to set its clock, teaching capabilities, suppliers, markets and energy options.</p>${button('solo', 'Try a test simulation')}</details><details class="panel"><summary>Create session</summary><form id="create-session-form">${createSessionFields()}${button('submit', 'Create session', '', 'primary')}<div class="error" role="alert"></div></form></details></aside><div><details class="panel" open><summary>Active sessions <span>${active.length} sessions</span></summary><p class="form-note">Open a session to manage your classroom. Paused sessions appear here too.</p>${active.length ? button('sessions-delete', 'Delete all active sessions', '', 'session-danger session-bulk') : ''}${cards(active)}</details><details class="panel"><summary>Past sessions <span>${past.length} sessions</span></summary>${cards(past)}</details></div></div></main></div>`;
+  const cards = list => list.map(s => `<article class="session-card"><div class="session-card-heading"><h3>${esc(s.name)}</h3><span class="badge session-status">${esc(s.status === 'completed' ? 'Closed' : s.status)}</span></div><p class="session-meta">Simulation hour ${number(s.hour)}</p><div class="session-actions" role="group" aria-label="Actions for ${esc(s.name)}">${sessionButton('open-session', 'Open', s.id, 'session-open')}${sessionButton('copy-session', 'Copy link', s.id)}${sessionButton('session-export', '↓ Export data', s.id, 'session-export')}${sessionButton('session-test', 'Test', s.id)}${s.status !== 'completed' ? sessionButton('session-close', 'Close', s.id) : ''}${sessionButton('session-delete', 'Delete', s.id, 'session-danger')}</div><div class="session-access">${sessionButton('session-codes', 'Company join codes ↗', s.id, 'session-access-button')}<small>Session ${esc(s.id)}</small></div></article>`).join('') || '<p class="empty">No sessions here yet.</p>';
+  root.innerHTML = `<div class="admin-home"><header class="admin-header">${brand}${accountControls(user)}</header><main id="content"><div class="page-heading"><div><p class="eyebrow">Instructor workspace</p><h1>Sustainability Studio admin</h1><p>Manage your sessions and set up each learning task.</p></div></div><div class="admin-columns"><aside><details class="panel"><summary>Options</summary><p class="form-note">Open a session to set its clock, teaching capabilities, suppliers, markets and energy options.</p>${button('solo', 'Try a test simulation')}</details><details class="panel"><summary>Create session</summary><form id="create-session-form">${createSessionFields()}${button('submit', 'Create session', '', 'primary')}<div class="error" role="alert"></div></form></details></aside><div><details class="panel" open><summary>Active sessions <span>${active.length} sessions</span></summary><p class="form-note">Open a session to manage your classroom. Paused sessions appear here too.</p>${active.length ? sessionButton('sessions-delete', 'Delete all active sessions', '', 'session-danger session-bulk') : ''}${cards(active)}</details><details class="panel"><summary>Past sessions <span>${past.length} sessions</span></summary>${cards(past)}</details></div></div></main></div>`;
 }
 
 function renderLobby() { root.innerHTML = `<main class="welcome" id="content">${brand}<h1>Your classroom.</h1><p>Welcome, ${esc(user.name)}. ${user.role === 'instructor' ? 'Create a session to begin.' : 'Join a company with the code your instructor provided.'}</p>${button(user.role === 'instructor' ? 'create' : 'join', user.role === 'instructor' ? 'Create session' : 'Join company', '', 'primary')} ${button('logout', 'Sign out')}</main>`; }
@@ -253,8 +324,8 @@ function render() {
   if (!visible(page) || (page === 'workspace' && admin)) page = 'overview';
   const titles = { workspace: 'Decision workspace', overview: c ? `Let's make progress, ${c.name.split(' ')[0]}.` : 'A classroom in motion.', orders: 'From offer to arrival.', supply: 'Keep your business moving.', production: 'Make capacity count.', finance: 'Follow the money.', energy: 'Build a better footprint.', reports: 'See the whole picture.', messages: 'Better decisions, together.', admin: 'Set the pace of learning.' };
   const subtitles = { workspace: 'Open the panels you need and compare them side by side.', overview: 'Your business, at a glance. Every decision has a next step.', orders: 'Accepted terms stay with each order, from first dispatch to final payment.', supply: 'Balance availability, working capital, and the footprint of every component.', production: 'Coordinate materials, people, machines, and the hours they work.', finance: 'Cash is available money. Profit is revenue earned less costs incurred.', energy: 'Invest now. Track activation and the results over time.', reports: 'Comparable daily results, with every reporting boundary clearly marked.', messages: 'A shared space for announcements, questions, and team decisions.', admin: 'Control the shared clock, classroom access, and teaching parameters.' };
-  root.innerHTML = `<div class="layout">${!admin || preview ? workspaceNavigation(admin, visible) : ''}<div class="workspace"><header class="topbar"><div class="breadcrumb">Workspace &nbsp; / &nbsp; <strong>${pages[page] || "Decision workspace"}</strong></div><div class="top-actions">${user?.role === 'instructor' ? button('sessions', 'All sessions', '', 'small') : ''}${accountControls(actor)}</div></header>${solo ? `<div class="mode-banner"><span><strong>Solo sandbox</strong> · ${solo.isTest ? 'Private test round · changes are discarded when you leave.' : 'Saved in this browser. Switch roles to rehearse; no other people are connected.'}</span>${button('switch-solo', admin ? 'Play a company' : 'Instructor view')}</div>` : health?.demo ? '<div class="mode-banner"><span><strong>Local classroom demo</strong> · Synthetic accounts share durable server state. Demo sign-in is enabled on this computer.</span></div>' : ''}<main id="content" class="content"><div class="page-heading"><div><div class="eyebrow">${esc(state.name)}${c ? ` &nbsp; / &nbsp; ${esc(c.name)}` : ''}</div><h1 tabindex="-1">${esc(titles[page])}</h1><p>${subtitles[page]}</p></div><div class="timebox"><span class="badge ${state.status === 'running' ? '' : 'amber'}">● ${esc(state.status)}</span><strong>${simDate(state.hour)} · simulation</strong><small>Day ${Math.floor(state.hour / 24) + 1} · ends ${simDate(state.endHour)}</small></div></div>${state.status === 'completed' ? `<div class="advice warning"><strong>Session complete. ${state.events.filter(e => e.status === 'pending').length} scheduled events remain.</strong>Pending deliveries, payments, and investments are preserved. The instructor can extend the end date to settle them.</div>` : ''}${admin ? `<div class="toolbar">${select('preview', 'Company preview · read-only', [['', 'All companies'], ...state.companies.map(x => [x.id, x.name])], preview || '')}${button('nav', 'Session control', 'admin', 'small')}${button('nav', 'Class overview', 'overview', 'small')}${button('nav', 'Reports', 'reports', 'small')}${button('nav', 'Announcements', 'messages', 'small')}</div>` : ''}${!admin && !solo ? `<div class="toolbar" aria-label="Classroom access">${button('join', 'Join another class', '', 'small')}${button('sessions', 'Switch session', '', 'small')}</div>` : ''}${page === "workspace" ? studentWorkspace(visible) : pageBody()}<div class="footer-note"><a href="notes/model.md" target="_blank" rel="noopener">Model & teaching guide ↗</a><br>All amounts are simulated EUR · Emissions in kg CO₂e · Simulation dates use UTC · Live state at ${simDate(state.hour)} · Model v${state.schema}<br>Original teaching model. No RealGame services, code, credentials, or assets are used.</div></main></div></div>`;
-  const pending = !solo && sessionStorage.getItem(`studio-pending:${backend}:${actor.id}:${sessionId}`);
+  root.innerHTML = `<div class="layout">${!admin || preview ? workspaceNavigation(admin, visible) : ''}<div class="workspace"><header class="topbar"><div class="breadcrumb">Workspace &nbsp; / &nbsp; <strong>${pages[page] || "Decision workspace"}</strong></div><div class="top-actions">${user?.role === 'instructor' ? button('sessions', 'All sessions', '', 'small') : ''}${accountControls(actor)}</div></header>${testRoom ? `<div class="mode-banner"><span><strong>Temporary test round</strong> · ${esc(actor.name)} · Shared only across these browser tabs. No test data is saved.</span>${admin ? button('test-students', 'Open test student tabs') + button('test-end', 'End test round') : ''}${button('test-leave', 'Leave test')}</div>` : solo ? `<div class="mode-banner"><span><strong>Solo sandbox</strong> · ${solo.isTest ? 'Private test round · changes are discarded when you leave.' : 'Saved in this browser. Switch roles to rehearse; no other people are connected.'}</span>${button('switch-solo', admin ? 'Play a company' : 'Instructor view')}</div>` : health?.demo ? '<div class="mode-banner"><span><strong>Local classroom demo</strong> · Synthetic accounts share durable server state. Demo sign-in is enabled on this computer.</span></div>' : ''}<main id="content" class="content"><div class="page-heading"><div><div class="eyebrow">${esc(state.name)}${c ? ` &nbsp; / &nbsp; ${esc(c.name)}` : ''}</div><h1 tabindex="-1">${esc(titles[page])}</h1><p>${subtitles[page]}</p></div><div class="timebox"><span class="badge ${state.status === 'running' ? '' : 'amber'}">● ${esc(state.status)}</span><strong>${simDate(state.hour)} · simulation</strong><small>Day ${Math.floor(state.hour / 24) + 1} · ends ${simDate(state.endHour)}</small></div></div>${state.status === 'completed' ? `<div class="advice warning"><strong>Session complete. ${state.events.filter(e => e.status === 'pending').length} scheduled events remain.</strong>Pending deliveries, payments, and investments are preserved. The instructor can extend the end date to settle them.</div>` : ''}${admin ? `<div class="toolbar">${select('preview', 'Company preview · read-only', [['', 'All companies'], ...state.companies.map(x => [x.id, x.name])], preview || '')}${button('nav', 'Session control', 'admin', 'small')}${button('nav', 'Class overview', 'overview', 'small')}${button('nav', 'Reports', 'reports', 'small')}${button('nav', 'Announcements', 'messages', 'small')}</div>` : ''}${!admin && !solo && !testRoom ? `<div class="toolbar" aria-label="Classroom access">${button('join', 'Join another class', '', 'small')}${button('sessions', 'Switch session', '', 'small')}</div>` : ''}${page === "workspace" ? studentWorkspace(visible) : pageBody()}<div class="footer-note"><a href="notes/model.md" target="_blank" rel="noopener">Model & teaching guide ↗</a><br>All amounts are simulated EUR · Emissions in kg CO₂e · Simulation dates use UTC · Live state at ${simDate(state.hour)} · Model v${state.schema}<br>Original teaching model. No RealGame services, code, credentials, or assets are used.</div></main></div></div>`;
+  const pending = !solo && !testRoom && sessionStorage.getItem(`studio-pending:${backend}:${actor.id}:${sessionId}`);
   if (pending) root.querySelector('#content').insertAdjacentHTML('afterbegin', `<div class="advice warning"><strong>A decision is awaiting confirmation.</strong>The response was interrupted. Retry with the same request key to confirm the outcome safely. ${button('retry-decision', 'Retry pending decision', '', 'small')}</div>`);
 }
 function pageBody() {
@@ -384,12 +455,12 @@ function channelOptions() { return [['announcements', 'Instructor announcements'
 function messagesPage() {
   const options = channelOptions(); if (!options.some(x => x[0] === channel)) channel = options[0][0];
   const messages = state.messages.filter(m => m.channel === channel);
-  const canSend = state.features.messaging.allowed && (isTeacher() || channel !== 'announcements');
+  const canSend = (state.status !== 'completed' || isTeacher()) && state.features.messaging.allowed && (isTeacher() || channel !== 'announcements');
   return `<div class="toolbar">${select('channel', 'Conversation', options, channel)}<span class="form-note">Students can message their team or the instructor. Announcements are read-only for students.</span></div>${panel(esc(options.find(x => x[0] === channel)?.[1]), 'Sender identity comes from the signed-in account. Both clocks are labelled.', `<div class="messages">${messages.map(m => `<article class="message ${m.role === 'instructor' ? 'teacher' : ''}"><div class="message-header">${esc(m.senderName)} · ${esc(m.role)}</div><p>${esc(m.text)}</p><small>Real time: ${new Date(m.realAt).toLocaleString('en-GB')} · Simulation: ${simDate(m.hour)}</small></article>`).join('') || '<p class="empty">Start a useful conversation. Messages are saved with this session.</p>'}</div>${canSend ? `<form id="message-form"><label>Your message<textarea name="text" maxlength="2000" placeholder="Share a decision, ask a question, or coordinate a next step…" required></textarea></label>${button('submit', channel === 'announcements' ? 'Post announcement' : 'Send message', '', 'primary')}<div class="error" role="alert"></div></form>` : '<p class="form-note">This conversation is read-only for your role or messaging is disabled.</p>'}`)}`;
 }
 function adminPage() {
   if (!isTeacher()) return '';
-  return `<div class="grid2">${panel('The shared clock', 'Pause for discussion. Step for a decision round. Run for continuous play.', `<div class="clock-controls">${button('clock', state.status === 'running' ? 'Pause clock' : 'Run clock', state.status === 'running' ? 'paused' : 'running', 'primary', state.status === 'completed' || !!solo)}${button('step', '+ 1 hour', '1', '', state.status !== 'paused')}${button('step', '+ 1 day', '24', '', state.status !== 'paused')}${button('step', 'Custom step', 'custom', '', state.status !== 'paused')}</div><p class="form-note">${solo ? 'Solo mode advances with manual steps.' : `Running speed: ${state.secondsPerHour} real seconds / simulation hour.`} No time is skipped during server downtime.</p>${button('settings', 'Session settings', '', 'small')}`)}${panel('Classroom access', 'Every student belongs to one company in this session.', `<div class="toolbar">${button('roster', 'Companies & join codes', '', 'primary', !!solo)}${button('create', 'New session', '', '', !!solo)}${button('sessions', 'Switch session', '', 'small', !!solo)}</div><p class="form-note">Company join codes grant student membership only. Instructor previews are read-only. Team messages are visible only to members of that company.</p>`)}</div>${panel('Teaching capabilities', 'Visibility controls navigation. Permission controls new decisions. Model effects are separate.', `<div class="toggle-row"><span>Feature</span><span>Visibility &nbsp; / &nbsp; Permission</span></div>${FEATURES.map(f => `<form class="toggle-row" data-feature="${f}"><span>${esc(f.charAt(0).toUpperCase() + f.slice(1))}</span><div class="toolbar">${check('visible', 'Show', state.features[f].visible)}${check('allowed', 'Allow decisions', state.features[f].allowed)}${button('submit', 'Apply', '', 'small')}</div><div class="error" role="alert"></div></form>`).join('')}<form id="effects-form" class="toggle-row"><span>Model effect</span><div class="toolbar">${check('carbonDemand', 'Customer preference for lower carbon', state.effects.carbonDemand)}${button('submit', 'Apply', '', 'small')}</div><div class="error" role="alert"></div></form>`)}${panel('Scenario catalogues', 'Change future supply, transport, demand, and energy conditions. Accepted contracts keep their terms.', `<div class="toolbar">${['suppliers', 'routes', 'markets', 'energy'].map(k => button('catalog-list', k.charAt(0).toUpperCase() + k.slice(1), k)).join('')}</div>`)}${panel('Upcoming outcomes across the class', 'Pending obligations remain visible beyond the configured end.', pendingEvents(10), button('events', 'All events', '', 'small'))}${panel('Audit trail', 'Accepted commands identify the actor and both clocks.', table(['Simulation / real time', 'Actor', 'Action', 'Result'], state.audit.slice(-30).reverse().map(a => [`${simDate(a.hour)}<small>${new Date(a.realAt).toLocaleString('en-GB')}</small>`, `${esc(a.actorName)}<small>${esc(a.role)}</small>`, esc(a.command.type), esc(a.result)])), button('replay', 'Export replay', '', 'small', !!solo))}`;
+  return `<div class="grid2">${panel('The shared clock', 'Pause for discussion. Step for a decision round. Run for continuous play.', `<div class="clock-controls">${button('clock', state.status === 'running' ? 'Pause clock' : 'Run clock', state.status === 'running' ? 'paused' : 'running', 'primary', state.status === 'completed' || !!solo)}${button('step', '+ 1 hour', '1', '', state.status !== 'paused')}${button('step', '+ 1 day', '24', '', state.status !== 'paused')}${button('step', 'Custom step', 'custom', '', state.status !== 'paused')}</div><p class="form-note">${solo ? 'Solo mode advances with manual steps.' : `Running speed: ${state.secondsPerHour} real seconds / simulation hour.`} No time is skipped during server downtime.</p>${button('settings', 'Session settings', '', 'small')}`)}${panel('Classroom access', 'Every student belongs to one company in this session.', `<div class="toolbar">${button('roster', 'Companies & join codes', '', 'primary', !!solo)}${button('create', 'New session', '', '', !!solo || !!testRoom)}${button('sessions', 'Switch session', '', 'small', !!solo)}</div><p class="form-note">Company join codes grant student membership only. Instructor previews are read-only. Team messages are visible only to members of that company.</p>`)}</div>${panel('Teaching capabilities', 'Visibility controls navigation. Permission controls new decisions. Model effects are separate.', `<div class="toggle-row"><span>Feature</span><span>Visibility &nbsp; / &nbsp; Permission</span></div>${FEATURES.map(f => `<form class="toggle-row" data-feature="${f}"><span>${esc(f.charAt(0).toUpperCase() + f.slice(1))}</span><div class="toolbar">${check('visible', 'Show', state.features[f].visible)}${check('allowed', 'Allow decisions', state.features[f].allowed)}${button('submit', 'Apply', '', 'small')}</div><div class="error" role="alert"></div></form>`).join('')}<form id="effects-form" class="toggle-row"><span>Model effect</span><div class="toolbar">${check('carbonDemand', 'Customer preference for lower carbon', state.effects.carbonDemand)}${button('submit', 'Apply', '', 'small')}</div><div class="error" role="alert"></div></form>`)}${panel('Scenario catalogues', 'Change future supply, transport, demand, and energy conditions. Accepted contracts keep their terms.', `<div class="toolbar">${['suppliers', 'routes', 'markets', 'energy'].map(k => button('catalog-list', k.charAt(0).toUpperCase() + k.slice(1), k)).join('')}</div>`)}${panel('Upcoming outcomes across the class', 'Pending obligations remain visible beyond the configured end.', pendingEvents(10), button('events', 'All events', '', 'small'))}${panel('Audit trail', 'Accepted commands identify the actor and both clocks.', table(['Simulation / real time', 'Actor', 'Action', 'Result'], state.audit.slice(-30).reverse().map(a => [`${simDate(a.hour)}<small>${new Date(a.realAt).toLocaleString('en-GB')}</small>`, `${esc(a.actorName)}<small>${esc(a.role)}</small>`, esc(a.command.type), esc(a.result)])), button('replay', 'Export replay', '', 'small', !!solo || !!testRoom))}`;
 }
 function modal(title, content, onSubmit, submitLabel = 'Confirm') {
   dialog.innerHTML = `<button class="close" data-action="close" aria-label="Close dialog">×</button><h2 id="dialog-title">${esc(title)}</h2>${onSubmit ? `<form id="modal-form">${content}<div class="error" role="alert"></div><div class="form-actions">${button('close', 'Cancel')}${button('submit', submitLabel, '', 'primary')}</div></form>` : content}`;
@@ -435,19 +506,19 @@ async function action(name, id) {
   if (name === 'submit') return;
   if (name === 'profile') { modal('My profile & statistics', '<p><strong>' + esc((user || actor).name) + '</strong></p><p>' + esc((user || actor).role) + '</p><p>' + sessions.length + ' classroom sessions · ' + sessions.filter(s => s.status === 'completed').length + ' completed</p>'); return; }
   if (name === 'copy-session') { const link = new URL(location.href); link.search = ''; link.hash = ''; link.searchParams.set('session', id); try { await navigator.clipboard.writeText(link.href); toast('Session link copied. Sign-in and membership are still required.'); } catch { modal('Copy session link', field('link', 'Select and copy this link', link.href, 'url', 'readonly')); } return; }
-  if (name === 'session-test') {
-    const replay = await api('/sessions/' + encodeURIComponent(id) + '/replay');
-    modal('Start a test round?', '<p>Rehearse this session’s initial setup in a private browser sandbox. Classroom progress and student accounts are not copied or changed.</p>', async () => {
-      solo = (await import('./src/solo.mjs?v=109b222f697a')).soloAdapter(replay.initial); solo.switchRole('instructor'); sessionId = 'solo'; preview = undefined; page = 'admin'; await load();
-    }, 'Start test round'); return;
-  }
+  if (name === 'test-leave') { leaveTest(); return; }
+  if (testRoom && ['sessions','logout','test-leave'].includes(name)) { leaveTest(); return; }
+  if (name === 'test-students' || (testRoom && name === 'roster')) { await testStudents(); return; }
+  if (name === 'test-end') { modal('End this test round?', '<p>This discards every test decision and disconnects all test student tabs.</p>', async () => { await testRoom.call('end'); leaveTest(); }, 'End test round'); return; }
+  if (testRoom && ['create','join','replay','assign'].includes(name)) throw new Error('This action is unavailable in a temporary test round.');
+  if (name === 'session-test') { await startTestSetup(id); return; }
   if (['session-close', 'session-delete', 'sessions-delete'].includes(name)) {
     if (!health?.sessionLifecycle) { modal('Server update needed', '<p>This classroom server needs the session-management update before sessions can be closed or deleted.</p>'); return; }
     const deleting = name !== 'session-close', targets = name === 'sessions-delete' ? sessions.filter(s => s.status !== 'completed') : sessions.filter(s => s.id === id);
     modal(deleting ? 'Delete sessions?' : 'Close session?', '<p>' + (deleting ? 'Remove these sessions from everyone’s list and revoke access. Stored records are retained on the server; this does not permanently erase data. Export anything you need first.' : 'Stop the clock and move this session to Past sessions. Results remain available. Extend its duration in settings to resume.') + '</p><ul>' + targets.map(s => '<li>' + esc(s.name) + '</li>').join('') + '</ul>' + (deleting ? field('confirmation', 'Type DELETE to confirm', '', 'text', 'pattern="DELETE" autocomplete="off"') : ''), async f => {
       if (deleting && f.get('confirmation') !== 'DELETE') throw new Error('Type DELETE to confirm.');
       let done = 0;
-      try { for (const target of targets) { const current = await api('/sessions/' + encodeURIComponent(target.id)); await api('/sessions/' + encodeURIComponent(target.id) + '/command', {key: crypto.randomUUID(), revision: current.state.revision, command: {type: deleting ? 'deleteSession' : 'closeSession'}}); done++; } }
+      try { for (const target of targets) { await lifecycleRequest(target.id, deleting ? 'deleteSession' : 'closeSession'); done++; } }
       catch (error) { await enter(); throw new Error(done + ' of ' + targets.length + ' sessions updated. ' + error.message + ' Refresh and retry remaining sessions.'); }
       await enter(); toast(done + (deleting ? ' sessions deleted.' : ' session closed.'));
     }, deleting ? 'Delete sessions' : 'Close session'); return;
@@ -470,7 +541,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=109b222f697a')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=4e8dc8e29f2a')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); renderWelcome(); return; }
@@ -561,9 +632,16 @@ document.addEventListener('change', async event => {
     if (target.name?.startsWith('series-')) { if (!selectedCompanies.size) selectedCompanies = new Set(state.companies.map(c => c.id)); if (target.checked) selectedCompanies.add(target.name.slice(7)); else selectedCompanies.delete(target.name.slice(7)); if (!selectedCompanies.size) { selectedCompanies.add(target.name.slice(7)); toast('Keep at least one company selected to display the report.'); } render(); }
   } catch (e) { toast(e.message); }
 });
+const testLink = new URLSearchParams(location.hash.slice(1));
+if (testLink.has('test')) {
+  try { const client = (await import('./src/test-client.mjs?v=4e8dc8e29f2a')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+  catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p>' + button('test-leave','Return to classroom') + '</main>'; }
+} else {
+
 try { health = await api('/health'); } catch { health = null; }
 if (!health || health.auth === 'firebase') {
   renderWelcome();
   try { const auth = await getFirebase(); if (auth.user) await enterFirebase(); } catch (e) { toast('Sign-in could not load. Check your connection and refresh the page.'); }
 } else if (token && health) { try { await enter(); } catch { token = ''; sessionStorage.removeItem('studio-token'); renderWelcome(); } } else renderWelcome();
+}
 setInterval(() => { if (!solo && state && !busy) load(false); }, 3000);

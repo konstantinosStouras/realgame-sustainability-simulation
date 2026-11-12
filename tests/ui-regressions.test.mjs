@@ -8,7 +8,7 @@ import { itemName, productionRecipe } from '../src/engine.mjs';
 // Unit harness for the original UI functions. It does not open a browser or
 // access a real service. The coordinator separately verifies rendered behavior.
 const appSource = readFileSync(new URL(process.env.UI_TEST_SOURCE || '../app.mjs', import.meta.url), 'utf8');
-const definitions = appSource.replace(/^import .*;\r?\n/gm, '').split("\ntry { health = await api('/health'); }")[0];
+const definitions = appSource.replace(/^import .*;\r?\n/gm, '').split("\nconst testLink =")[0];
 const storage = () => { const values = new Map(); return { getItem: k => values.get(k) ?? null, setItem: (k, v) => values.set(k, String(v)), removeItem: k => values.delete(k) }; };
 function harness() {
   const handlers = {}, root = {}, dialog = { open: false }, toast = {};

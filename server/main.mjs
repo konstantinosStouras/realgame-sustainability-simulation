@@ -20,10 +20,10 @@ export function createApp({ store = new Store(process.env.DATA_PATH || '.data/si
       if (origin && origin !== ownOrigin && !origins.includes(origin)) fail('This origin is not allowed.', 403);
       if (origins.includes(origin)) { res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Vary', 'Origin'); }
       if (req.method === 'OPTIONS') { res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type'); res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'); res.writeHead(204); res.end(); return; }
-      if (url.pathname === '/api/health') return send(200, { ok: true, demo, version: 1, classroomAccounting: true, sessionLifecycle: true, auth: verifyFirebase ? 'firebase' : 'local-demo', projectId });
+      if (url.pathname === '/api/health') return send(200, { ok: true, demo, version: 1, classroomAccounting: true, sessionLifecycle: true, testClassroom: true, auth: verifyFirebase ? 'firebase' : 'local-demo', projectId });
       if (!url.pathname.startsWith('/api/')) {
         if (req.method !== 'GET' && req.method !== 'HEAD') fail('Method not allowed.', 405);
-        const files = { '/': 'index.html', '/index.html': 'index.html', '/styles.css': 'styles.css', '/theme.css': 'theme.css', '/theme.mjs': 'theme.mjs', '/google-g.png': 'google-g.png', '/app.mjs': 'app.mjs', '/src/engine.mjs': 'src/engine.mjs', '/src/solo.mjs': 'src/solo.mjs', '/src/firebase-client.mjs': 'src/firebase-client.mjs', '/firebase-config.mjs': 'firebase-config.mjs', '/notes/model.md': 'notes/model.md' };
+        const files = { '/': 'index.html', '/index.html': 'index.html', '/styles.css': 'styles.css', '/theme.css': 'theme.css', '/theme.mjs': 'theme.mjs', '/google-g.png': 'google-g.png', '/app.mjs': 'app.mjs', '/src/engine.mjs': 'src/engine.mjs', '/src/solo.mjs': 'src/solo.mjs', '/src/test-client.mjs': 'src/test-client.mjs', '/src/test-worker.mjs': 'src/test-worker.mjs', '/src/test-classroom.mjs': 'src/test-classroom.mjs', '/src/firebase-client.mjs': 'src/firebase-client.mjs', '/firebase-config.mjs': 'firebase-config.mjs', '/notes/model.md': 'notes/model.md' };
         const file = files[url.pathname]; if (!file) fail('Not found.', 404);
         const type = file.endsWith('.mjs') ? 'text/javascript; charset=utf-8' : file.endsWith('.css') ? 'text/css; charset=utf-8' : file.endsWith('.png') ? 'image/png' : file.endsWith('.md') ? 'text/plain; charset=utf-8' : 'text/html; charset=utf-8';
         res.setHeader('Content-Security-Policy', "default-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; img-src 'self' data: https://*.googleusercontent.com; style-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com; frame-src https://*.firebaseapp.com https://accounts.google.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
@@ -57,13 +57,16 @@ export function createApp({ store = new Store(process.env.DATA_PATH || '.data/si
       if (url.pathname === '/api/logout' && req.method === 'POST') { store.logout(token); return send(200, { ok: true }); }
       if (url.pathname === '/api/join' && req.method === 'POST') return send(200, store.join(user, body.code));
       if (url.pathname === '/api/sessions' && req.method === 'POST') return send(201, { id: store.create(user, body).id });
-      const match = url.pathname.match(/^\/api\/sessions\/([^/]+)(?:\/(command|roster|assign|replay))?$/);
+      const match = url.pathname.match(/^\/api\/sessions\/([^/]+)(?:\/(command|roster|assign|replay|test-template))?$/);
       if (!match) fail('Not found.', 404);
-      const id = match[1], action = match[2], actor = store.actor(user, id);
-      if (!action && req.method === 'GET') return send(200, { state: publicView(store.session(id), actor, url.searchParams.get('company')), actor });
+      const id = match[1], action = match[2];
       if (action === 'command' && req.method === 'POST') return send(200, store.command(user, id, body));
+      const actor = store.actor(user, id);
+      if (!action && req.method === 'GET') return send(200, { state: publicView(store.session(id), actor, url.searchParams.get('company')), actor });
+
       if (action === 'roster' && req.method === 'GET') return send(200, store.roster(user, id));
       if (action === 'assign' && req.method === 'POST') return send(200, store.assign(user, id, body.userId, body.companyId));
+      if (action === 'test-template' && req.method === 'GET') return send(200, store.testTemplate(user, id));
       if (action === 'replay' && req.method === 'GET') return send(200, store.replay(user, id));
       fail('Method not allowed.', 405);
     } catch (error) { if (!error.status) console.error(error); if (!res.headersSent) send(error.status || 500, { error: error.status ? error.message : 'Server error. No decision was committed.' }); }

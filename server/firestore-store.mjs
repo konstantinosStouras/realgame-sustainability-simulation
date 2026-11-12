@@ -1,3 +1,4 @@
+import { testTemplate } from './test-template.mjs';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createSession, applyCommand, assertInvariants, publicView, canMessage, fail } from '../src/engine.mjs';
 import { encodeState, decodeState, digest, advanceCloudClock } from './cloud-state.mjs';
@@ -158,6 +159,16 @@ export class FirestoreStore {
       this.writeState(tx, ref, state, metadata, metadata.nextTickAt);
       this.log(tx, ref, actor, command, realAt, state.revision);
       return { ok: true };
+    });
+  }
+  async testTemplate(user, id) {
+    if (user.role !== 'instructor') fail('Instructor access required.', 403);
+    return this.db.runTransaction(async tx => {
+      const ref = this.sessionRef(id), doc = await tx.get(ref);
+      if (!doc.exists || doc.data().status === 'deleted') fail('Session not found.',404);
+      const current = await this.readState(tx, ref, doc.data());
+      const initial = await this.readState(tx, ref, doc.data(), true);
+      return testTemplate(initial, current);
     });
   }
   async replay(user, id) {

@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 
 const source = readFileSync(new URL('../app.mjs', import.meta.url), 'utf8')
-  .replace(/^import .*;\r?\n/gm, '').split("\ntry { health = await api('/health'); }")[0];
+  .replace(/^import .*;\r?\n/gm, '').split("\nconst testLink =")[0];
 function setup(role) {
   const root = {}, values = new Map();
   const storage = { getItem: k => values.get(k), setItem: (k,v) => values.set(k,v) };
