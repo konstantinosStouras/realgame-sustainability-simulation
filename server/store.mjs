@@ -87,18 +87,22 @@ export class Store {
     return { members: this.db.prepare('SELECT u.id,u.name,u.username,u.role,m.companyId FROM members m JOIN users u ON u.id=m.userId WHERE m.sessionId=?').all(sessionId), invites: this.db.prepare('SELECT code,companyId FROM invites WHERE sessionId=?').all(sessionId) };
   }
   assign(user, sessionId, userId, companyId) {
-    this.actor(user, sessionId); if (user.role !== 'instructor') fail('Instructor access required.', 403);
+    const actor = this.actor(user, sessionId); if (user.role !== 'instructor') fail('Instructor access required.', 403);
     if (!this.session(sessionId).companies.some(c => c.id === companyId)) fail('Company not found.');
     const student = this.user(userId); if (student.role !== 'student') fail('Only student assignments can change.');
     if (!this.db.prepare('SELECT 1 FROM members WHERE sessionId=? AND userId=?').get(sessionId, userId)) fail('Student is not in this session.');
     return this.transaction(() => {
       this.db.prepare('UPDATE members SET companyId=? WHERE sessionId=? AND userId=?').run(companyId, sessionId, userId);
-      const s = this.session(sessionId); s.audit.push({ id: `assignment-${randomUUID()}`, hour: s.hour, realAt: new Date().toISOString(), actorId: user.id, actorName: user.name, role: user.role, command: { type: 'assignment', userId, companyId }, result: 'Student assignment updated.' }); s.revision++; this.save(s); return { ok: true };
+      const s = this.session(sessionId), realAt = new Date().toISOString(), command = { type: 'assignment', userId, companyId };
+      applyCommand(s, actor, command, realAt); assertInvariants(s); this.save(s);
+      this.db.prepare('INSERT INTO commands(sessionId,actor,command,realAt) VALUES (?,?,?,?)').run(sessionId, JSON.stringify(actor), JSON.stringify(command), realAt);
+      return { ok: true };
     });
   }
   command(user, id, request) {
     return this.transaction(() => {
       const actor = this.actor(user, id), { key, revision, command } = request;
+      if (command?.type === 'assignment') fail('Use the instructor assignment endpoint to change membership.', 403);
       if (typeof key !== 'string' || key.length < 8 || key.length > 100) fail('A unique request key is required.');
       const payload = JSON.stringify({ id, command });
       const previous = this.db.prepare('SELECT * FROM requests WHERE userId=? AND key=?').get(user.id, key);
@@ -122,11 +126,19 @@ export class Store {
   replay(user, id) {
     const viewer = this.actor(user, id); if (user.role !== 'instructor') fail('Instructor access required.', 403);
     const current = this.session(id);
-    return { note: 'Economic replay. Private chat text is redacted; administrative membership metadata is stored separately.', initial: JSON.parse(this.db.prepare('SELECT initial FROM sessions WHERE id=?').get(id).initial), commands: this.db.prepare('SELECT actor,command,realAt FROM commands WHERE sessionId=? ORDER BY seq').all(id).map(x => {
+    const commands = this.db.prepare('SELECT actor,command,realAt FROM commands WHERE sessionId=? ORDER BY seq').all(id).map(x => {
       const command = JSON.parse(x.command);
       if (command.type === 'message' && !canMessage(current, viewer, command.channel)) command.text = '[private message redacted]';
       return { actor: JSON.parse(x.actor), command, realAt: x.realAt };
-    }) };
+    });
+    const missingAssignments = Math.max(0, current.audit.filter(a => a.command.type === 'assignment').length - commands.filter(x => x.command.type === 'assignment').length);
+    return {
+      note: missingAssignments ? 'Incomplete replay: this older session has assignment transitions missing from its command history. Private chat text is redacted.' : 'Economic state, revision and audit replay includes assignment transitions. Private chat text is redacted; user accounts and membership tables are not recreated.',
+      complete: missingAssignments === 0,
+      missingAssignments,
+      initial: JSON.parse(this.db.prepare('SELECT initial FROM sessions WHERE id=?').get(id).initial),
+      commands
+    };
   }
   seedDemo() {
     const found = this.db.prepare("SELECT id FROM users WHERE username='demo-instructor'").get();

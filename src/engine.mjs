@@ -131,8 +131,15 @@ export function applyCommand(s, actor, a, realAt = '2026-01-01T00:00:00.000Z') {
   for (const c of s.companies) c.energyTerms ||= structuredClone(s.catalog.energy.find(x => x.id === c.energy));
   for (const e of s.events) if (e.type === 'energy' && e.status === 'pending') e.data.terms ||= structuredClone(s.catalog.energy.find(x => x.id === e.data.energyId));
   let result;
-  if (['step', 'clock', 'configure', 'catalog', 'renameCompany'].includes(a.type)) {
+  if (['step', 'clock', 'configure', 'catalog', 'renameCompany', 'assignment'].includes(a.type)) {
     if (actor.role !== 'instructor') fail('Instructor access required.', 403);
+    // Store.assign updates membership in the same transaction. This deterministic
+    // transition preserves its audit record and revision in exported replay.
+    if (a.type === 'assignment') {
+      cleanText(a.userId, 'Assigned user', 200);
+      if (!s.companies.some(c => c.id === a.companyId)) fail('Company not found.');
+      result = 'Student assignment updated.';
+    }
     if (a.type === 'step') { if (s.status === 'running') fail('Pause before stepping the clock.'); advance(s, integer(a.hours, 'Hours', 1, 168)); result = `Advanced to simulation hour ${s.hour}.`; }
     if (a.type === 'clock') {
       if (!['running', 'paused'].includes(a.status)) fail('Invalid clock status.');
@@ -142,7 +149,7 @@ export function applyCommand(s, actor, a, realAt = '2026-01-01T00:00:00.000Z') {
     }
     if (a.type === 'configure') {
       if (a.name !== undefined) s.name = cleanText(a.name, 'Session name');
-      if (a.endHour !== undefined) { s.endHour = integer(a.endHour, 'End hour', Math.max(24, s.hour), 4320); if (s.status === 'completed' && s.endHour > s.hour) s.status = 'paused'; }
+      if (a.endHour !== undefined) { s.endHour = integer(a.endHour, 'End hour', Math.max(24, s.hour), 4320); if (s.hour >= s.endHour) s.status = 'completed'; else if (s.status === 'completed') s.status = 'paused'; }
       if (a.carbonDemand !== undefined) s.effects.carbonDemand = bool(a.carbonDemand, 'Carbon demand effect');
       if (a.feature !== undefined) { if (!FEATURES.includes(a.feature)) fail('Unknown capability.'); s.features[a.feature] = { visible: bool(a.visible, 'Visibility'), allowed: bool(a.allowed, 'Decision permission') }; }
       result = 'Settings applied to future decisions and events. Existing contracts keep their accepted terms.';
@@ -293,9 +300,9 @@ function executeEvent(s, e) {
   e.status = 'completed'; e.completedAt = s.hour;
   notice(s, c, e.description, 'outcome');
 }
-function production(s, c) {
+function production(s, c, shifts) {
   const shift = Math.floor(((s.hour - 1) % 24) / 8);
-  if (!c.shifts[shift]) { c.lastBottleneck = 'Shift inactive'; return; }
+  if (!shifts[shift]) { c.lastBottleneck = 'Shift inactive'; return; }
   const energy = c.energyTerms || s.catalog.energy.find(x => x.id === c.energy);
   const machineLimit = c.machines * 6, staffLimit = c.workers * 2, capacity = c.inventory.panel.capacity - c.inventory.panel.qty;
   const materials = Object.entries(RECIPE).map(([item, count]) => [item, Math.floor(c.inventory[item].qty / count)]);
@@ -391,10 +398,12 @@ export function advance(s, hours) {
   if (s.status === 'completed') fail('Session completed. Extend its duration to continue.');
   for (let i = 0; i < hours && s.hour < s.endHour; i++) {
     s.hour++;
+    // Production closes (hour - 1, hour]; boundary changes govern the next interval.
+    const closingShifts = new Map(s.companies.map(c => [c.id, [...c.shifts]]));
     // All due events, including same-hour consequences, run in creation order.
     let due;
     while ((due = s.events.filter(e => e.status === 'pending' && e.at <= s.hour).sort((a, b) => a.at - b.at || Number(a.id.split('-')[1]) - Number(b.id.split('-')[1]))[0])) executeEvent(s, due);
-    for (const c of s.companies) production(s, c);
+    for (const c of s.companies) production(s, c, closingShifts.get(c.id));
     if (s.hour % 6 === 0) demand(s);
     for (const c of s.companies) automated(s, c);
     if (s.hour % 24 === 0) dailyClose(s);

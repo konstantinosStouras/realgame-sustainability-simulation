@@ -16,3 +16,4 @@ Only add notes suitable for a public repository. Keep login details and private 
 ## Inspection records
 
 - [RealGame inspection status, 12 November 2026](realgame-inspection.md)
+- [Our simulation: multiplayer playtest and fixes, 12 November 2026](multi-agent-qa.md)
