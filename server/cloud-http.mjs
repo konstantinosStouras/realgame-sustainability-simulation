@@ -10,7 +10,7 @@ export function createCloudHandler({ store, verifyFirebase, projectId, allowedOr
       if (origin) { res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Vary', 'Origin'); }
       if (req.method === 'OPTIONS') { res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type'); res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'); res.writeHead(204); res.end(); return; }
       const url = new URL(req.url, 'https://classroom.invalid'), path = url.pathname;
-      if (path === '/api/health' && req.method === 'GET') return send(200, { ok: true, demo: false, version: 1, classroomAccounting: true, sessionLifecycle: true, sessionLinks: true, auth: 'firebase', projectId, persistence: 'firestore', region: 'europe-west2' });
+      if (path === '/api/health' && req.method === 'GET') return send(200, { ok: true, demo: false, version: 1, classroomAccounting: true, sessionLifecycle: true, sessionLinks: true, testClassroom: true, auth: 'firebase', projectId, persistence: 'firestore', region: 'europe-west2' });
       if (!path.startsWith('/api/')) fail('Not found.', 404);
       const header = req.headers.authorization || '';
       if (!header.startsWith('Bearer ')) fail('Sign in to continue.', 401);
@@ -27,13 +27,14 @@ export function createCloudHandler({ store, verifyFirebase, projectId, allowedOr
       if (path === '/api/enter' && req.method === 'POST') return send(200, await store.enter(user, body.sessionId, body.code));
       if (path === '/api/join' && req.method === 'POST') return send(200, await store.join(user, body.code));
       if (path === '/api/sessions' && req.method === 'POST') return send(201, { id: (await store.create(user, body)).id });
-      const match = path.match(/^\/api\/sessions\/([^/]+)(?:\/(command|roster|assign|replay))?$/);
+      const match = path.match(/^\/api\/sessions\/([^/]+)(?:\/(command|roster|assign|replay|test-template))?$/);
       if (!match) fail('Not found.', 404);
       const [, id, action] = match;
       if (!action && req.method === 'GET') return send(200, await store.view(user, id, url.searchParams.get('company')));
       if (action === 'command' && req.method === 'POST') return send(200, await store.command(user, id, body));
       if (action === 'roster' && req.method === 'GET') return send(200, await store.roster(user, id));
       if (action === 'assign' && req.method === 'POST') return send(200, await store.assign(user, id, body.userId, body.companyId));
+      if (action === 'test-template' && req.method === 'GET') return send(200, await store.testTemplate(user, id));
       if (action === 'replay' && req.method === 'GET') return send(200, await store.replay(user, id));
       fail('Method not allowed.', 405);
     } catch (error) {

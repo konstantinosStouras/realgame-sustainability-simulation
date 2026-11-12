@@ -146,6 +146,8 @@ function requireCompany(s, actor, a) {
 }
 export function applyCommand(s, actor, a, realAt = '2026-01-01T00:00:00.000Z', { replay = false } = {}) {
   if (!a || typeof a.type !== 'string') fail('A command type is required.');
+  if (s.status === 'deleted') fail('Session not found.', 404);
+  if (s.status === 'completed' && actor.role !== 'instructor' && a.type === 'message' && !replay) fail('This session is closed and read-only.', 409);
   // Preserve contracts when opening sessions saved before energy-term snapshots were added.
   for (const c of s.companies) c.energyTerms ||= structuredClone(s.catalog.energy.find(x => x.id === c.energy));
   for (const e of s.events) if (e.type === 'energy' && e.status === 'pending') e.data.terms ||= structuredClone(s.catalog.energy.find(x => x.id === e.data.energyId));
@@ -159,7 +161,7 @@ export function applyCommand(s, actor, a, realAt = '2026-01-01T00:00:00.000Z', {
       if (!s.companies.some(c => c.id === a.companyId)) fail('Company not found.');
       result = 'Student assignment updated.';
     }
-    if (a.type === 'closeSession') { s.status = 'completed'; s.endHour = s.hour; result = 'Session closed.'; }
+    if (a.type === 'closeSession') { s.plannedEndHour ??= s.endHour; s.status = 'completed'; s.endHour = s.hour; result = 'Session closed.'; }
     if (a.type === 'deleteSession') { s.status = 'deleted'; result = 'Session deleted; stored records retained.'; }
     if (a.type === 'step') { if (s.status === 'running') fail('Pause before stepping the clock.'); advance(s, integer(a.hours, 'Hours', 1, 168)); result = `Advanced to simulation hour ${s.hour}.`; }
     if (a.type === 'clock') {
@@ -286,6 +288,7 @@ export function applyCommand(s, actor, a, realAt = '2026-01-01T00:00:00.000Z', {
 }
 export function canMessage(s, actor, channel, sending = false) {
   if (!['instructor', 'student'].includes(actor.role)) return false;
+  if (sending && actor.role !== 'instructor' && ['completed','deleted'].includes(s.status)) return false;
 
   if (channel === 'announcements') return !sending || actor.role === 'instructor';
   const [kind, ...ids] = channel.split(':');
