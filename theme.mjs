@@ -9,7 +9,8 @@
     document.documentElement.dataset.theme = theme;
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#161f1b' : '#f5f5ef');
     for (const button of buttons) {
-      button.textContent = theme === 'dark' ? '☀ Light theme' : '☾ Dark theme';
+      button.textContent = theme === 'dark' ? '☀' : '☾';
+      button.title = `Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`;
       button.setAttribute('aria-label', `Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`);
       button.setAttribute('aria-pressed', String(theme === 'dark'));
     }
@@ -43,6 +44,14 @@
     bar.setAttribute('aria-label', 'Appearance');
     bar.append(makeButton());
     document.body.prepend(bar);
+    const root = document.querySelector('#app');
+    const toggle = bar.firstChild;
+    if (root) new MutationObserver(() => {
+      const slot = root.querySelector('[data-theme-slot]') || root.querySelector('.welcome-nav');
+      if (slot && toggle.parentNode !== slot) slot.append(toggle);
+      else if (!slot && toggle.parentNode !== bar) bar.append(toggle);
+      bar.hidden = !!slot;
+    }).observe(root, { childList: true, subtree: true });
     const dialog = document.querySelector('#dialog');
     if (dialog) new MutationObserver(() => {
       for (const button of buttons) if (!button.isConnected) buttons.delete(button);
