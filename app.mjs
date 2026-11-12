@@ -1,5 +1,5 @@
-import { ITEMS, INVESTMENTS, FEATURES } from './src/engine.mjs?v=63809aebd638';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=63809aebd638';
+import { ITEMS, INVESTMENTS, FEATURES } from './src/engine.mjs?v=b6adb3295473';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=b6adb3295473';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -108,7 +108,7 @@ function renderWelcome() {
   if (localStorage.getItem('studio-backend')) root.querySelector('.welcome-layout > .panel').insertAdjacentHTML('beforeend', `<p>${button('forget-server', 'Reset server connection', '', 'small')}</p>`);
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=63809aebd638')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=b6adb3295473')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -134,6 +134,33 @@ const studentPanels = {
   messages: ['Messages', 'messages', messagesPage]
 };
 const openPanels = new Set();
+const primaryPages = ['overview', 'production', 'finance', 'energy', 'reports'];
+
+function workspaceNavigation(admin, visible) {
+  const pageButton = key => `<button type="button" data-action="nav" data-id="${key}" ${page === key ? 'class="active" aria-current="page"' : ''}>${icon(key)}${pages[key]}</button>`;
+  const primary = primaryPages.filter(visible).map(pageButton).join('');
+  const extraPages = ['orders', 'supply', 'messages', 'admin'];
+  const secondary = admin ? extraPages.filter(visible).map(pageButton).join('') :
+    Object.entries(studentPanels).filter(([id]) => studentPanelVisible(id, visible)).map(([id, [label, iconKey]]) =>
+      `<button type="button" data-action="panel" data-id="${id}" aria-pressed="${page === 'workspace' && openPanels.has(id)}">${icon(iconKey)}${label}</button>`
+    ).join('');
+  const label = admin ? 'Classroom' : 'Decision panels';
+  const secondaryActive = admin ? extraPages.includes(page) : page === 'workspace';
+  return `<header class="workspace-nav">${brand}
+    <nav class="nav workspace-nav-desktop" aria-label="Workspace">
+      ${primary}
+      ${secondary ? `<details class="workspace-menu"><summary class="${secondaryActive ? 'active' : ''}">${label}</summary><div class="workspace-menu-items">${secondary}</div></details>` : ''}
+    </nav>
+    <details class="workspace-menu workspace-nav-mobile">
+      <summary>Menu</summary>
+      <nav class="nav workspace-menu-items" aria-label="Workspace">
+        ${primary}
+        ${secondary ? `<div class="workspace-menu-label">${label}</div>${secondary}` : ''}
+      </nav>
+    </details>
+  </header>`;
+}
+
 function studentPanelVisible(id, visible) {
   return Object.hasOwn(studentPanels, id) && visible(studentPanels[id][1]);
 }
@@ -152,11 +179,9 @@ function render() {
   const c = company(), admin = isTeacher();
   const visible = key => admin || !({ orders: 'offers', supply: 'purchasing', production: 'production', finance: 'finance', energy: 'energy', messages: 'messaging' }[key]) || state.features[{ orders: 'offers', supply: 'purchasing', production: 'production', finance: 'finance', energy: 'energy', messages: 'messaging' }[key]].visible;
   if (!visible(page) || (page === 'workspace' && admin)) page = 'overview';
-  const menu = Object.entries(pages).filter(([key]) => (key !== 'admin' || admin) && visible(key) && (admin || !['orders', 'supply', 'messages'].includes(key)));
-  const panelMenu = admin ? '' : Object.entries(studentPanels).filter(([id]) => studentPanelVisible(id, visible)).map(([id, [label, iconKey]]) => '<button type="button" data-action="panel" data-id="' + id + '" aria-pressed="' + (page === 'workspace' && openPanels.has(id)) + '">' + icon(iconKey) + label + '</button>').join('');
   const titles = { workspace: 'Decision workspace', overview: c ? `Let's make progress, ${c.name.split(' ')[0]}.` : 'A classroom in motion.', orders: 'From offer to arrival.', supply: 'Keep your business moving.', production: 'Make capacity count.', finance: 'Follow the money.', energy: 'Build a better footprint.', reports: 'See the whole picture.', messages: 'Better decisions, together.', admin: 'Set the pace of learning.' };
   const subtitles = { workspace: 'Open the panels you need and compare them side by side.', overview: 'Your business, at a glance. Every decision has a next step.', orders: 'Accepted terms stay with each order, from first dispatch to final payment.', supply: 'Balance availability, working capital, and the footprint of every component.', production: 'Coordinate materials, people, machines, and the hours they work.', finance: 'Cash is available money. Profit is revenue earned less costs incurred.', energy: 'Invest now. Track activation and the results over time.', reports: 'Comparable daily results, with every reporting boundary clearly marked.', messages: 'A shared space for announcements, questions, and team decisions.', admin: 'Control the shared clock, classroom access, and teaching parameters.' };
-  root.innerHTML = `<div class="layout"><header class="workspace-nav">${brand}<div class="nav-label">${admin ? 'Instructor workspace' : 'Your company'}</div><nav class="nav" aria-label="Workspace">${menu.map(([key, title]) => `<button data-action="nav" data-id="${key}" class="${page === key ? 'active' : ''}" ${page === key ? 'aria-current="page"' : ''}>${icon(key)}${title}</button>`).join('')}${panelMenu}</nav></header><div class="workspace"><header class="topbar"><div class="breadcrumb">Workspace &nbsp; / &nbsp; <strong>${pages[page] || "Decision workspace"}</strong></div><div class="top-actions"><span id="connection" class="connection">${solo ? 'Single-browser sandbox' : online ? '<span class="status-dot"></span>Connected · shared server' : 'Reconnecting…'}</span><div class="identity"><span class="avatar">${esc(actor.name.slice(0, 2).toUpperCase())}</span><span>${esc(actor.name)}<br><small>${admin ? 'Instructor' : 'Student'}</small></span></div>${button('logout', 'Exit', '', 'small')}</div></header>${solo ? `<div class="mode-banner"><span><strong>Solo sandbox</strong> · Saved in this browser. Switch roles to rehearse; no other people are connected.</span>${button('switch-solo', admin ? 'Play a company' : 'Instructor view')}</div>` : health?.demo ? '<div class="mode-banner"><span><strong>Local classroom demo</strong> · Synthetic accounts share durable server state. Demo sign-in is enabled on this computer.</span></div>' : ''}<main id="content" class="content"><div class="page-heading"><div><div class="eyebrow">${esc(state.name)}${c ? ` &nbsp; / &nbsp; ${esc(c.name)}` : ''}</div><h1>${esc(titles[page])}</h1><p>${subtitles[page]}</p></div><div class="timebox"><span class="badge ${state.status === 'running' ? '' : 'amber'}">● ${esc(state.status)}</span><strong>${simDate(state.hour)} · simulation</strong><small>Day ${Math.floor(state.hour / 24) + 1} · ends ${simDate(state.endHour)}</small></div></div>${state.status === 'completed' ? `<div class="advice warning"><strong>Session complete. ${state.events.filter(e => e.status === 'pending').length} scheduled events remain.</strong>Pending deliveries, payments, and investments are preserved. The instructor can extend the end date to settle them.</div>` : ''}${admin && page !== 'admin' ? `<div class="toolbar">${select('preview', 'Company preview · read-only', [['', 'All companies'], ...state.companies.map(x => [x.id, x.name])], preview || '')}${button('nav', 'Session control', 'admin', 'small')}</div>` : ''}${!admin && !solo ? `<div class="toolbar" aria-label="Classroom access">${button('join', 'Join another class', '', 'small')}${button('sessions', 'Switch session', '', 'small')}</div>` : ''}${page === "workspace" ? studentWorkspace(visible) : pageBody()}<div class="footer-note"><a href="notes/model.md" target="_blank" rel="noopener">Model & teaching guide ↗</a><br>All amounts are simulated EUR · Emissions in kg CO₂e · Simulation dates use UTC · Live state at ${simDate(state.hour)} · Model v${state.schema}<br>Original teaching model. No RealGame services, code, credentials, or assets are used.</div></main></div></div>`;
+  root.innerHTML = `<div class="layout">${workspaceNavigation(admin, visible)}<div class="workspace"><header class="topbar"><div class="breadcrumb">Workspace &nbsp; / &nbsp; <strong>${pages[page] || "Decision workspace"}</strong></div><div class="top-actions"><span id="connection" class="connection">${solo ? 'Single-browser sandbox' : online ? '<span class="status-dot"></span>Connected · shared server' : 'Reconnecting…'}</span><div class="identity"><span class="avatar">${esc(actor.name.slice(0, 2).toUpperCase())}</span><span>${esc(actor.name)}<br><small>${admin ? 'Instructor' : 'Student'}</small></span></div>${button('logout', 'Exit', '', 'small')}</div></header>${solo ? `<div class="mode-banner"><span><strong>Solo sandbox</strong> · Saved in this browser. Switch roles to rehearse; no other people are connected.</span>${button('switch-solo', admin ? 'Play a company' : 'Instructor view')}</div>` : health?.demo ? '<div class="mode-banner"><span><strong>Local classroom demo</strong> · Synthetic accounts share durable server state. Demo sign-in is enabled on this computer.</span></div>' : ''}<main id="content" class="content"><div class="page-heading"><div><div class="eyebrow">${esc(state.name)}${c ? ` &nbsp; / &nbsp; ${esc(c.name)}` : ''}</div><h1 tabindex="-1">${esc(titles[page])}</h1><p>${subtitles[page]}</p></div><div class="timebox"><span class="badge ${state.status === 'running' ? '' : 'amber'}">● ${esc(state.status)}</span><strong>${simDate(state.hour)} · simulation</strong><small>Day ${Math.floor(state.hour / 24) + 1} · ends ${simDate(state.endHour)}</small></div></div>${state.status === 'completed' ? `<div class="advice warning"><strong>Session complete. ${state.events.filter(e => e.status === 'pending').length} scheduled events remain.</strong>Pending deliveries, payments, and investments are preserved. The instructor can extend the end date to settle them.</div>` : ''}${admin && page !== 'admin' ? `<div class="toolbar">${select('preview', 'Company preview · read-only', [['', 'All companies'], ...state.companies.map(x => [x.id, x.name])], preview || '')}${button('nav', 'Session control', 'admin', 'small')}</div>` : ''}${!admin && !solo ? `<div class="toolbar" aria-label="Classroom access">${button('join', 'Join another class', '', 'small')}${button('sessions', 'Switch session', '', 'small')}</div>` : ''}${page === "workspace" ? studentWorkspace(visible) : pageBody()}<div class="footer-note"><a href="notes/model.md" target="_blank" rel="noopener">Model & teaching guide ↗</a><br>All amounts are simulated EUR · Emissions in kg CO₂e · Simulation dates use UTC · Live state at ${simDate(state.hour)} · Model v${state.schema}<br>Original teaching model. No RealGame services, code, credentials, or assets are used.</div></main></div></div>`;
   const pending = !solo && sessionStorage.getItem(`studio-pending:${backend}:${actor.id}:${sessionId}`);
   if (pending) root.querySelector('#content').insertAdjacentHTML('afterbegin', `<div class="advice warning"><strong>A decision is awaiting confirmation.</strong>The response was interrupted. Retry with the same request key to confirm the outcome safely. ${button('retry-decision', 'Retry pending decision', '', 'small')}</div>`);
 }
@@ -298,11 +323,11 @@ async function action(name, id) {
     else openPanels.add(id);
     page = 'workspace';
     render();
-    root.querySelector('[data-action="panel"][data-id="' + id + '"]')?.focus();
+    root.querySelector('.page-heading h1')?.focus();
     return;
   }
   if (name === 'nav') { page = id; render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=63809aebd638')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=b6adb3295473')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); renderWelcome(); return; }
@@ -348,8 +373,22 @@ Verdant Energy</textarea></label>`, async f => { const r = await api('/sessions'
   if (name === 'ledger-csv') csv('transaction-journal.csv', [['Hour', 'Simulation time (UTC)', 'Transaction', 'Account', 'Debit positive / credit negative (EUR)'], ...c.ledger.flatMap(l => Object.entries(l.lines).map(([a, n]) => [l.hour, simDate(l.hour), l.description, a, n / 100]))]);
 }
 document.addEventListener('click', async event => {
+  for (const menu of root.querySelectorAll('.workspace-menu[open]')) {
+    if (!menu.contains(event.target)) menu.open = false;
+  }
   const b = event.target.closest('[data-action]'); if (!b || b.disabled || b.dataset.action === 'submit') return;
-  event.preventDefault(); try { await action(b.dataset.action, b.dataset.id); } catch (e) { toast(e.message); }
+  event.preventDefault();
+  try {
+    await action(b.dataset.action, b.dataset.id);
+    if (b.dataset.action === 'nav' && b.closest('.workspace-nav')) root.querySelector('.page-heading h1')?.focus();
+  } catch (e) { toast(e.message); }
+});
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape' || dialog.open) return;
+  const menu = root.querySelector('.workspace-menu[open]');
+  if (!menu) return;
+  menu.open = false;
+  menu.querySelector('summary').focus();
 });
 document.addEventListener('submit', async event => {
   const form = event.target; if (form.id === 'modal-form') return;
