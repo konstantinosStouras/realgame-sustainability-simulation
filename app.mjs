@@ -1,5 +1,5 @@
-import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=02bbba9e64fc';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=02bbba9e64fc';
+import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=9d6abe6b7628';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=9d6abe6b7628';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -133,7 +133,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=02bbba9e64fc')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=9d6abe6b7628')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -158,7 +158,7 @@ async function createClassroom(f) {  const r = await api('/sessions', { ...(heal
 function renderAdminHome() {
   const active = sessions.filter(s => s.status !== 'completed'), past = sessions.filter(s => s.status === 'completed');
   const cards = list => list.map(s => `<article class="session-card"><div class="session-card-heading"><code>${esc(s.id)}</code><span class="badge">${esc(s.status)}</span></div><h3>${esc(s.name)}</h3><p class="form-note">Simulation hour ${number(s.hour)}</p><div class="toolbar">${button('open-session', 'Open', s.id, 'primary')}${button('session-export', 'Export data', s.id)}${button('session-codes', 'Company join codes', s.id)}${button('copy-session', 'Copy session code', s.id)}</div></article>`).join('') || '<p class="empty">No sessions here yet.</p>';
-  root.innerHTML = `<div class="admin-home"><header class="admin-header">${brand}${accountControls(user)}</header><main id="content"><div class="page-heading"><div><p class="eyebrow">Instructor workspace</p><h1>Sustainability Studio admin</h1><p>Manage your sessions and set up each learning task.</p></div></div><div class="admin-columns"><aside><details class="panel"><summary>Options</summary><p class="form-note">Open a session to set its clock, teaching capabilities, suppliers, markets and energy options.</p>${button('solo', 'Try a test simulation')}</details><details class="panel"><summary>Create session</summary><form id="create-session-form">${createSessionFields()}${button('submit', 'Create session', '', 'primary')}<div class="error" role="alert"></div></form></details></aside><div><section class="panel"><div class="panel-head"><h2>Active sessions</h2><span>${active.length} sessions</span></div><p class="form-note">Open a session to manage your classroom. Paused sessions appear here too.</p>${cards(active)}</section><details class="panel"><summary>Past sessions <span>${past.length} sessions</span></summary>${cards(past)}</details></div></div></main></div>`;
+  root.innerHTML = `<div class="admin-home"><header class="admin-header">${brand}${accountControls(user)}</header><main id="content"><div class="page-heading"><div><p class="eyebrow">Instructor workspace</p><h1>Sustainability Studio admin</h1><p>Manage your sessions and set up each learning task.</p></div></div><div class="admin-columns"><aside><details class="panel"><summary>Options</summary><p class="form-note">Open a session to set its clock, teaching capabilities, suppliers, markets and energy options.</p>${button('solo', 'Try a test simulation')}</details><details class="panel"><summary>Create session</summary><form id="create-session-form">${createSessionFields()}${button('submit', 'Create session', '', 'primary')}<div class="error" role="alert"></div></form></details></aside><div><details class="panel" open><summary>Active sessions <span>${active.length} sessions</span></summary><p class="form-note">Open a session to manage your classroom. Paused sessions appear here too.</p>${cards(active)}</details><details class="panel"><summary>Past sessions <span>${past.length} sessions</span></summary>${cards(past)}</details></div></div></main></div>`;
 }
 
 function renderLobby() { root.innerHTML = `<main class="welcome" id="content">${brand}<h1>Your classroom.</h1><p>Welcome, ${esc(user.name)}. ${user.role === 'instructor' ? 'Create a session to begin.' : 'Join a company with the code your instructor provided.'}</p>${button(user.role === 'instructor' ? 'create' : 'join', user.role === 'instructor' ? 'Create session' : 'Join company', '', 'primary')} ${button('logout', 'Sign out')}</main>`; }
@@ -451,7 +451,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=02bbba9e64fc')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=9d6abe6b7628')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); renderWelcome(); return; }

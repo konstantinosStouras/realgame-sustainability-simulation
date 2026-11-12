@@ -49,8 +49,13 @@
 .admin-columns{display:grid;grid-template-columns:minmax(220px, .75fr) minmax(0, 2fr);gap:24px}
 .admin-columns>*,.account-name{min-width:0}
 .admin-columns .panel{margin-bottom:20px}
-.admin-columns summary{font-weight:600;cursor:pointer}
-.admin-columns summary span{float:right;font-size:12px;color:var(--muted)}
+.admin-columns summary{font-weight:600;cursor:pointer;display:flex;align-items:center;gap:12px;list-style:none;min-height:44px}
+.admin-columns summary::-webkit-details-marker{display:none}
+.admin-columns summary::after{content:"+";margin-left:auto;flex:0 0 24px;text-align:center;font-size:24px;font-weight:400;color:var(--green)}
+.admin-columns details[open]>summary::after{content:"−"}
+.admin-columns summary:focus-visible{outline:2px solid var(--green);outline-offset:6px;border-radius:4px}
+.admin-columns summary span{margin-left:auto;font-size:12px;font-weight:400;color:var(--muted);white-space:nowrap}
+.admin-columns summary:has(span)::after{margin-left:0}
 .session-card{border:1px solid var(--line);border-radius:12px;padding:20px;margin-top:16px;background:var(--paper)}
 .session-card-heading{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .session-card code{overflow-wrap:anywhere}
