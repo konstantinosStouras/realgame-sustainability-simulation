@@ -19,6 +19,7 @@ export class FirestoreStore {
     return user;
   }
   async actor(tx, user, id) {
+    if (user.role === 'instructor') return { ...user, companyId: null };
     const member = await tx.get(this.memberRef(id, user.id));
     if (!member.exists) fail('You are not a member of this session.', 403);
     return { ...user, companyId: member.data().companyId };
@@ -40,6 +41,13 @@ export class FirestoreStore {
     tx.create(ref.collection('commands').doc(String(revision).padStart(12, '0')), { actor, command, realAt, revision });
   }
   async list(user) {
+    if (user.role === 'instructor') {
+      const sessions = await this.sessions.orderBy('createdAt', 'desc').get();
+      return sessions.docs.map(doc => {
+        const { name, hour, status, createdAt } = doc.data();
+        return { id: doc.id, name, hour, status, companyId: null, createdAt };
+      });
+    }
     const members = await this.members.where('userId', '==', user.id).get();
     if (members.empty) return [];
     const docs = await this.db.getAll(...members.docs.map(m => this.sessionRef(m.data().sessionId)));
@@ -88,7 +96,8 @@ export class FirestoreStore {
   async roster(user, id) {
     if (user.role !== 'instructor') fail('Instructor access required.', 403);
     return this.db.runTransaction(async tx => {
-      await this.actor(tx, user, id);
+      const session = await tx.get(this.sessionRef(id));
+      if (!session.exists) fail('Session not found.', 404);
       const members = await tx.get(this.members.where('sessionId', '==', id));
       const invites = await tx.get(this.invites.where('sessionId', '==', id));
       const users = members.empty ? [] : await tx.getAll(...members.docs.map(m => this.userRef(m.data().userId)));
@@ -138,6 +147,7 @@ export class FirestoreStore {
     return this.db.runTransaction(async tx => {
       const actor = await this.actor(tx, user, id), ref = this.sessionRef(id);
       const [doc, student, member] = await tx.getAll(ref, this.userRef(userId), this.memberRef(id, userId));
+      if (!doc.exists) fail('Session not found.', 404);
       if (!student.exists || student.data().role !== 'student' || !member.exists) fail('Student is not in this session.');
       const metadata = doc.data(), state = await this.readState(tx, ref, metadata);
       const command = { type: 'assignment', userId, companyId }, realAt = new Date(this.now()).toISOString();
@@ -152,7 +162,9 @@ export class FirestoreStore {
   async replay(user, id) {
     if (user.role !== 'instructor') fail('Instructor access required.', 403);
     return this.db.runTransaction(async tx => {
-      const actor = await this.actor(tx, user, id), ref = this.sessionRef(id), doc = await tx.get(ref), metadata = doc.data();
+      const ref = this.sessionRef(id), doc = await tx.get(ref);
+      if (!doc.exists) fail('Session not found.', 404);
+      const metadata = doc.data();
       const state = await this.readState(tx, ref, metadata), initial = await this.readState(tx, ref, metadata, true);
       const records = await tx.get(ref.collection('commands').orderBy('revision'));
       const commands = records.docs.map(d => { const { actor, command, realAt } = d.data(); if (command.type === 'message' && !canMessage(state, { ...user, companyId: null }, command.channel)) command.text = '[private message redacted]'; return { actor, command, realAt }; });
