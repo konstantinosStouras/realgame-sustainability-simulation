@@ -55,6 +55,7 @@ export function createApp({ store = new Store(process.env.DATA_PATH || '.data/si
       const user = verifyFirebase ? store.firebaseUser(await verifyFirebase(token), (process.env.FIREBASE_INSTRUCTOR_UIDS || '').split(',').filter(Boolean)) : store.authenticate(token);
       if (url.pathname === '/api/me' && req.method === 'GET') return send(200, { user, sessions: store.list(user) });
       if (url.pathname === '/api/logout' && req.method === 'POST') { store.logout(token); return send(200, { ok: true }); }
+      if (url.pathname === '/api/enter' && req.method === 'POST') return send(200, store.enter(user, body.sessionId, body.code));
       if (url.pathname === '/api/join' && req.method === 'POST') return send(200, store.join(user, body.code));
       if (url.pathname === '/api/sessions' && req.method === 'POST') return send(201, { id: store.create(user, body).id });
       const match = url.pathname.match(/^\/api\/sessions\/([^/]+)(?:\/(command|roster|assign|replay))?$/);

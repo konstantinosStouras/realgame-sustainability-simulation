@@ -1,3 +1,4 @@
+import { requireOpen } from './session-access.mjs';
 import { sessionId } from '../src/session-id.mjs';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createSession, applyCommand, assertInvariants, publicView, canMessage, fail } from '../src/engine.mjs';
@@ -23,6 +24,9 @@ export class FirestoreStore {
     if (user.role === 'instructor') return { ...user, companyId: null };
     const member = await tx.get(this.memberRef(id, user.id));
     if (!member.exists) fail('You are not a member of this session.', 403);
+    const session = await tx.get(this.sessionRef(id));
+    if (!session.exists || session.data().status === 'deleted') fail('Session not found.', 404);
+    requireOpen(session.data());
     return { ...user, companyId: member.data().companyId };
   }
   async readState(tx, ref, metadata, initial = false) {
@@ -36,7 +40,7 @@ export class FirestoreStore {
     const encoded = encodeState(state), { chunks, ...info } = encoded;
     chunks.forEach((data, i) => tx.set(ref.collection('stateChunks').doc(String(i)), { data }));
     for (let i = chunks.length; i < (metadata.chunkCount || 0); i++) tx.delete(ref.collection('stateChunks').doc(String(i)));
-    tx.set(ref, { ...metadata, ...info, chunkCount: chunks.length, id: state.id, name: state.name, hour: state.hour, status: state.status, revision: state.revision, nextTickAt });
+    tx.set(ref, { ...metadata, ...info, chunkCount: chunks.length, id: state.id, name: state.name, hour: state.hour, status: state.status, studentAccess: state.studentAccess !== false, revision: state.revision, nextTickAt });
   }
   log(tx, ref, actor, command, realAt, revision) {
     tx.create(ref.collection('commands').doc(String(revision).padStart(12, '0')), { actor, command, realAt, revision });
@@ -68,6 +72,24 @@ export class FirestoreStore {
     });
     return state;
   }
+  async enter(user, id, code) {
+    if (typeof id === 'string') id = id.trim().toLowerCase();
+    if (typeof id !== 'string' || !/^[A-Za-z0-9-]{1,100}$/.test(id)) fail('Enter a valid session ID.');
+    return this.db.runTransaction(async tx => {
+      const session = await tx.get(this.sessionRef(id));
+      if (!session.exists || session.data().status === 'deleted') fail('Session not found.', 404);
+      if (user.role === 'instructor') return { sessionId: id };
+      requireOpen(session.data());
+      const member = this.memberRef(id, user.id), old = await tx.get(member);
+      if (old.exists) return { sessionId: id };
+      if (!code) return { requiresCompanyCode: true };
+      if (typeof code !== 'string' || code.length > 100) fail('Invalid company join code.');
+      const invite = await tx.get(this.invites.doc(digest(code.trim())));
+      if (!invite.exists || invite.data().sessionId !== id) fail('Company code does not belong to this session.');
+      tx.create(member, { sessionId: id, companyId: invite.data().companyId, userId: user.id });
+      return { sessionId: id };
+    });
+  }
   async join(user, code) {
     if (user.role !== 'student') fail('Only students join through company codes.', 403);
     if (typeof code !== 'string' || code.trim().length > 100) fail('Invalid company join code.');
@@ -77,7 +99,7 @@ export class FirestoreStore {
       const { sessionId, companyId } = invite.data(), member = this.memberRef(sessionId, user.id);
       const [old, session] = await tx.getAll(member, this.sessionRef(sessionId));
       if (!session.exists || session.data().status === 'deleted') fail('Session not found.', 404);
-      if (session.data().status === 'completed') fail('This session is closed.', 409);
+      requireOpen(session.data());
       if (old.exists) fail('Already a member. Ask the instructor to change your assignment.', 409);
       tx.create(member, { sessionId, companyId, userId: user.id });
       return { sessionId };

@@ -80,3 +80,9 @@ GitHub Pages serves the root of `main` at the existing subpath. Assets are relat
 - `private/`: ignored reference materials and local working records; never publish.
 
 This project is independent of RealGame. It uses no RealGame services, credentials, copied bundles, screenshots, or teaching materials. See the model guide for simplified rules and material v1 limits.
+
+### Session links and student entry
+
+Instructors choose a unique Session ID when creating a class (letters, digits and hyphens). Open and Copy session link use the website's existing path with `?session=CLASS-ID`. Existing session IDs and company assignments remain valid.
+
+Registered students visiting the base URL see the session-ID form, never an automatically selected previous class. A session link supplies the ID; new members must additionally enter that session's company join code. Unknown IDs, mismatched codes and closed sessions reveal no simulation state. Session settings → Open session to students controls access independently of the clock. Created sessions are open by default; completed sessions are closed. Closing access blocks existing members' reads and decisions server-side, and the browser returns to the entry form on its next refresh. Instructors retain access.
