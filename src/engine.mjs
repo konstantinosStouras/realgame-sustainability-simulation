@@ -76,27 +76,47 @@ function catalog() {
     ]
   };
 }
-export function createSession({ id = 'session', name = 'The circular economy challenge', seed = 20261112, days = 30, companyNames = ['Helio Works', 'Northstar Solar', 'Verdant Energy'], revenueAt = 'receipt', dailyCorporateOverhead = 0, dailyEnergyOverhead = 0, dailyDepreciation = null } = {}) {
+export function createSession({ id = 'session', name = 'The circular economy challenge', seed = 20261112, days = 30, companyNames = ['Helio Works', 'Northstar Solar', 'Verdant Energy'], revenueAt = 'receipt', dailyCorporateOverhead = 0, dailyEnergyOverhead = 0, dailyDepreciation = null, startingPrices = {}, inventoryStatement = 'cogs', openingUnitCosts = {} } = {}) {
   integer(seed, 'Seed', 0, 4294967295); integer(days, 'Duration in days', 1, 180);
   if (!['dispatch', 'receipt'].includes(revenueAt)) fail('Choose dispatch or customer receipt for revenue recognition.');
   integer(dailyCorporateOverhead, 'Daily corporate overhead (cents)', 0, 100000000);
   integer(dailyEnergyOverhead, 'Daily energy overhead (cents)', 0, 100000000);
   if (dailyDepreciation !== null) integer(dailyDepreciation, 'Daily depreciation (cents)', 0, 100000000);
+  if (!['cogs', 'inventory-change'].includes(inventoryStatement)) fail('Choose a valid inventory statement format.');
+  for (const [settings, keys, label, minimum] of [
+    [startingPrices, ['local', 'export'], 'Starting sales price', 5000],
+    [openingUnitCosts, Object.keys(ITEMS), 'Opening inventory unit cost', 0]
+  ]) {
+    if (!settings || typeof settings !== 'object' || Array.isArray(settings)) fail(`${label} settings must be an object.`);
+    for (const [key, amount] of Object.entries(settings)) {
+      if (!keys.includes(key)) fail(`Unknown ${label.toLowerCase()} key.`);
+      integer(amount, label, minimum, 1000000);
+    }
+  }
   if (!Array.isArray(companyNames) || companyNames.length < 1 || companyNames.length > 12) fail('Choose 1–12 companies.');
   const s = { id, name: cleanText(name, 'Session name'), schema: VERSION, seed, rng: seed >>> 0, sequence: 0, revision: 0, hour: 0, startDate: '2026-01-01T00:00:00.000Z', endHour: days * 24, status: 'paused', secondsPerHour: 4, features: Object.fromEntries(FEATURES.map(f => [f, { visible: true, allowed: true }])), effects: { carbonDemand: true }, catalog: catalog(), companies: [], events: [], snapshots: [], messages: [], audit: [] };
   s.recipe = { ...RECIPE };
   s.accounting = { revenueAt, dailyCorporateOverhead };
   if (dailyEnergyOverhead) s.accounting.dailyEnergyOverhead = dailyEnergyOverhead;
   if (dailyDepreciation !== null) s.accounting.dailyDepreciation = dailyDepreciation;
+  if (inventoryStatement !== 'cogs') s.accounting.inventoryStatement = inventoryStatement;
+  if (Object.keys(startingPrices).length) s.accounting.startingPrices = { ...startingPrices };
+  if (Object.keys(openingUnitCosts).length) s.accounting.openingUnitCosts = { ...openingUnitCosts };
   companyNames.forEach((name, i) => {
     const c = { id: `company-${i + 1}`, name: cleanText(name, 'Company name', 60), accounts: {}, ledger: [], inventory: {}, offers: [], orders: [], shipments: [], purchases: [], loans: [], deposits: [], investments: [], notices: [], reorder: {}, autoStatus: {}, workers: 8, machines: 2, shifts: [true, false, false], energy: 'grid', efficiency: 1, satisfaction: 1, quality: 1, marketing: 0, research: 0, production: 0, energyKwh: 0, energyCost: 0, emissions: 0, dispatched: 0, received: 0, receivedValue: 0, demandUnits: 0, lastBottleneck: 'Waiting for the first production hour' };
-    for (const [item, qty, cost, carbon, capacity] of [['cell', 14400, 310, 2.2, 36000], ['frame', 600, 1800, 9, 1500], ['controller', 600, 2400, 6, 1500], ['panel', 180, 13000, 72, 1200]]) c.inventory[item] = { qty, value: qty * cost, carbon: qty * carbon, capacity };
+    for (const [item, qty, cost, carbon, capacity] of [['cell', 14400, 310, 2.2, 36000], ['frame', 600, 1800, 9, 1500], ['controller', 600, 2400, 6, 1500], ['panel', 180, 13000, 72, 1200]]) c.inventory[item] = { qty, value: qty * (openingUnitCosts[item] ?? cost), carbon: qty * carbon, capacity };
     const inventoryValue = sum(Object.values(c.inventory).map(x => x.value));
     post(s, c, 'Opening capital and assets', { cash: 18000000, inventory: inventoryValue, fixedAssets: 6000000, equity: -(24000000 + inventoryValue) });
-    for (const market of s.catalog.markets) c.offers.push({ id: `${market.id}-standard`, marketId: market.id, price: market.referencePrice, min: 1, max: 500, delivery: market.id === 'local' ? 60 : 96, payment: 72, enabled: true });
+    for (const market of s.catalog.markets) c.offers.push({ id: `${market.id}-standard`, marketId: market.id, price: startingPrices[market.id] ?? market.referencePrice, min: 1, max: 500, delivery: market.id === 'local' ? 60 : 96, payment: 72, enabled: true });
     s.companies.push(c);
   });
   return s;
+}
+export function inventoryStatementValues(company) {
+  const openingInventory = company.ledger[0].lines.inventory;
+  const purchases = sum(company.purchases.filter(purchase => purchase.receivedAt != null).map(purchase => purchase.cost));
+  const inventoryChange = balance(company, 'inventory') + balance(company, 'transit') - openingInventory;
+  return { purchases, inventoryChange };
 }
 function sampleDelay(s, obj) { return random(s) * 100 < obj.reliability ? 0 : 1 + Math.floor(random(s) * obj.maxDelay); }
 function purchase(s, c, a, automated = false) {
