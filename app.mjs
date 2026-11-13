@@ -1,10 +1,5 @@
-<<<<<<< HEAD
-import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=aa6dc4782c6e';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=aa6dc4782c6e';
-=======
-import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=aa6dc4782c6e';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=aa6dc4782c6e';
->>>>>>> origin/main
+import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=532cd5618e3a';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=532cd5618e3a';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -212,11 +207,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-<<<<<<< HEAD
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=aa6dc4782c6e')).firebase;
-=======
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=aa6dc4782c6e')).firebase;
->>>>>>> origin/main
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=532cd5618e3a')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -270,11 +261,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-<<<<<<< HEAD
-      const client = (await import('./src/test-client.mjs?v=aa6dc4782c6e')).testClient();
-=======
-      const client = (await import('./src/test-client.mjs?v=aa6dc4782c6e')).testClient();
->>>>>>> origin/main
+      const client = (await import('./src/test-client.mjs?v=532cd5618e3a')).testClient();
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -626,7 +613,6 @@ function openDispatch(id) {
   const update = () => { const f = new FormData(dialog.querySelector('form')), route = routes.find(r => r.id === f.get('routeId')), qty = value(f, 'qty'); dialog.querySelector('#dispatch-quote').innerHTML = `<strong>${exactMoney(route.fixed + route.unit * qty)} freight ${route.term ? 'due ' + simDate(state.hour + route.term) : 'paid now'} · ${number(route.carbonFixed + route.carbonUnit * qty)} kg CO₂e</strong>Estimated arrival: ${simDate(state.hour + route.hours)}. ${route.reliability}% on time; up to ${route.maxDelay} h carrier delay.${qty < o.remaining ? '<br>Partial dispatch: the unshipped quantity stays open.' : ''}${state.hour + route.hours > o.dueAt ? '<br>Expected late: satisfaction penalty at receipt.' : state.hour + route.hours < o.dueAt - 24 ? '<br>More than 24 h early: small satisfaction penalty at receipt.' : ''}`; };
   dialog.querySelector('form').addEventListener('input', update); update();
 }
-<<<<<<< HEAD
 function sessionSettingsCommand(current, form) {
   const hours = Number(form.get('days')) * 24, rounded = Math.round(hours);
   if (!Number.isFinite(hours) || Math.abs(hours - rounded) > 1e-8) throw new Error('Duration must be a whole number of simulation hours.');
@@ -639,7 +625,6 @@ function sessionSettingsCommand(current, form) {
   }
   return command;
 }
-=======
 function closeMobileMenu() {
   const toggle = root.querySelector('.mobile-menu-toggle');
   if (!toggle) return;
@@ -654,7 +639,6 @@ document.addEventListener('keydown', event => {
   }
 });
 
->>>>>>> origin/main
 async function action(name, id) {
   if (name === 'toggle-mobile-menu') {
     const toggle = root.querySelector('.mobile-menu-toggle');
@@ -730,11 +714,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-<<<<<<< HEAD
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=aa6dc4782c6e')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
-=======
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=aa6dc4782c6e')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
->>>>>>> origin/main
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=532cd5618e3a')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -869,11 +849,7 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-<<<<<<< HEAD
-    try { const client = (await import('./src/test-client.mjs?v=aa6dc4782c6e')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
-=======
-    try { const client = (await import('./src/test-client.mjs?v=aa6dc4782c6e')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
->>>>>>> origin/main
+    try { const client = (await import('./src/test-client.mjs?v=532cd5618e3a')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p>' + button('test-leave','Return to classroom') + '</main>'; }
     return;
   }

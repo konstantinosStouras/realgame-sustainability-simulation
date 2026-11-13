@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 const source = readFileSync(new URL('../app.mjs', import.meta.url), 'utf8');
-const settings = vm.runInNewContext(source.slice(source.indexOf('function sessionSettingsCommand('), source.indexOf('async function action(')) + '\nsessionSettingsCommand');
+const settings = vm.runInNewContext(source.slice(source.indexOf('function sessionSettingsCommand('), source.indexOf('function closeMobileMenu(')) + '\nsessionSettingsCommand');
 const form = days => new Map([['days', String(days)], ['name','Renamed'], ['studentAccess','on']]);
 test('unchanged closed duration is omitted, including hour zero and partial days', () => {
   for (const hour of [0,1,23,24,103,4319,4320]) {
