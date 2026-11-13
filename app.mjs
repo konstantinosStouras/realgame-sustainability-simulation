@@ -1,5 +1,5 @@
-import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=85d44c10b5ca';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=85d44c10b5ca';
+import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=54ec4e330e1b';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=54ec4e330e1b';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -207,7 +207,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=85d44c10b5ca')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=54ec4e330e1b')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -261,7 +261,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=85d44c10b5ca')).testClient();
+      const client = (await import('./src/test-client.mjs?v=54ec4e330e1b')).testClient();
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -280,8 +280,14 @@ function accountControls(person = user || actor) {
 const sessionCities = ["athens", "berlin", "cairo", "dubai", "lima", "lisbon", "london", "madrid", "miami", "oslo", "paris", "rome", "seoul", "sydney", "tokyo"];
 function createSessionFields() { return `<div class="session-setup"><fieldset class="session-details"><legend>Session details</legend><p class="form-note">Give your class a name and a memorable session ID.</p>${field('name', 'Session name', 'Sustainability challenge', 'text', 'maxlength="120"')}${select('sessionCity', 'Session ID', [...sessionCities.map(city => [city, city]), ['custom', 'Choose my own ID…']], 'athens')}<label data-custom-session hidden>Custom session ID<input name="customSessionId" disabled minlength="3" maxlength="32" pattern="[A-Za-z0-9]+(-[A-Za-z0-9]+)*" placeholder="e.g. london-2026" autocapitalize="none" spellcheck="false"></label><p class="form-note">Choose a city or your own ID: 3–32 letters, numbers or hyphens. IDs must be unique. Students enter this ID, then their company code when joining for the first time.</p></fieldset><fieldset><legend>Class setup</legend><div class="form-grid">${field('days', 'Duration (days)', 30, 'number', 'min="1" max="180"')}</div><label>Company names (one per line)<textarea name="companies" required rows="4">Helio Works
 Northstar Solar
-Verdant Energy</textarea></label></fieldset><details class="session-advanced"><summary>Advanced settings</summary>${field('seed', 'Random seed', 42, 'number', 'min="0" max="4294967295"')}<p class="form-note">Use the same seed to repeat the starting conditions.</p>${health?.classroomAccounting ? `<div class="form-grid">${select('revenueAt', 'Recognize sales revenue at', [['receipt', 'Customer receipt'], ['dispatch', 'Dispatch']], 'receipt')}${field('corporateOverhead', 'Daily corporate overhead (€ per company)', 0, 'number', 'min="0" max="1000000" step="0.01"')}</div><p class="form-note">Customer payment is due after receipt. Corporate overhead is charged at each daily close.</p>` : ''}</details></div>`; }
-async function createClassroom(f) {  const r = await api('/sessions', { ...(health?.classroomAccounting ? { revenueAt: f.get('revenueAt'), dailyCorporateOverhead: Math.round(value(f, 'corporateOverhead') * 100) } : {}), id: f.get('sessionCity') === 'custom' ? f.get('customSessionId') : f.get('sessionCity'), name: f.get('name'), seed: value(f, 'seed'), days: value(f, 'days'), companyNames: f.get('companies').split('\n').map(x => x.trim()).filter(Boolean) }); selectSession(r.id); page = 'admin'; await enter(); }
+Verdant Energy</textarea></label></fieldset><details class="session-advanced"><summary>Advanced settings</summary>${field('seed', 'Random seed', 42, 'number', 'min="0" max="4294967295"')}<p class="form-note">Use the same seed to repeat the starting conditions.</p>${health?.classroomAccounting ? `<div class="form-grid">${select('revenueAt', 'Recognize sales revenue at', [['receipt', 'Customer receipt'], ['dispatch', 'Dispatch']], 'receipt')}${field('corporateOverhead', 'Daily corporate overhead (€ per company)', 0, 'number', 'min="0" max="1000000" step="0.01"')}</div><p class="form-note">Customer payment is due after receipt. Corporate overhead is charged at each daily close.</p>` : ''}${health?.operatingCostSettings ? `<div class="form-grid">${field('energyOverhead', 'Additional daily energy overhead (€ per company)', 0, 'number', 'min="0" max="1000000" step="0.01"')}<label>Fixed daily depreciation (€ per company)<input name="depreciation" type="number" min="0" max="1000000" step="0.01" placeholder="20% annual default"></label></div><p class="form-note">Energy overhead adds to electricity charges. Leave depreciation blank for the 20% annual declining-balance method. A fixed charge is capped by the remaining asset value.</p>` : ''}</details></div>`; }
+async function createClassroom(f) {
+  const depreciation = f.get('depreciation');
+  const operatingCosts = health?.operatingCostSettings ? {
+    dailyEnergyOverhead: Math.round(value(f, 'energyOverhead') * 100),
+    dailyDepreciation: depreciation == null || depreciation === '' ? null : Math.round(Number(depreciation) * 100)
+  } : {};
+  const r = await api('/sessions', { ...operatingCosts, ...(health?.classroomAccounting ? { revenueAt: f.get('revenueAt'), dailyCorporateOverhead: Math.round(value(f, 'corporateOverhead') * 100) } : {}), id: f.get('sessionCity') === 'custom' ? f.get('customSessionId') : f.get('sessionCity'), name: f.get('name'), seed: value(f, 'seed'), days: value(f, 'days'), companyNames: f.get('companies').split('\n').map(x => x.trim()).filter(Boolean) }); selectSession(r.id); page = 'admin'; await enter(); }
 const sessionHints = {
   'open-session': 'Open session controls, company previews and reports. Effect on students: opening a session does not change their access or decisions.',
   'copy-session': 'Copy a link to this session. Effect on students: they still need to sign in and belong to a company; the link does not grant access.',
@@ -640,7 +646,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=85d44c10b5ca')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=54ec4e330e1b')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -775,7 +781,7 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=85d44c10b5ca')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    try { const client = (await import('./src/test-client.mjs?v=54ec4e330e1b')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p>' + button('test-leave','Return to classroom') + '</main>'; }
     return;
   }

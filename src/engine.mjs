@@ -76,14 +76,18 @@ function catalog() {
     ]
   };
 }
-export function createSession({ id = 'session', name = 'The circular economy challenge', seed = 20261112, days = 30, companyNames = ['Helio Works', 'Northstar Solar', 'Verdant Energy'], revenueAt = 'receipt', dailyCorporateOverhead = 0 } = {}) {
+export function createSession({ id = 'session', name = 'The circular economy challenge', seed = 20261112, days = 30, companyNames = ['Helio Works', 'Northstar Solar', 'Verdant Energy'], revenueAt = 'receipt', dailyCorporateOverhead = 0, dailyEnergyOverhead = 0, dailyDepreciation = null } = {}) {
   integer(seed, 'Seed', 0, 4294967295); integer(days, 'Duration in days', 1, 180);
   if (!['dispatch', 'receipt'].includes(revenueAt)) fail('Choose dispatch or customer receipt for revenue recognition.');
   integer(dailyCorporateOverhead, 'Daily corporate overhead (cents)', 0, 100000000);
+  integer(dailyEnergyOverhead, 'Daily energy overhead (cents)', 0, 100000000);
+  if (dailyDepreciation !== null) integer(dailyDepreciation, 'Daily depreciation (cents)', 0, 100000000);
   if (!Array.isArray(companyNames) || companyNames.length < 1 || companyNames.length > 12) fail('Choose 1–12 companies.');
   const s = { id, name: cleanText(name, 'Session name'), schema: VERSION, seed, rng: seed >>> 0, sequence: 0, revision: 0, hour: 0, startDate: '2026-01-01T00:00:00.000Z', endHour: days * 24, status: 'paused', secondsPerHour: 4, features: Object.fromEntries(FEATURES.map(f => [f, { visible: true, allowed: true }])), effects: { carbonDemand: true }, catalog: catalog(), companies: [], events: [], snapshots: [], messages: [], audit: [] };
   s.recipe = { ...RECIPE };
   s.accounting = { revenueAt, dailyCorporateOverhead };
+  if (dailyEnergyOverhead) s.accounting.dailyEnergyOverhead = dailyEnergyOverhead;
+  if (dailyDepreciation !== null) s.accounting.dailyDepreciation = dailyDepreciation;
   companyNames.forEach((name, i) => {
     const c = { id: `company-${i + 1}`, name: cleanText(name, 'Company name', 60), accounts: {}, ledger: [], inventory: {}, offers: [], orders: [], shipments: [], purchases: [], loans: [], deposits: [], investments: [], notices: [], reorder: {}, autoStatus: {}, workers: 8, machines: 2, shifts: [true, false, false], energy: 'grid', efficiency: 1, satisfaction: 1, quality: 1, marketing: 0, research: 0, production: 0, energyKwh: 0, energyCost: 0, emissions: 0, dispatched: 0, received: 0, receivedValue: 0, demandUnits: 0, lastBottleneck: 'Waiting for the first production hour' };
     for (const [item, qty, cost, carbon, capacity] of [['cell', 14400, 310, 2.2, 36000], ['frame', 600, 1800, 9, 1500], ['controller', 600, 2400, 6, 1500], ['panel', 180, 13000, 72, 1200]]) c.inventory[item] = { qty, value: qty * cost, carbon: qty * carbon, capacity };
@@ -453,11 +457,20 @@ function dailyClose(s) {
     const corporate = s.accounting?.dailyCorporateOverhead ?? 0;
     const corporatePaid = Math.min(balance(c, 'cash'), corporate);
     if (corporate) post(s, c, 'Daily corporate overhead', { expense: corporate, cash: -corporatePaid, overheadPayable: corporatePaid - corporate });
+    const energyOverhead = s.accounting?.dailyEnergyOverhead ?? 0;
+    const energyPaid = Math.min(balance(c, 'cash'), energyOverhead);
+    if (energyOverhead) {
+      post(s, c, 'Daily energy overhead', { expense: energyOverhead, cash: -energyPaid, overheadPayable: energyPaid - energyOverhead });
+      c.energyCost += energyOverhead;
+    }
     const oldArrears = -balance(c, 'overheadPayable');
     if (oldArrears && balance(c, 'cash') > 0) { const payment = Math.min(oldArrears, balance(c, 'cash')); post(s, c, 'Settle overhead arrears', { overheadPayable: payment, cash: -payment }); }
-    if (arrears || corporatePaid < corporate) notice(s, c, 'Daily overhead could not be fully paid. Arrears remain in liabilities and will be retried at daily close.', 'warning');
-    const depreciation = Math.min(balance(c, 'fixedAssets'), Math.round(balance(c, 'fixedAssets') * 0.2 / 365));
-    post(s, c, 'Daily depreciation (20% annual declining balance)', { expense: depreciation, fixedAssets: -depreciation });
+    if (arrears || corporatePaid < corporate || energyPaid < energyOverhead) notice(s, c, 'Daily overhead could not be fully paid. Arrears remain in liabilities and will be retried at daily close.', 'warning');
+    const fixedAssets = balance(c, 'fixedAssets');
+    const fixedDailyDepreciation = s.accounting?.dailyDepreciation;
+    const depreciation = Math.min(fixedAssets, fixedDailyDepreciation ?? Math.round(fixedAssets * 0.2 / 365));
+    const depreciationDescription = fixedDailyDepreciation == null ? 'Daily depreciation (20% annual declining balance)' : 'Daily depreciation (fixed amount)';
+    post(s, c, depreciationDescription, { expense: depreciation, fixedAssets: -depreciation });
     c.quality = Math.min(1.5, c.quality + Math.sqrt(c.research / 10000) * 0.004);
     c.satisfaction = Math.min(1.3, c.satisfaction + 0.005);
   }

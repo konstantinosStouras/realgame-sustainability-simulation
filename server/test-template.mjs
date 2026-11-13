@@ -6,6 +6,8 @@ export function testTemplate(initial, current) {
     companyNames: current.companies.map(c => c.name),
     revenueAt: initial.accounting?.revenueAt || 'receipt',
     dailyCorporateOverhead: initial.accounting?.dailyCorporateOverhead || 0,
+    dailyEnergyOverhead: initial.accounting?.dailyEnergyOverhead ?? 0,
+    dailyDepreciation: initial.accounting?.dailyDepreciation ?? null,
     features: current.features, effects: current.effects, catalog: current.catalog,
     recipe: initial.recipe, secondsPerHour: current.secondsPerHour
   });
