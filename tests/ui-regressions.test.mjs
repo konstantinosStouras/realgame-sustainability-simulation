@@ -161,7 +161,11 @@ test('student workspace exposes nine categories and shows filtered live stock wi
         controller:{qty:8,capacity:16,value:800,carbon:8},
         panel:{qty:2,capacity:4,value:25000,carbon:120}
       },
-      purchases:[{item:'cell',qty:240,receivedAt:null},{item:'controller',qty:100,receivedAt:70}]
+      purchases:[
+        {id:'later',item:'cell',qty:224,expectedAt:75,receivedAt:null},
+        {id:'first',item:'cell',qty:16,expectedAt:73,receivedAt:null},
+        {id:'received',item:'controller',qty:100,expectedAt:70,receivedAt:70}
+      ]
     };
     openPanels.add('inventory');`);
   const navigation = h.run('workspaceNavigation(false, () => true)');
@@ -175,6 +179,8 @@ test('student workspace exposes nine categories and shows filtered live stock wi
   assert.match(workspace, /2 solar panels from stock on hand/);
   assert.match(workspace, /After incoming orders: 4 solar panels \(2 more\)/);
   assert.match(workspace, /Limiting after receipt: Junction box<\/span>/);
+  assert.match(workspace, /first<small><\/small><\/td><td>16 × Photo cell<\/td><td>4 Jan, 01:00<\/td><td>0<\/td><td>2<\/td>.*later<small><\/small><\/td><td>224 × Photo cell<\/td><td>4 Jan, 03:00<\/td><td>\+2<\/td><td>4<\/td>/);
+  assert.doesNotMatch(workspace, /received<small>/);
   assert.match(workspace, /Limiting: Photo cell<\/span>/);
   assert.match(workspace, /Photo cell<\/td><td>[^]*?\/ 128<\/span><\/td><td>32 <span class="badge amber">Limiting<\/span><\/td>/);
   assert.match(workspace, /Recycled frame<\/td><td>[^]*?\/ 12<\/span><\/td><td>1<\/td>/);
@@ -185,6 +191,7 @@ test('student workspace exposes nine categories and shows filtered live stock wi
   assert.match(legacy, /2 solar modules from stock on hand/);
   assert.match(legacy, /After incoming orders: 6 solar modules \(4 more\)/);
   assert.match(legacy, /Limiting after receipt: Recycled frame<\/span>/);
+  assert.match(legacy, /16 × PV cell<\/td><td>4 Jan, 01:00<\/td><td>\+1<\/td><td>3<\/td>/);
   assert.match(legacy, /PV cell<\/td><td>[^]*?\/ 128<\/span><\/td><td>24 <span class="badge amber">Limiting<\/span><\/td>/);
   assert.match(legacy, /Controller<\/td><td>[^]*?\/ 16<\/span><\/td><td>1<\/td>/);
   h.run('state.recipe = {cell:32,frame:1,controller:2}');
@@ -196,7 +203,8 @@ test('student workspace exposes nine categories and shows filtered live stock wi
   assert.match(h.run('studentWorkspace(() => true)'), /0 solar panels from stock on hand/);
   h.run("inventoryCategories.delete('component')");
   const finishedOnly = h.run('studentWorkspace(() => true)');
-  assert.doesNotMatch(finishedOnly, /Photo cell<\/td>/);
+  assert.doesNotMatch(finishedOnly, /aria-label="Component"/);
+  assert.match(finishedOnly, /224 × Photo cell<\/td>/);
   assert.match(finishedOnly, /Limiting: Photo cell<\/span>/);
   assert.doesNotMatch(h.run("studentWorkspace(key => key !== 'supply')"), /Solar panel/);
 });
