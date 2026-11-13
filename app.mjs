@@ -1,5 +1,5 @@
-import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=4c4a112d6fc4';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=4c4a112d6fc4';
+import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=c0a7f289e21a';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=c0a7f289e21a';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -207,7 +207,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=4c4a112d6fc4')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=c0a7f289e21a')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -261,7 +261,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=4c4a112d6fc4')).testClient();
+      const client = (await import('./src/test-client.mjs?v=c0a7f289e21a')).testClient();
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -394,7 +394,7 @@ function workspaceNavigation(admin, visible) {
     return href ? `<a href="${href}" target="_blank" rel="noopener" ${accessibility}>${body}</a>` :
       `<button type="button" data-action="workspace-tool" data-id="${id}" ${accessibility}${current ? ' aria-current="page"' : ''}${active ? ' class="active"' : ''}${unavailable ? ' aria-disabled="true"' : ''}${destinations.length > 1 || id === 'help' ? ' aria-haspopup="dialog"' : ''}>${body}</button>`;
   });
-  return `<header class="workspace-nav"><nav class="workspace-tools" aria-label="Workspace">${buttons.join('')}</nav></header>`;
+  return `<header class="workspace-nav"><button type="button" class="mobile-menu-toggle" data-action="toggle-mobile-menu" aria-expanded="false" aria-controls="workspace-sections"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg><span>Menu</span></button><nav id="workspace-sections" class="workspace-tools" aria-label="Workspace">${buttons.join('')}</nav></header>`;
 }
 
 function studentPanelVisible(id, visible) {
@@ -607,7 +607,29 @@ function openDispatch(id) {
   const update = () => { const f = new FormData(dialog.querySelector('form')), route = routes.find(r => r.id === f.get('routeId')), qty = value(f, 'qty'); dialog.querySelector('#dispatch-quote').innerHTML = `<strong>${exactMoney(route.fixed + route.unit * qty)} freight ${route.term ? 'due ' + simDate(state.hour + route.term) : 'paid now'} · ${number(route.carbonFixed + route.carbonUnit * qty)} kg CO₂e</strong>Estimated arrival: ${simDate(state.hour + route.hours)}. ${route.reliability}% on time; up to ${route.maxDelay} h carrier delay.${qty < o.remaining ? '<br>Partial dispatch: the unshipped quantity stays open.' : ''}${state.hour + route.hours > o.dueAt ? '<br>Expected late: satisfaction penalty at receipt.' : state.hour + route.hours < o.dueAt - 24 ? '<br>More than 24 h early: small satisfaction penalty at receipt.' : ''}`; };
   dialog.querySelector('form').addEventListener('input', update); update();
 }
+function closeMobileMenu() {
+  const toggle = root.querySelector('.mobile-menu-toggle');
+  if (!toggle) return;
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.closest('.workspace-nav').classList.remove('mobile-menu-open');
+}
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && root.querySelector('.mobile-menu-open')) {
+    closeMobileMenu();
+    root.querySelector('.mobile-menu-toggle')?.focus();
+  }
+});
+
 async function action(name, id) {
+  if (name === 'toggle-mobile-menu') {
+    const toggle = root.querySelector('.mobile-menu-toggle');
+    const open = toggle.getAttribute('aria-expanded') !== 'true';
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.closest('.workspace-nav').classList.toggle('mobile-menu-open', open);
+    return;
+  }
+  if (name === 'workspace-tool') closeMobileMenu();
   if (name === 'workspace-tool') {
     const tool = workspaceTools.find(tool => tool.id === id);
     const admin = isTeacher();
@@ -674,7 +696,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=4c4a112d6fc4')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=c0a7f289e21a')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -756,7 +778,7 @@ document.addEventListener('click', async event => {
   b.disabled = true; b.setAttribute('aria-busy', 'true');
   try {
     await action(b.dataset.action, b.dataset.id);
-    if (!dialog.open && page !== 'workspace' && (workspaceChoice || b.closest('.workspace-nav'))) root.querySelector('.page-heading h1')?.focus();
+    if (b.dataset.action !== 'toggle-mobile-menu' && !dialog.open && page !== 'workspace' && (workspaceChoice || b.closest('.workspace-nav'))) root.querySelector('.page-heading h1')?.focus();
   } catch (e) { toast(e.message); } finally { b.disabled = false; b.removeAttribute('aria-busy'); }
 });
 document.addEventListener('submit', async event => {
@@ -809,7 +831,7 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=4c4a112d6fc4')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    try { const client = (await import('./src/test-client.mjs?v=c0a7f289e21a')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p>' + button('test-leave','Return to classroom') + '</main>'; }
     return;
   }
