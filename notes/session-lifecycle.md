@@ -24,3 +24,9 @@ The browser must support module SharedWorkers. Unsupported browsers show an expl
 ## Verification
 
 86 automated tests passed after integration with the session-setup and sign-in-restoration changes. Browser checks opened independent student tabs, submitted a simulated deposit, verified the teammate's balance and instructor's actor attribution, and verified that ending the round disconnected student tabs. Firestore integration checks passed against a disposable namespace and removed that namespace afterward; no Firebase Authentication test users were created. Firebase deployed both classroom functions and Hosting successfully; live health flags and browser assets were verified.
+
+## Immediate tab updates
+
+The shared worker now notifies authenticated room tabs after accepted decisions and clock changes, and broadcasts a terminal event when the round ends. Notifications contain only the room identifier and event type; each tab fetches its own authorized view. Ending a round closes decision dialogs, clears the displayed state and invalidates pending view responses. Hidden tabs no longer depend on the visible-tab polling interval. Browsers can suspend pages entirely; a visibility-change refresh covers their return. Draft decision forms are preserved until submission or dismissal rather than overwritten by a teammate's update.
+
+Verification for this change uses mocked message ports and a stub UI only. No new simulation sessions, student accounts, Firebase records or test downloads were created.

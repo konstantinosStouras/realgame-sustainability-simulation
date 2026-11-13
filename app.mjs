@@ -1,5 +1,5 @@
-import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=3dbf02c986e0';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=3dbf02c986e0';
+import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=8479858e406d';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=8479858e406d';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -71,10 +71,10 @@ async function load(force = true, afterCommand = false) {
     // Keep the version that the student actually reviewed while editing a decision.
     if (!force && !afterCommand && (submittingForms.size || dialog.open || document.activeElement?.closest('form'))) { online = true; return; }
     state = data.state; actor = data.actor; online = true;
-    if ((force || changed) && !dialog.open && (force || (!submittingForms.size && !document.activeElement?.closest('form, details[open]')))) render();
+    if ((force || changed) && !dialog.open && (force || (!submittingForms.size && !document.activeElement?.closest(testRoom ? 'form' : 'form, details[open]')))) render();
   } catch (e) {
     if (sessionId !== loadingSession || preview !== loadingPreview || sequence !== loadSequence || solo) return;
-    if (testRoom && e.status === 410) { state = null; root.innerHTML = '<main class="welcome"><h1>Test round ended</h1><p>Its temporary data has been discarded.</p>' + button('test-leave','Return to classroom') + '</main>'; return; }
+    if (testRoom && e.status === 410) { endTestView(); return; }
     if (!testRoom && [403, 404].includes(e.status)) { state = null; actor = null; sessionId = null; if (dialog.open) dialog.close(); renderLobby(e.message); return; }
     online = false; if (force) throw e; const status = document.querySelector('#connection'); if (status) status.textContent = 'Connection interrupted · reconnecting'; } finally { pendingLoads--; }
 }
@@ -207,7 +207,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=3dbf02c986e0')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=8479858e406d')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -233,6 +233,13 @@ function testTabUrl(key) {
   const url = new URL(location.href); url.search = '';
   url.hash = new URLSearchParams({test: testRoom.credentials.roomId, key}).toString(); return url.href;
 }
+function endTestView() {
+  ++loadSequence; // An in-flight view must never restore a discarded classroom.
+  state = null; actor = null; sessionId = null; testPending = null; roster = null;
+  if (dialog.open) dialog.close();
+  testRoom?.close();
+  root.innerHTML = '<main class="welcome"><h1>Test round ended</h1><p>Its temporary data has been discarded.</p>' + button('test-leave','Return to classroom') + '</main>';
+}
 async function enterTest(client) {
   const view = await client.call('view'); testRoom = client; solo = null;
   state = view.state; actor = view.actor; user = actor; sessionId = state.id; preview = undefined;
@@ -244,6 +251,13 @@ async function enterTest(client) {
   if (preview) state = (await client.call('view', { preview })).state;
   history.replaceState(null, '', testTabUrl(client.credentials.key));
   render();
+  client.subscribe(event => {
+    if (testRoom !== client || !sessionId) return;
+    if (event === 'ended') endTestView();
+    else if (event === 'changed') void load(false);
+  });
+  // Cover changes between the initial view and registering the listener.
+  await load(false);
 }
 function leaveTest() {
   testRoom?.close(); const url = new URL(location.href); url.hash = ''; url.search = ''; location.replace(url.href);
@@ -261,7 +275,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=3dbf02c986e0')).testClient();
+      const client = (await import('./src/test-client.mjs?v=8479858e406d')).testClient();
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -702,7 +716,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=3dbf02c986e0')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=8479858e406d')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -837,7 +851,7 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=3dbf02c986e0')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    try { const client = (await import('./src/test-client.mjs?v=8479858e406d')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p>' + button('test-leave','Return to classroom') + '</main>'; }
     return;
   }
@@ -867,3 +881,8 @@ await startWorkspace();
 setInterval(() => { if (!solo && state && !busy && !pendingLoads && !document.hidden) load(false); }, 3000);
 
 window.addEventListener('popstate', () => { if (user && !solo) enter().catch(e => toast(e.message)); });
+
+// Suspended browser tabs resync as soon as they become visible again.
+document.addEventListener('visibilitychange', () => {
+  if (testRoom && sessionId && !document.hidden) void load(false);
+});
