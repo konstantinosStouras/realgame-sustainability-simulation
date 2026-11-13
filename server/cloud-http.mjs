@@ -11,7 +11,7 @@ export function createCloudHandler({ store, verifyFirebase, projectId, allowedOr
       if (origin) { res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Vary', 'Origin'); }
       if (req.method === 'OPTIONS') { res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type'); res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'); res.writeHead(204); res.end(); return; }
       const url = new URL(req.url, 'https://classroom.invalid'), path = url.pathname;
-      if (path === '/api/health' && req.method === 'GET') return send(200, { ok: true, demo: false, version: 1, classroomAccounting: true, operatingCostSettings: true, pricingInventorySettings: true, sessionLifecycle: true, sessionLinks: true, attachmentExport: true, testClassroom: true, auth: 'firebase', projectId, persistence: 'firestore', region: 'europe-west2' });
+      if (path === '/api/health' && req.method === 'GET') return send(200, { ok: true, demo: false, version: 1, classroomAccounting: true, atomicSessionSettings: true, operatingCostSettings: true, pricingInventorySettings: true, sessionLifecycle: true, sessionLinks: true, attachmentExport: true, testClassroom: true, auth: 'firebase', projectId, persistence: 'firestore', region: 'europe-west2' });
       if (!path.startsWith('/api/')) fail('Not found.', 404);
       if (path === '/api/export-download') {
         const credentials = await readExportForm(req);
