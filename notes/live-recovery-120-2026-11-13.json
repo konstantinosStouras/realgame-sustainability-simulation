@@ -1,0 +1,1687 @@
+{
+  "date": "2026-11-13",
+  "students": 120,
+  "teams": 12,
+  "simulatedDays": 60,
+  "renderedBrowsers": 0,
+  "methodology": "Independent authenticated HTTPS clients; sequential fault cases within rotating groups and concurrent decision, retry and reconnect waves.",
+  "baseline": {
+    "revision": "classroom-00030-fuj",
+    "passed": false,
+    "totalApiAttempts": 1590,
+    "clientStatuses": {
+      "0": 97,
+      "200": 1327,
+      "201": 1,
+      "409": 165
+    },
+    "ordinaryTimeouts": 81,
+    "injectedResponseLosses": 8,
+    "injectedSocketAborts": 8,
+    "maxOrdinaryMs": 15017,
+    "cleaned": true,
+    "completedDays": 14,
+    "waves": [
+      {
+        "phase": "recovery-1-competing-120",
+        "requests": 120,
+        "statuses": {
+          "200": 1,
+          "409": 119
+        },
+        "p50": 3087,
+        "p95": 4764,
+        "p99": 5017,
+        "max": 5023
+      },
+      {
+        "phase": "recovery-1-exact-retries-120",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 1803,
+        "p95": 3034,
+        "p99": 3102,
+        "max": 3106
+      },
+      {
+        "phase": "recovery-1-reconnected-views-120",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 1926,
+        "p95": 2721,
+        "p99": 2765,
+        "max": 2772
+      },
+      {
+        "phase": "day-1-120-views",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 1582,
+        "p95": 2588,
+        "p99": 2638,
+        "max": 2665
+      },
+      {
+        "phase": "recovery-15-competing-120",
+        "requests": 120,
+        "statuses": {
+          "0": 81,
+          "200": 1,
+          "409": 38
+        },
+        "p50": 15010,
+        "p95": 15017,
+        "p99": 15017,
+        "max": 15017
+      }
+    ]
+  },
+  "corrected": {
+    "revision": "classroom-00031-yic",
+    "commit": "1c0f2aa",
+    "economicAndRecoveryChecksPassed": true,
+    "productionCapacityPassed": false,
+    "memoryFailure": {
+      "limitMiB": 512,
+      "observedMiB": 559,
+      "time": "2026-11-13T15:47:08.397269Z"
+    },
+    "totalApiAttempts": 5254,
+    "clientStatuses": {
+      "0": 80,
+      "200": 4537,
+      "201": 1,
+      "403": 1,
+      "409": 635
+    },
+    "ordinaryTimeouts": 0,
+    "injectedResponseLosses": 40,
+    "injectedSocketAborts": 40,
+    "maxOrdinaryMs": 12419,
+    "cleaned": true,
+    "completedDays": 60,
+    "waves": [
+      {
+        "phase": "recovery-1-competing-120",
+        "requests": 120,
+        "statuses": {
+          "200": 1,
+          "409": 119
+        },
+        "p50": 3219,
+        "p95": 3570,
+        "p99": 3657,
+        "max": 3673
+      },
+      {
+        "phase": "recovery-1-exact-retries-120",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 1304,
+        "p95": 2076,
+        "p99": 2082,
+        "max": 2090
+      },
+      {
+        "phase": "recovery-1-reconnected-views-120",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 1431,
+        "p95": 2517,
+        "p99": 2561,
+        "max": 2635
+      },
+      {
+        "phase": "day-1-120-views",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 1425,
+        "p95": 1915,
+        "p99": 1939,
+        "max": 1939
+      },
+      {
+        "phase": "recovery-15-competing-120",
+        "requests": 120,
+        "statuses": {
+          "200": 1,
+          "409": 119
+        },
+        "p50": 2527,
+        "p95": 2898,
+        "p99": 2912,
+        "max": 2929
+      },
+      {
+        "phase": "recovery-15-exact-retries-120",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 1169,
+        "p95": 1748,
+        "p99": 1778,
+        "max": 2024
+      },
+      {
+        "phase": "recovery-15-reconnected-views-120",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 2612,
+        "p95": 3857,
+        "p99": 3876,
+        "max": 3881
+      },
+      {
+        "phase": "day-15-120-views",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 2834,
+        "p95": 3825,
+        "p99": 3859,
+        "max": 3866
+      },
+      {
+        "phase": "recovery-30-competing-120",
+        "requests": 120,
+        "statuses": {
+          "200": 1,
+          "409": 119
+        },
+        "p50": 3127,
+        "p95": 3243,
+        "p99": 3970,
+        "max": 3970
+      },
+      {
+        "phase": "recovery-30-exact-retries-120",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 1149,
+        "p95": 1849,
+        "p99": 1851,
+        "max": 2018
+      },
+      {
+        "phase": "recovery-30-reconnected-views-120",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 3073,
+        "p95": 5818,
+        "p99": 5972,
+        "max": 5980
+      },
+      {
+        "phase": "day-30-120-views",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 4858,
+        "p95": 5796,
+        "p99": 5842,
+        "max": 5872
+      },
+      {
+        "phase": "recovery-45-competing-120",
+        "requests": 120,
+        "statuses": {
+          "200": 1,
+          "409": 119
+        },
+        "p50": 2708,
+        "p95": 3533,
+        "p99": 3536,
+        "max": 3539
+      },
+      {
+        "phase": "recovery-45-exact-retries-120",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 1233,
+        "p95": 1489,
+        "p99": 1603,
+        "max": 1622
+      },
+      {
+        "phase": "recovery-45-reconnected-views-120",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 5753,
+        "p95": 9175,
+        "p99": 9237,
+        "max": 9416
+      },
+      {
+        "phase": "day-45-120-views",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 7391,
+        "p95": 8599,
+        "p99": 8695,
+        "max": 8708
+      },
+      {
+        "phase": "recovery-59-competing-120",
+        "requests": 120,
+        "statuses": {
+          "200": 1,
+          "409": 119
+        },
+        "p50": 3588,
+        "p95": 4163,
+        "p99": 4760,
+        "max": 4867
+      },
+      {
+        "phase": "recovery-59-exact-retries-120",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 1393,
+        "p95": 1994,
+        "p99": 1999,
+        "max": 2000
+      },
+      {
+        "phase": "recovery-59-reconnected-views-120",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 11279,
+        "p95": 12290,
+        "p99": 12383,
+        "max": 12419
+      },
+      {
+        "phase": "day-59-120-views",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 8275,
+        "p95": 12216,
+        "p99": 12357,
+        "max": 12376
+      }
+    ],
+    "unexpectedFailures": 0,
+    "browserDeadlineOverruns": 0,
+    "recovery": {
+      "waves": [
+        {
+          "day": 1,
+          "students": 120,
+          "teams": 12,
+          "competingAccepted": 1,
+          "competingStale": 119,
+          "exactRetries": 120,
+          "acceptedDecisions": 33,
+          "fromRevision": 141,
+          "toRevision": 174,
+          "faultClientCount": 24
+        },
+        {
+          "day": 15,
+          "students": 120,
+          "teams": 12,
+          "competingAccepted": 1,
+          "competingStale": 119,
+          "exactRetries": 120,
+          "acceptedDecisions": 33,
+          "fromRevision": 404,
+          "toRevision": 437,
+          "faultClientCount": 24
+        },
+        {
+          "day": 30,
+          "students": 120,
+          "teams": 12,
+          "competingAccepted": 1,
+          "competingStale": 119,
+          "exactRetries": 120,
+          "acceptedDecisions": 33,
+          "fromRevision": 682,
+          "toRevision": 715,
+          "faultClientCount": 24
+        },
+        {
+          "day": 45,
+          "students": 120,
+          "teams": 12,
+          "competingAccepted": 1,
+          "competingStale": 119,
+          "exactRetries": 120,
+          "acceptedDecisions": 33,
+          "fromRevision": 946,
+          "toRevision": 979,
+          "faultClientCount": 24
+        },
+        {
+          "day": 59,
+          "students": 120,
+          "teams": 12,
+          "competingAccepted": 1,
+          "competingStale": 119,
+          "exactRetries": 120,
+          "acceptedDecisions": 33,
+          "fromRevision": 1197,
+          "toRevision": 1230,
+          "faultClientCount": 24
+        }
+      ],
+      "intentionalFaults": {
+        "beforeSend": 40,
+        "discardedAcceptedReply": 40,
+        "inFlightAbort": 40
+      },
+      "refreshedIdentities": 120,
+      "acceptedDecisions": 165,
+      "passed": true
+    },
+    "economy": {
+      "days": 60,
+      "students": 120,
+      "teams": 12,
+      "acceptedDecisions": 1255,
+      "replayExact": true,
+      "allDailyReportsReconciled": true,
+      "allLoansRepaid": true,
+      "pendingDeposits": 12,
+      "final": {
+        "day": 60,
+        "hour": 1440,
+        "revision": 1255,
+        "compressedBytes": 2030709,
+        "chunks": 4,
+        "production": 58566,
+        "orders": 5760,
+        "shipments": 5606,
+        "receivedUnits": 48576,
+        "paidShipments": 5229,
+        "cashCents": 441386701,
+        "profitCents": 400270909
+      }
+    },
+    "daily": [
+      {
+        "day": 1,
+        "hour": 24,
+        "revision": 175,
+        "compressedBytes": 20650,
+        "chunks": 1,
+        "production": 1152,
+        "orders": 96,
+        "shipments": 0,
+        "receivedUnits": 0,
+        "paidShipments": 0,
+        "cashCents": 179029281,
+        "profitCents": -2206719
+      },
+      {
+        "day": 2,
+        "hour": 48,
+        "revision": 200,
+        "compressedBytes": 39515,
+        "chunks": 1,
+        "production": 2304,
+        "orders": 192,
+        "shipments": 24,
+        "receivedUnits": 30,
+        "paidShipments": 0,
+        "cashCents": 183308769,
+        "profitCents": -3841563
+      },
+      {
+        "day": 3,
+        "hour": 72,
+        "revision": 213,
+        "compressedBytes": 65536,
+        "chunks": 1,
+        "production": 3456,
+        "orders": 288,
+        "shipments": 144,
+        "receivedUnits": 268,
+        "paidShipments": 0,
+        "cashCents": 181488801,
+        "profitCents": -3701145
+      },
+      {
+        "day": 4,
+        "hour": 96,
+        "revision": 226,
+        "compressedBytes": 111932,
+        "chunks": 1,
+        "production": 3600,
+        "orders": 384,
+        "shipments": 240,
+        "receivedUnits": 988,
+        "paidShipments": 0,
+        "cashCents": 179613105,
+        "profitCents": 3451246
+      },
+      {
+        "day": 5,
+        "hour": 120,
+        "revision": 239,
+        "compressedBytes": 144328,
+        "chunks": 1,
+        "production": 4728,
+        "orders": 480,
+        "shipments": 336,
+        "receivedUnits": 1806,
+        "paidShipments": 6,
+        "cashCents": 177658945,
+        "profitCents": 11278274
+      },
+      {
+        "day": 6,
+        "hour": 144,
+        "revision": 252,
+        "compressedBytes": 177630,
+        "chunks": 1,
+        "production": 5880,
+        "orders": 576,
+        "shipments": 432,
+        "receivedUnits": 2634,
+        "paidShipments": 43,
+        "cashCents": 181597217,
+        "profitCents": 18885531
+      },
+      {
+        "day": 7,
+        "hour": 168,
+        "revision": 277,
+        "compressedBytes": 211889,
+        "chunks": 1,
+        "production": 7032,
+        "orders": 672,
+        "shipments": 528,
+        "receivedUnits": 3529,
+        "paidShipments": 92,
+        "cashCents": 189795415,
+        "profitCents": 27245526
+      },
+      {
+        "day": 8,
+        "hour": 192,
+        "revision": 290,
+        "compressedBytes": 247610,
+        "chunks": 1,
+        "production": 8184,
+        "orders": 768,
+        "shipments": 624,
+        "receivedUnits": 4369,
+        "paidShipments": 211,
+        "cashCents": 216704607,
+        "profitCents": 34787721
+      },
+      {
+        "day": 9,
+        "hour": 216,
+        "revision": 303,
+        "compressedBytes": 282292,
+        "chunks": 1,
+        "production": 9336,
+        "orders": 864,
+        "shipments": 720,
+        "receivedUnits": 5142,
+        "paidShipments": 318,
+        "cashCents": 188933009,
+        "profitCents": 41389110
+      },
+      {
+        "day": 10,
+        "hour": 240,
+        "revision": 328,
+        "compressedBytes": 320188,
+        "chunks": 1,
+        "production": 10488,
+        "orders": 960,
+        "shipments": 828,
+        "receivedUnits": 5986,
+        "paidShipments": 416,
+        "cashCents": 209940291,
+        "profitCents": 48527539
+      },
+      {
+        "day": 11,
+        "hour": 264,
+        "revision": 341,
+        "compressedBytes": 356847,
+        "chunks": 1,
+        "production": 11640,
+        "orders": 1056,
+        "shipments": 924,
+        "receivedUnits": 6865,
+        "paidShipments": 513,
+        "cashCents": 206950263,
+        "profitCents": 56081147
+      },
+      {
+        "day": 12,
+        "hour": 288,
+        "revision": 354,
+        "compressedBytes": 388480,
+        "chunks": 1,
+        "production": 12792,
+        "orders": 1152,
+        "shipments": 1020,
+        "receivedUnits": 7747,
+        "paidShipments": 608,
+        "cashCents": 225968515,
+        "profitCents": 63518693
+      },
+      {
+        "day": 13,
+        "hour": 312,
+        "revision": 367,
+        "compressedBytes": 422912,
+        "chunks": 1,
+        "production": 13944,
+        "orders": 1248,
+        "shipments": 1116,
+        "receivedUnits": 8631,
+        "paidShipments": 708,
+        "cashCents": 211100307,
+        "profitCents": 71074736
+      },
+      {
+        "day": 14,
+        "hour": 336,
+        "revision": 392,
+        "compressedBytes": 461408,
+        "chunks": 1,
+        "production": 15096,
+        "orders": 1344,
+        "shipments": 1212,
+        "receivedUnits": 9500,
+        "paidShipments": 814,
+        "cashCents": 230727021,
+        "profitCents": 78489071
+      },
+      {
+        "day": 15,
+        "hour": 360,
+        "revision": 438,
+        "compressedBytes": 501341,
+        "chunks": 1,
+        "production": 16248,
+        "orders": 1440,
+        "shipments": 1308,
+        "receivedUnits": 10374,
+        "paidShipments": 908,
+        "cashCents": 222697574,
+        "profitCents": 86019336
+      },
+      {
+        "day": 16,
+        "hour": 384,
+        "revision": 451,
+        "compressedBytes": 536048,
+        "chunks": 2,
+        "production": 17400,
+        "orders": 1536,
+        "shipments": 1404,
+        "receivedUnits": 11277,
+        "paidShipments": 1007,
+        "cashCents": 208977966,
+        "profitCents": 94013498
+      },
+      {
+        "day": 17,
+        "hour": 408,
+        "revision": 464,
+        "compressedBytes": 569882,
+        "chunks": 2,
+        "production": 18552,
+        "orders": 1632,
+        "shipments": 1500,
+        "receivedUnits": 12162,
+        "paidShipments": 1099,
+        "cashCents": 230642198,
+        "profitCents": 101330397
+      },
+      {
+        "day": 18,
+        "hour": 432,
+        "revision": 477,
+        "compressedBytes": 602698,
+        "chunks": 2,
+        "production": 19704,
+        "orders": 1728,
+        "shipments": 1596,
+        "receivedUnits": 12981,
+        "paidShipments": 1194,
+        "cashCents": 228729650,
+        "profitCents": 107939231
+      },
+      {
+        "day": 19,
+        "hour": 456,
+        "revision": 490,
+        "compressedBytes": 637454,
+        "chunks": 2,
+        "production": 20856,
+        "orders": 1824,
+        "shipments": 1692,
+        "receivedUnits": 13846,
+        "paidShipments": 1292,
+        "cashCents": 218800292,
+        "profitCents": 114991280
+      },
+      {
+        "day": 20,
+        "hour": 480,
+        "revision": 516,
+        "compressedBytes": 677256,
+        "chunks": 2,
+        "production": 21972,
+        "orders": 1920,
+        "shipments": 1800,
+        "receivedUnits": 14750,
+        "paidShipments": 1388,
+        "cashCents": 238926150,
+        "profitCents": 122616120
+      },
+      {
+        "day": 21,
+        "hour": 504,
+        "revision": 541,
+        "compressedBytes": 713376,
+        "chunks": 2,
+        "production": 23124,
+        "orders": 2016,
+        "shipments": 1896,
+        "receivedUnits": 15608,
+        "paidShipments": 1481,
+        "cashCents": 235554814,
+        "profitCents": 129740182
+      },
+      {
+        "day": 22,
+        "hour": 528,
+        "revision": 554,
+        "compressedBytes": 747103,
+        "chunks": 2,
+        "production": 24276,
+        "orders": 2112,
+        "shipments": 1992,
+        "receivedUnits": 16486,
+        "paidShipments": 1577,
+        "cashCents": 222672786,
+        "profitCents": 137281949
+      },
+      {
+        "day": 23,
+        "hour": 552,
+        "revision": 568,
+        "compressedBytes": 780774,
+        "chunks": 2,
+        "production": 25380,
+        "orders": 2208,
+        "shipments": 2088,
+        "receivedUnits": 17337,
+        "paidShipments": 1681,
+        "cashCents": 242330616,
+        "profitCents": 144415202
+      },
+      {
+        "day": 24,
+        "hour": 576,
+        "revision": 581,
+        "compressedBytes": 813467,
+        "chunks": 2,
+        "production": 26388,
+        "orders": 2304,
+        "shipments": 2184,
+        "receivedUnits": 18205,
+        "paidShipments": 1784,
+        "cashCents": 245584516,
+        "profitCents": 151642960
+      },
+      {
+        "day": 25,
+        "hour": 600,
+        "revision": 594,
+        "compressedBytes": 847970,
+        "chunks": 2,
+        "production": 27498,
+        "orders": 2400,
+        "shipments": 2280,
+        "receivedUnits": 19073,
+        "paidShipments": 1882,
+        "cashCents": 263326272,
+        "profitCents": 158812481
+      },
+      {
+        "day": 26,
+        "hour": 624,
+        "revision": 607,
+        "compressedBytes": 880397,
+        "chunks": 2,
+        "production": 28626,
+        "orders": 2496,
+        "shipments": 2376,
+        "receivedUnits": 19908,
+        "paidShipments": 1977,
+        "cashCents": 247333670,
+        "profitCents": 165549051
+      },
+      {
+        "day": 27,
+        "hour": 648,
+        "revision": 620,
+        "compressedBytes": 916486,
+        "chunks": 2,
+        "production": 29562,
+        "orders": 2592,
+        "shipments": 2472,
+        "receivedUnits": 20755,
+        "paidShipments": 2072,
+        "cashCents": 255209356,
+        "profitCents": 172496147
+      },
+      {
+        "day": 28,
+        "hour": 672,
+        "revision": 645,
+        "compressedBytes": 951562,
+        "chunks": 2,
+        "production": 30630,
+        "orders": 2688,
+        "shipments": 2568,
+        "receivedUnits": 21520,
+        "paidShipments": 2169,
+        "cashCents": 270205288,
+        "profitCents": 178574363
+      },
+      {
+        "day": 29,
+        "hour": 696,
+        "revision": 658,
+        "compressedBytes": 983681,
+        "chunks": 2,
+        "production": 31686,
+        "orders": 2784,
+        "shipments": 2664,
+        "receivedUnits": 22407,
+        "paidShipments": 2262,
+        "cashCents": 286435462,
+        "profitCents": 186270188
+      },
+      {
+        "day": 30,
+        "hour": 720,
+        "revision": 716,
+        "compressedBytes": 1027048,
+        "chunks": 3,
+        "production": 32598,
+        "orders": 2880,
+        "shipments": 2772,
+        "receivedUnits": 23243,
+        "paidShipments": 2361,
+        "cashCents": 261379523,
+        "profitCents": 193243758
+      },
+      {
+        "day": 31,
+        "hour": 744,
+        "revision": 729,
+        "compressedBytes": 1061017,
+        "chunks": 3,
+        "production": 33486,
+        "orders": 2976,
+        "shipments": 2868,
+        "receivedUnits": 24100,
+        "paidShipments": 2452,
+        "cashCents": 275184499,
+        "profitCents": 200229863
+      },
+      {
+        "day": 32,
+        "hour": 768,
+        "revision": 742,
+        "compressedBytes": 1092950,
+        "chunks": 3,
+        "production": 34350,
+        "orders": 3072,
+        "shipments": 2964,
+        "receivedUnits": 24979,
+        "paidShipments": 2551,
+        "cashCents": 263438041,
+        "profitCents": 207355637
+      },
+      {
+        "day": 33,
+        "hour": 792,
+        "revision": 755,
+        "compressedBytes": 1125292,
+        "chunks": 3,
+        "production": 35214,
+        "orders": 3168,
+        "shipments": 3060,
+        "receivedUnits": 25804,
+        "paidShipments": 2651,
+        "cashCents": 270280933,
+        "profitCents": 213980823
+      },
+      {
+        "day": 34,
+        "hour": 816,
+        "revision": 768,
+        "compressedBytes": 1159084,
+        "chunks": 3,
+        "production": 36078,
+        "orders": 3264,
+        "shipments": 3156,
+        "receivedUnits": 26671,
+        "paidShipments": 2753,
+        "cashCents": 286161559,
+        "profitCents": 221199878
+      },
+      {
+        "day": 35,
+        "hour": 840,
+        "revision": 793,
+        "compressedBytes": 1194976,
+        "chunks": 3,
+        "production": 36925,
+        "orders": 3360,
+        "shipments": 3252,
+        "receivedUnits": 27658,
+        "paidShipments": 2852,
+        "cashCents": 278131565,
+        "profitCents": 229775840
+      },
+      {
+        "day": 36,
+        "hour": 864,
+        "revision": 806,
+        "compressedBytes": 1228145,
+        "chunks": 3,
+        "production": 37760,
+        "orders": 3456,
+        "shipments": 3348,
+        "receivedUnits": 28467,
+        "paidShipments": 2947,
+        "cashCents": 282448671,
+        "profitCents": 236462559
+      },
+      {
+        "day": 37,
+        "hour": 888,
+        "revision": 819,
+        "compressedBytes": 1260447,
+        "chunks": 3,
+        "production": 38577,
+        "orders": 3552,
+        "shipments": 3444,
+        "receivedUnits": 29350,
+        "paidShipments": 3040,
+        "cashCents": 298081787,
+        "profitCents": 243930468
+      },
+      {
+        "day": 38,
+        "hour": 912,
+        "revision": 832,
+        "compressedBytes": 1294070,
+        "chunks": 3,
+        "production": 39673,
+        "orders": 3648,
+        "shipments": 3540,
+        "receivedUnits": 30224,
+        "paidShipments": 3143,
+        "cashCents": 299179082,
+        "profitCents": 251226472
+      },
+      {
+        "day": 39,
+        "hour": 936,
+        "revision": 845,
+        "compressedBytes": 1326366,
+        "chunks": 3,
+        "production": 40631,
+        "orders": 3744,
+        "shipments": 3636,
+        "receivedUnits": 31049,
+        "paidShipments": 3232,
+        "cashCents": 305995223,
+        "profitCents": 257854554
+      },
+      {
+        "day": 40,
+        "hour": 960,
+        "revision": 870,
+        "compressedBytes": 1365344,
+        "chunks": 3,
+        "production": 41660,
+        "orders": 3840,
+        "shipments": 3744,
+        "receivedUnits": 31949,
+        "paidShipments": 3332,
+        "cashCents": 320498864,
+        "profitCents": 265244438
+      },
+      {
+        "day": 41,
+        "hour": 984,
+        "revision": 883,
+        "compressedBytes": 1397774,
+        "chunks": 3,
+        "production": 42508,
+        "orders": 3936,
+        "shipments": 3840,
+        "receivedUnits": 32737,
+        "paidShipments": 3431,
+        "cashCents": 321345523,
+        "profitCents": 271516893
+      },
+      {
+        "day": 42,
+        "hour": 1008,
+        "revision": 908,
+        "compressedBytes": 1433626,
+        "chunks": 3,
+        "production": 43301,
+        "orders": 4032,
+        "shipments": 3936,
+        "receivedUnits": 33660,
+        "paidShipments": 3523,
+        "cashCents": 323227685,
+        "profitCents": 279432671
+      },
+      {
+        "day": 43,
+        "hour": 1032,
+        "revision": 921,
+        "compressedBytes": 1467145,
+        "chunks": 3,
+        "production": 44044,
+        "orders": 4128,
+        "shipments": 4032,
+        "receivedUnits": 34431,
+        "paidShipments": 3627,
+        "cashCents": 338034082,
+        "profitCents": 285672519
+      },
+      {
+        "day": 44,
+        "hour": 1056,
+        "revision": 934,
+        "compressedBytes": 1500148,
+        "chunks": 3,
+        "production": 44899,
+        "orders": 4224,
+        "shipments": 4128,
+        "receivedUnits": 35320,
+        "paidShipments": 3727,
+        "cashCents": 337085753,
+        "profitCents": 293364590
+      },
+      {
+        "day": 45,
+        "hour": 1080,
+        "revision": 980,
+        "compressedBytes": 1537827,
+        "chunks": 4,
+        "production": 45730,
+        "orders": 4320,
+        "shipments": 4224,
+        "receivedUnits": 36145,
+        "paidShipments": 3825,
+        "cashCents": 349443313,
+        "profitCents": 300042235
+      },
+      {
+        "day": 46,
+        "hour": 1104,
+        "revision": 993,
+        "compressedBytes": 1570942,
+        "chunks": 4,
+        "production": 46594,
+        "orders": 4416,
+        "shipments": 4320,
+        "receivedUnits": 37049,
+        "paidShipments": 3915,
+        "cashCents": 349000364,
+        "profitCents": 307387981
+      },
+      {
+        "day": 47,
+        "hour": 1128,
+        "revision": 1006,
+        "compressedBytes": 1604334,
+        "chunks": 4,
+        "production": 47437,
+        "orders": 4512,
+        "shipments": 4416,
+        "receivedUnits": 37920,
+        "paidShipments": 4016,
+        "cashCents": 354611083,
+        "profitCents": 314504946
+      },
+      {
+        "day": 48,
+        "hour": 1152,
+        "revision": 1019,
+        "compressedBytes": 1638532,
+        "chunks": 4,
+        "production": 48271,
+        "orders": 4608,
+        "shipments": 4512,
+        "receivedUnits": 38808,
+        "paidShipments": 4109,
+        "cashCents": 360727894,
+        "profitCents": 321938469
+      },
+      {
+        "day": 49,
+        "hour": 1176,
+        "revision": 1044,
+        "compressedBytes": 1671693,
+        "chunks": 4,
+        "production": 49087,
+        "orders": 4704,
+        "shipments": 4608,
+        "receivedUnits": 39651,
+        "paidShipments": 4210,
+        "cashCents": 373588436,
+        "profitCents": 328949534
+      },
+      {
+        "day": 50,
+        "hour": 1200,
+        "revision": 1069,
+        "compressedBytes": 1708358,
+        "chunks": 4,
+        "production": 49899,
+        "orders": 4800,
+        "shipments": 4715,
+        "receivedUnits": 40449,
+        "paidShipments": 4303,
+        "cashCents": 386215433,
+        "profitCents": 335407475
+      },
+      {
+        "day": 51,
+        "hour": 1224,
+        "revision": 1082,
+        "compressedBytes": 1740915,
+        "chunks": 4,
+        "production": 50718,
+        "orders": 4896,
+        "shipments": 4803,
+        "receivedUnits": 41274,
+        "paidShipments": 4401,
+        "cashCents": 388525716,
+        "profitCents": 342232147
+      },
+      {
+        "day": 52,
+        "hour": 1248,
+        "revision": 1095,
+        "compressedBytes": 1771343,
+        "chunks": 4,
+        "production": 51546,
+        "orders": 4992,
+        "shipments": 4891,
+        "receivedUnits": 42061,
+        "paidShipments": 4498,
+        "cashCents": 394633112,
+        "profitCents": 348552647
+      },
+      {
+        "day": 53,
+        "hour": 1272,
+        "revision": 1108,
+        "compressedBytes": 1799984,
+        "chunks": 4,
+        "production": 52466,
+        "orders": 5088,
+        "shipments": 4979,
+        "receivedUnits": 42905,
+        "paidShipments": 4593,
+        "cashCents": 405521486,
+        "profitCents": 355254753
+      },
+      {
+        "day": 54,
+        "hour": 1296,
+        "revision": 1121,
+        "compressedBytes": 1837318,
+        "chunks": 4,
+        "production": 53383,
+        "orders": 5184,
+        "shipments": 5067,
+        "receivedUnits": 43698,
+        "paidShipments": 4698,
+        "cashCents": 408149181,
+        "profitCents": 361418878
+      },
+      {
+        "day": 55,
+        "hour": 1320,
+        "revision": 1134,
+        "compressedBytes": 1865298,
+        "chunks": 4,
+        "production": 54279,
+        "orders": 5280,
+        "shipments": 5155,
+        "receivedUnits": 44513,
+        "paidShipments": 4785,
+        "cashCents": 412088418,
+        "profitCents": 367904054
+      },
+      {
+        "day": 56,
+        "hour": 1344,
+        "revision": 1159,
+        "compressedBytes": 1897621,
+        "chunks": 4,
+        "production": 55110,
+        "orders": 5376,
+        "shipments": 5243,
+        "receivedUnits": 45343,
+        "paidShipments": 4876,
+        "cashCents": 420761820,
+        "profitCents": 374572040
+      },
+      {
+        "day": 57,
+        "hour": 1368,
+        "revision": 1172,
+        "compressedBytes": 1928376,
+        "chunks": 4,
+        "production": 55922,
+        "orders": 5472,
+        "shipments": 5331,
+        "receivedUnits": 46146,
+        "paidShipments": 4964,
+        "cashCents": 422213432,
+        "profitCents": 381134727
+      },
+      {
+        "day": 58,
+        "hour": 1392,
+        "revision": 1185,
+        "compressedBytes": 1960759,
+        "chunks": 4,
+        "production": 56798,
+        "orders": 5568,
+        "shipments": 5419,
+        "receivedUnits": 46957,
+        "paidShipments": 5055,
+        "cashCents": 429761789,
+        "profitCents": 387748228
+      },
+      {
+        "day": 59,
+        "hour": 1416,
+        "revision": 1231,
+        "compressedBytes": 1997152,
+        "chunks": 4,
+        "production": 57651,
+        "orders": 5664,
+        "shipments": 5507,
+        "receivedUnits": 47763,
+        "paidShipments": 5142,
+        "cashCents": 438825830,
+        "profitCents": 394070727
+      },
+      {
+        "day": 60,
+        "hour": 1440,
+        "revision": 1255,
+        "compressedBytes": 2030709,
+        "chunks": 4,
+        "production": 58566,
+        "orders": 5760,
+        "shipments": 5606,
+        "receivedUnits": 48576,
+        "paidShipments": 5229,
+        "cashCents": 441386701,
+        "profitCents": 400270909
+      }
+    ]
+  },
+  "memoryOnlyFollowUp": {
+    "revision": "classroom-00032-ced",
+    "memoryMiB": 1024,
+    "passed": false,
+    "ordinaryTimeouts": 70,
+    "clientStatuses": {
+      "0": 70,
+      "200": 294,
+      "201": 1
+    },
+    "cleaned": true,
+    "phases": [
+      {
+        "phase": "mature-public-reopen",
+        "requests": 1,
+        "statuses": {
+          "200": 1
+        },
+        "p50": 1423,
+        "p95": 1423,
+        "p99": 1423,
+        "max": 1423
+      },
+      {
+        "phase": "mature-1-views-120",
+        "requests": 120,
+        "statuses": {
+          "0": 70,
+          "200": 50
+        },
+        "p50": 15002,
+        "p95": 15013,
+        "p99": 15015,
+        "max": 15016
+      },
+      {
+        "phase": "mature-1-watches-120",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 26417,
+        "p95": 27328,
+        "p99": 27379,
+        "max": 27382
+      }
+    ],
+    "serverErrorLogs": 0,
+    "serverOutOfMemoryErrors": 0
+  },
+  "firstCompressedProbe": {
+    "revision": "classroom-00033-hov",
+    "completed": false,
+    "reason": "Probe incorrectly required every first long-poll response to carry the new revision; two valid unchanged heartbeats stopped wave 2 before reconnects were checked.",
+    "cleaned": true,
+    "phases": [
+      {
+        "phase": "mature-public-reopen",
+        "requests": 1,
+        "statuses": {
+          "200": 1
+        },
+        "p50": 1476,
+        "p95": 1476,
+        "p99": 1476,
+        "max": 1476
+      },
+      {
+        "phase": "mature-1-views-120",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 5777,
+        "p95": 8586,
+        "p99": 8771,
+        "max": 8811
+      },
+      {
+        "phase": "mature-1-decisions-120",
+        "requests": 120,
+        "statuses": {
+          "200": 1,
+          "409": 119
+        },
+        "p50": 4063,
+        "p95": 4159,
+        "p99": 4168,
+        "max": 4172
+      },
+      {
+        "phase": "mature-1-watches-120",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 12257,
+        "p95": 12352,
+        "p99": 12375,
+        "max": 12418
+      },
+      {
+        "phase": "mature-1-retries-120",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 1457,
+        "p95": 2064,
+        "p99": 2353,
+        "max": 2528
+      },
+      {
+        "phase": "mature-2-views-120",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 5218,
+        "p95": 7820,
+        "p99": 8050,
+        "max": 8085
+      },
+      {
+        "phase": "mature-2-decisions-120",
+        "requests": 120,
+        "statuses": {
+          "200": 1,
+          "409": 119
+        },
+        "p50": 4686,
+        "p95": 4896,
+        "p99": 4897,
+        "max": 4900
+      },
+      {
+        "phase": "mature-2-watches-120",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 11455,
+        "p95": 11574,
+        "p99": 25792,
+        "max": 26541
+      }
+    ]
+  },
+  "finalCapacityRetest": {
+    "revision": "classroom-00033-hov",
+    "commit": "a5b199b",
+    "memoryMiB": 1024,
+    "maxInstances": 2,
+    "concurrencyPerInstance": 160,
+    "passed": true,
+    "totalApiAttempts": 1926,
+    "clientStatuses": {
+      "200": 1568,
+      "201": 1,
+      "409": 357
+    },
+    "unexpectedFailures": 0,
+    "browserDeadlineOverruns": 0,
+    "maxOrdinaryMs": 9163,
+    "capacity": {
+      "waves": [
+        {
+          "wave": 1,
+          "beforeRevision": 1,
+          "afterRevision": 2,
+          "viewStats": {
+            "phase": "mature-1-views-120",
+            "requests": 120,
+            "statuses": {
+              "200": 120
+            },
+            "p50": 5585,
+            "p95": 8661,
+            "p99": 9148,
+            "max": 9163
+          },
+          "decisionStats": {
+            "phase": "mature-1-decisions-120",
+            "requests": 120,
+            "statuses": {
+              "200": 1,
+              "409": 119
+            },
+            "p50": 5341,
+            "p95": 5587,
+            "p99": 5625,
+            "max": 5625
+          },
+          "watchStats": {
+            "phase": "mature-1-watches-120",
+            "requests": 120,
+            "statuses": {
+              "200": 120
+            },
+            "p50": 12256,
+            "p95": 12395,
+            "p99": 12467,
+            "max": 12469
+          },
+          "updatedViewStats": {
+            "phase": "mature-1-updated-120",
+            "requests": 120,
+            "statuses": {
+              "200": 120
+            },
+            "p50": 5479,
+            "p95": 7619,
+            "p99": 7753,
+            "max": 7756
+          },
+          "retryStats": {
+            "phase": "mature-1-retries-120",
+            "requests": 120,
+            "statuses": {
+              "200": 120
+            },
+            "p50": 1352,
+            "p95": 1791,
+            "p99": 1843,
+            "max": 1844
+          },
+          "watchClients": 120,
+          "heartbeatReconnects": 0,
+          "maxWatchConvergenceMs": 20149,
+          "exactlyOneEffect": true
+        },
+        {
+          "wave": 2,
+          "beforeRevision": 2,
+          "afterRevision": 3,
+          "viewStats": {
+            "phase": "mature-2-views-120",
+            "requests": 120,
+            "statuses": {
+              "200": 120
+            },
+            "p50": 6308,
+            "p95": 8418,
+            "p99": 8602,
+            "max": 8640
+          },
+          "decisionStats": {
+            "phase": "mature-2-decisions-120",
+            "requests": 120,
+            "statuses": {
+              "200": 1,
+              "409": 119
+            },
+            "p50": 5155,
+            "p95": 5336,
+            "p99": 5564,
+            "max": 5630
+          },
+          "watchStats": {
+            "phase": "mature-2-watches-120",
+            "requests": 120,
+            "statuses": {
+              "200": 120
+            },
+            "p50": 11914,
+            "p95": 12024,
+            "p99": 12349,
+            "max": 12369
+          },
+          "updatedViewStats": {
+            "phase": "mature-2-updated-120",
+            "requests": 120,
+            "statuses": {
+              "200": 120
+            },
+            "p50": 6601,
+            "p95": 8366,
+            "p99": 8618,
+            "max": 8843
+          },
+          "retryStats": {
+            "phase": "mature-2-retries-120",
+            "requests": 120,
+            "statuses": {
+              "200": 120
+            },
+            "p50": 1100,
+            "p95": 1650,
+            "p99": 1651,
+            "max": 1652
+          },
+          "watchClients": 120,
+          "heartbeatReconnects": 0,
+          "maxWatchConvergenceMs": 20771,
+          "exactlyOneEffect": true
+        },
+        {
+          "wave": 3,
+          "beforeRevision": 3,
+          "afterRevision": 4,
+          "viewStats": {
+            "phase": "mature-3-views-120",
+            "requests": 120,
+            "statuses": {
+              "200": 120
+            },
+            "p50": 6512,
+            "p95": 8610,
+            "p99": 8773,
+            "max": 8806
+          },
+          "decisionStats": {
+            "phase": "mature-3-decisions-120",
+            "requests": 120,
+            "statuses": {
+              "200": 1,
+              "409": 119
+            },
+            "p50": 5363,
+            "p95": 5943,
+            "p99": 5945,
+            "max": 5945
+          },
+          "watchStats": {
+            "phase": "mature-3-watches-120",
+            "requests": 120,
+            "statuses": {
+              "200": 120
+            },
+            "p50": 11574,
+            "p95": 12286,
+            "p99": 12480,
+            "max": 12482
+          },
+          "updatedViewStats": {
+            "phase": "mature-3-updated-120",
+            "requests": 120,
+            "statuses": {
+              "200": 120
+            },
+            "p50": 5830,
+            "p95": 8377,
+            "p99": 8573,
+            "max": 8602
+          },
+          "retryStats": {
+            "phase": "mature-3-retries-120",
+            "requests": 120,
+            "statuses": {
+              "200": 120
+            },
+            "p50": 1238,
+            "p95": 1611,
+            "p99": 1612,
+            "max": 1612
+          },
+          "watchClients": 120,
+          "heartbeatReconnects": 0,
+          "maxWatchConvergenceMs": 20234,
+          "exactlyOneEffect": true
+        }
+      ],
+      "students": 120,
+      "teams": 12,
+      "sourceHour": 1440,
+      "sourceRawBytes": 17332858,
+      "seedRawBytes": 16838302,
+      "seedCompressedBytes": 1993945,
+      "seedChunks": 4,
+      "passed": true,
+      "acceptedDeposits": 3,
+      "receipts": 4,
+      "finalRevision": 4,
+      "unchangedClosedReports": true,
+      "replayExact": true
+    },
+    "cleaned": true,
+    "serverErrorLogs": 0,
+    "serverCapacity": {
+      "capturedAt": "2026-11-13T16:21:17.836Z",
+      "httpStatuses": {
+        "200": 1568,
+        "201": 1,
+        "409": 357
+      },
+      "maxObservedInstances": 2,
+      "maxMinuteMeanCpu": 0.1883305485286034,
+      "maxMinuteMeanMemory": 0.37088775634765625,
+      "instantaneousPeaksMeasured": false
+    },
+    "privateViews": {
+      "count": 360,
+      "encoding": "gzip",
+      "wireBytes": 78992991,
+      "decodedBytes": 576086238
+    },
+    "updatedPrivateViews": {
+      "count": 360,
+      "encoding": "gzip",
+      "wireBytes": 79003417,
+      "decodedBytes": 576116868
+    },
+    "methodology": "Fresh synthetic session seeded from saved 60-day state, followed by three 120-client read/watch/decision/retry waves. This is targeted verification of response changes, not another 60-day simulation."
+  },
+  "validation": {
+    "automatedTests": 246,
+    "passed": 246,
+    "independentFullReplay": true,
+    "closedCompanyReportRows": 720
+  }
+}

@@ -37,7 +37,28 @@ export async function runMatureCapacityScenario(ctx,{seedState:source,wait=ms=>n
   if(wave>1){console.log(`Expiring decoded snapshot cache before mature wave ${wave}.`);await wait(cacheExpiryMs);}
   const before=await persisted();assert.equal(before.status,'paused');assert.equal(before.hour,1440);assertInvariants(before);
   const watchPhase=`mature-${wave}-watches-120`,viewPhase=`mature-${wave}-views-120`,decisionPhase=`mature-${wave}-decisions-120`,retryPhase=`mature-${wave}-retries-120`;
-  const watches=Promise.allSettled(students.map((who,i)=>call(watchPhase,endpoint+`/updates?revision=${before.revision}&wait=${run}-${wave}-${i}`,who,undefined,45000)));
+  let heartbeats=0;
+  const watchDurations=[];
+  const watches=Promise.allSettled(students.map(async(who,i)=>{
+   const started=performance.now();let attempt=0;
+   // Match the browser protocol: an unchanged 25-second heartbeat reconnects
+   // with the same cursor. Require all clients to converge within 45 seconds,
+   // rather than mistaking one valid heartbeat for a missed notification.
+   while(true){
+    const remaining=45000-(performance.now()-started);assert.ok(remaining>0,'Live-update convergence exceeded 45 seconds');
+    const update=await call(watchPhase,endpoint+`/updates?revision=${before.revision}&wait=${run}-${wave}-${i}-${attempt++}`,who,undefined,Math.ceil(Math.min(35000,remaining)));
+    const value=requireOk(update);assert.ok(!value.closed&&!value.cancelled);
+    if(value.revision>before.revision){
+     const remainingView=45000-(performance.now()-started);assert.ok(remainingView>0);
+     const view=requireOk(await call(`mature-${wave}-updated-120`,endpoint,who,undefined,Math.ceil(Math.min(15000,remainingView)))).state;
+     assert.ok(view.revision>=value.revision);assert.equal(view.company.id,before.companies[i%12].id);
+     assert.deepEqual(view.snapshots,before.snapshots);assert.ok(view.companies.every(c=>!Object.hasOwn(c,'cash')));
+     watchDurations.push(Math.round(performance.now()-started));
+     return {...update,confirmedView:{revision:view.revision,accounts:view.company.accounts,profit:view.company.profit}};
+    }
+    assert.equal(value.revision,before.revision);heartbeats++;
+   }
+  }));
   try {
   await wait(watchLeadMs);
   // Validate and discard each response promptly instead of retaining120large
@@ -58,10 +79,13 @@ export async function runMatureCapacityScenario(ctx,{seedState:source,wait=ms=>n
   const updates=await watches;for(const update of updates){assert.equal(update.status,'fulfilled');assert.ok(requireOk(update.value).revision>=receipt.revision);}
   const watchStats=summary(watchPhase);assert.ok(watchStats.max<45000);
   const after=await persisted();assertOneRecoveryDeposit(before,after,winner,requests[winner].command.amount);
+  updates.forEach((update,i)=>{assert.equal(update.value.confirmedView.revision,after.revision);assert.deepEqual(update.value.confirmedView.accounts,after.companies[i%12].accounts);assert.equal(update.value.confirmedView.profit,profit(after.companies[i%12]));});
+  const updatedViewStats=summary(`mature-${wave}-updated-120`);assert.ok(updatedViewStats.max<15000);
   const duplicates=await Promise.all(Array.from({length:120},()=>call(retryPhase,endpoint+'/command',students[winner],requests[winner],15000)));
   for(const duplicate of duplicates)assert.deepEqual(requireOk(duplicate),receipt);
   const retryStats=summary(retryPhase);assert.ok(retryStats.max<15000);assert.deepEqual(await persisted(),after);
-  waves.push({wave,beforeRevision:before.revision,afterRevision:after.revision,viewStats,decisionStats,watchStats,retryStats,exactlyOneEffect:true});
+  assert.equal(watchDurations.length,120);assert.ok(Math.max(...watchDurations)<45000);
+  waves.push({wave,beforeRevision:before.revision,afterRevision:after.revision,viewStats,decisionStats,watchStats,updatedViewStats,retryStats,watchClients:120,heartbeatReconnects:heartbeats,maxWatchConvergenceMs:Math.max(...watchDurations),exactlyOneEffect:true});
   console.log(JSON.stringify({phase:'mature-wave-complete',wave,revision:after.revision}));
   } finally {
    // Even if a view/decision assertion fails, settle every bounded watch before
