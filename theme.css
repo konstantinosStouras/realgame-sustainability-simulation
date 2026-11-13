@@ -90,7 +90,12 @@
 .session-actions button:focus-visible,.session-access-button:focus-visible,.session-bulk:focus-visible{outline:3px solid var(--green);outline-offset:3px}
 .session-actions button[aria-busy=true]{opacity:.6;cursor:wait}
 .session-access{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:18px;padding-top:12px;border-top:1px solid var(--line)}
-.session-access-button{border:0;background:transparent;padding:6px 0;font-size:1rem;color:var(--green)}
+.session-access .session-access-button{min-height:44px;max-width:100%;padding:11px 16px;border:1px solid #bccfba;border-radius:10px;background:#f0f5eb;color:#28513c;font-family:Inter,"Segoe UI",Arial,sans-serif;font-size:14px;font-weight:600;line-height:1.4;letter-spacing:.01em;text-align:left;white-space:normal;box-shadow:0 1px 2px #173a3108}
+.session-access .session-access-button:hover{background:#e3edd8;border-color:#86a278;color:#173a31}
+.session-access .session-access-button:active{box-shadow:inset 0 1px 3px #173a311a}
+[data-theme=dark] .session-access .session-access-button{background:#23382b;border-color:#4d6951;color:#d8ebc4;box-shadow:0 1px 2px #0002}
+[data-theme=dark] .session-access .session-access-button:hover{background:#304a36;border-color:#92b37b;color:#eff8e4}
+.session-access .session-access-button:focus-visible{outline:3px solid var(--green);outline-offset:3px}
 .session-access small{font-size:0.875rem;overflow-wrap:anywhere;color:var(--muted)}
 [data-theme=dark] .session-actions .session-open{background:#c8dfa7;color:#15261d;border-color:#c8dfa7}
 [data-theme=dark] .session-actions .session-export{background:#287c48;color:#fff;border-color:#439c65}
