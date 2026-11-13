@@ -1,4 +1,4 @@
-import { createSession, applyCommand, tick, publicView, assertInvariants, fail } from './engine.mjs?v=81758ca79447';
+import { createSession, applyCommand, tick, publicView, assertInvariants, fail } from './engine.mjs?v=43f44409cec1';
 
 // This model is held only by a SharedWorker. No storage, network or Firebase APIs.
 export class TestClassroom {
@@ -16,8 +16,11 @@ export class TestClassroom {
     this.receipts = new Map(); this.nextTick = null;
   }
   actor(key) { const person = this.people.find(p => p.key === key); if (!person) fail('This test tab link is invalid.', 403); const { key: _, ...actor } = person; return actor; }
+  requireAccess(actor) {
+    if (actor.role === 'student' && (this.state.studentAccess === false || this.state.status === 'completed')) fail('This test session is completed or closed to students. Ask the instructor to reopen it.', 403);
+  }
   roster(key) { if (this.actor(key).role !== 'instructor') fail('Instructor access required.', 403); return structuredClone(this.people); }
-  view(key, preview) { const actor = this.actor(key); return { actor, state: publicView(this.state, actor, preview) }; }
+  view(key, preview) { const actor = this.actor(key); this.requireAccess(actor); return { actor, state: publicView(this.state, actor, preview) }; }
   advance(now) {
     if (this.state.status !== 'running') { this.nextTick = null; return; }
     this.nextTick ??= now + this.state.secondsPerHour * 1000;
@@ -25,14 +28,17 @@ export class TestClassroom {
   }
   command(key, request, now = Date.now()) {
     const actor = this.actor(key);
+    this.requireAccess(actor);
     if (typeof request.key !== 'string' || request.key.length < 8) fail('A request key is required.');
     const receiptKey = actor.id + ':' + request.key, payload = JSON.stringify(request.command), previous = this.receipts.get(receiptKey);
     if (previous) { if (previous.payload !== payload) fail('Request key already used for a different decision.',409); return previous.response; }
     if (request.revision !== this.state.revision) fail('The test session changed. Review the refreshed state and try again.',409);
     if (['assignment','deleteSession'].includes(request.command?.type)) fail('This action is not available in a temporary test round.');
     const next = structuredClone(this.state), message = applyCommand(next, actor, request.command, new Date(now).toISOString());
-    assertInvariants(next); this.state = next;
-    if (request.command.type === 'clock' || next.status !== 'running') this.nextTick = next.status === 'running' ? now + next.secondsPerHour * 1000 : null;
+    assertInvariants(next);
+    const speedChanged = next.secondsPerHour !== this.state.secondsPerHour;
+    this.state = next;
+    if (request.command.type === 'clock' || speedChanged || next.status !== 'running') this.nextTick = next.status === 'running' ? now + next.secondsPerHour * 1000 : null;
     const response = { message, revision: next.revision }; this.receipts.set(receiptKey, {payload,response}); return response;
   }
 }

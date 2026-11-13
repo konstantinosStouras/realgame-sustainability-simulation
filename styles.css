@@ -393,3 +393,15 @@ td { line-height: 1.5; }
 .chart-point.is-highlighted, .chart-point:focus-visible { r: 6; stroke: var(--text); stroke-width: 2; outline: none; }
 .chart-tooltip { position: absolute; z-index: 2; left: 8px; right: 8px; bottom: calc(100% + 4px); padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--text); box-shadow: 0 4px 16px #0003; font-size: 14px; line-height: 1.4; pointer-events: none; overflow-wrap: anywhere; }
 .chart-tooltip[hidden] { display: none; }
+
+/* Stable series colors for the full supported classroom of twelve companies. */
+:root{--chart-3:#2469a5;--chart-4:#7d4c9d;--chart-5:#b13d50;--chart-6:#167c83;--chart-7:#a15017;--chart-8:#4261a0;--chart-9:#9e3980;--chart-10:#637024;--chart-11:#536471}
+.color-3{stroke:var(--chart-3)}.chart circle.c3{fill:var(--chart-3)}.legend-dot.c3{background:var(--chart-3)}
+.color-4{stroke:var(--chart-4)}.chart circle.c4{fill:var(--chart-4)}.legend-dot.c4{background:var(--chart-4)}
+.color-5{stroke:var(--chart-5)}.chart circle.c5{fill:var(--chart-5)}.legend-dot.c5{background:var(--chart-5)}
+.color-6{stroke:var(--chart-6)}.chart circle.c6{fill:var(--chart-6)}.legend-dot.c6{background:var(--chart-6)}
+.color-7{stroke:var(--chart-7)}.chart circle.c7{fill:var(--chart-7)}.legend-dot.c7{background:var(--chart-7)}
+.color-8{stroke:var(--chart-8)}.chart circle.c8{fill:var(--chart-8)}.legend-dot.c8{background:var(--chart-8)}
+.color-9{stroke:var(--chart-9)}.chart circle.c9{fill:var(--chart-9)}.legend-dot.c9{background:var(--chart-9)}
+.color-10{stroke:var(--chart-10)}.chart circle.c10{fill:var(--chart-10)}.legend-dot.c10{background:var(--chart-10)}
+.color-11{stroke:var(--chart-11)}.chart circle.c11{fill:var(--chart-11)}.legend-dot.c11{background:var(--chart-11)}

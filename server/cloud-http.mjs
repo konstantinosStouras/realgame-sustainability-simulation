@@ -1,4 +1,5 @@
 import { readExportForm, sendExport } from './export-download.mjs';
+import { readBody } from './read-body.mjs';
 import { fail } from '../src/engine.mjs';
 
 export function createCloudHandler({ store, verifyFirebase, projectId, allowedOrigins }) {
@@ -25,7 +26,7 @@ export function createCloudHandler({ store, verifyFirebase, projectId, allowedOr
       if (req.method === 'POST') {
         if (!req.headers['content-type']?.startsWith('application/json')) fail('Use JSON requests.', 415);
         if (req.body !== undefined) { if ((req.rawBody?.length || Buffer.byteLength(JSON.stringify(req.body))) > 16000) fail('Request too large.', 413); body = req.body; }
-        else { let data = ''; for await (const chunk of req) { data += chunk; if (Buffer.byteLength(data) > 16000) fail('Request too large.', 413); } try { body = JSON.parse(data || '{}'); } catch { fail('Invalid JSON.'); } }
+        else { const data = (await readBody(req)).toString('utf8'); try { body = JSON.parse(data || '{}'); } catch { fail('Invalid JSON.'); } }
         if (!body || typeof body !== 'object' || Array.isArray(body)) fail('Expected a JSON object.');
       }
       if (path === '/api/me' && req.method === 'GET') return send(200, { user, sessions: await store.list(user) });

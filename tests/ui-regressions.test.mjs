@@ -331,3 +331,75 @@ for (const mode of ['inline', 'modal']) for (const choice of ['oslo', 'custom'])
     if (mode === 'modal') assert.equal(dialog.open, false);
   });
 }
+
+test('revoked temporary access removes decisions and reconnects when access reopens', async () => {
+  const h = harness(), dialog = h.document.querySelector('#dialog');
+  dialog.open = true; dialog.close = () => { dialog.open = false; };
+  let denied = true;
+  h.context.apiImplementation = async () => {
+    if (denied) throw Object.assign(new Error('Session closed'), {status:403});
+    return {state:{revision:3,hour:72},actor:{id:'student',role:'student'}};
+  };
+  h.run("testRoom = {}; user = {id:'student',role:'student'}; api = apiImplementation;");
+  await h.run('load(false)');
+  assert.equal(h.run('state'), null);
+  assert.equal(h.run('actor'), null);
+  assert.equal(dialog.open, false);
+  assert.equal(h.run('sessionId'), 'test-session');
+  assert.equal(h.run('testAccessClosed'), true);
+  assert.match(h.document.querySelector('#app').innerHTML, /Test classroom access is closed/);
+  assert.match(h.document.querySelector('#app').innerHTML, /test-retry/);
+  denied = false;
+  await h.run('load(false)');
+  assert.equal(h.run('testAccessClosed'), false);
+  assert.equal(h.run('state.revision'), 3);
+  assert.equal(h.run('actor.id'), 'student');
+  assert.equal(h.context.renderCount, 1);
+});
+
+test('temporary decision access rejection refreshes and removes stale controls', async () => {
+  const h = harness();
+  h.context.deniedCall = async () => { throw Object.assign(new Error('Access closed'), {status:403}); };
+  h.run('testRoom = {call:deniedCall};');
+  await assert.rejects(h.run("command({type:'budget',research:0,marketing:0})"), {status:403});
+  assert.equal(h.run('state'), null);
+  assert.equal(h.run('testAccessClosed'), true);
+  assert.equal(h.run('testPending'), null);
+});
+
+test('temporary throttling keeps the original request key for an exact retry', async () => {
+  const h = harness(), requests = []; let throttled = true;
+  h.context.callImplementation = async (action, payload) => {
+    if (action === 'command') {
+      requests.push(payload.key);
+      if (throttled) throw Object.assign(new Error('Try again'), {status:429});
+      return {message:'Accepted'};
+    }
+    return {state:{revision:2,hour:72},actor:{id:'test-user',role:'instructor'}};
+  };
+  h.run('testRoom = {call:callImplementation};');
+  await assert.rejects(h.run("command({type:'step',hours:1})"), {status:429});
+  throttled = false;
+  await h.run("command({type:'step',hours:1})");
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0], requests[1]);
+});
+
+test('twelve competing companies have distinct stable chart and legend colors', () => {
+  const h = harness();
+  h.run(`state.companies = Array.from({length:12},(_,i)=>({id:'company-'+(i+1),name:'Team '+(i+1)}));
+    state.snapshots = [{hour:72,companies:state.companies.map((c,i)=>({...c,profit:i*100}))}];`);
+  const all = h.run("chart('profit','EUR',{selected:true})");
+  const colors = [...all.matchAll(/chart-line color-(\d+)/g)].map(m=>m[1]);
+  assert.equal(new Set(colors).size, 12);
+  assert.deepEqual([...all.matchAll(/legend-dot c(\d+)/g)].map(m=>m[1]), colors);
+  h.run("selectedCompanies = new Set(['company-4','company-12']);");
+  assert.deepEqual([...h.run("chart('profit','EUR',{selected:true})").matchAll(/chart-line color-(\d+)/g)].map(m=>m[1]), ['3','11']);
+  const css = readFileSync(new URL('../styles.css',import.meta.url),'utf8');
+  const dark = readFileSync(new URL('../theme.css',import.meta.url),'utf8');
+  for(let i=0;i<12;i++) {
+    assert.ok(css.includes(`.color-${i}{stroke:var(--chart-${i})}`));
+    assert.ok(css.includes(`.chart circle.c${i}{fill:var(--chart-${i})}`));
+    assert.match(dark, new RegExp(`--chart-${i}:#[a-f0-9]{6}`));
+  }
+});

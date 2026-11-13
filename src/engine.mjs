@@ -206,10 +206,11 @@ export function applyCommand(s, actor, a, realAt = '2026-01-01T00:00:00.000Z', {
     if (a.type === 'renameCompany') { const c = s.companies.find(x => x.id === a.companyId); if (!c) fail('Company not found.'); c.name = cleanText(a.name, 'Company name', 60); result = 'Company renamed.'; }
     if (a.type === 'catalog') {
       const editable = { suppliers: { price: [1, 1000000], stock: [0, 10000000], replenish: [0, 1000000], lead: [1, 720], term: [0, 720], reliability: [0, 100] }, routes: { hours: [1, 720], term: [0, 720], fixed: [0, 1000000], unit: [0, 100000], reliability: [0, 100] }, markets: { volume: [0, 1000], referencePrice: [100, 1000000], greenWeight: [0, 100] }, energy: { fee: [0, 10000000], daily: [0, 1000000], delay: [1, 720] } };
-      const rules = editable[a.collection]; if (!rules) fail('Unknown catalog.');
+      if (typeof a.collection !== 'string' || !Object.hasOwn(editable, a.collection)) fail('Unknown catalog.');
+      const rules = editable[a.collection];
       const row = s.catalog[a.collection].find(x => x.id === a.id); if (!row) fail('Catalog row not found.');
-      if (!a.patch || typeof a.patch !== 'object') fail('Catalog changes required.');
-      for (const [key, value] of Object.entries(a.patch)) { if (key === 'enabled') row.enabled = bool(value, 'Enabled'); else if (rules[key]) row[key] = integer(value, key, ...rules[key]); else fail(`Field ${key} is not editable.`); }
+      if (!a.patch || typeof a.patch !== 'object' || Array.isArray(a.patch)) fail('Catalog changes required.');
+      for (const [key, value] of Object.entries(a.patch)) { if (key === 'enabled') row.enabled = bool(value, 'Enabled'); else if (Object.hasOwn(rules, key)) row[key] = integer(value, key, ...rules[key]); else fail(`Field ${key} is not editable.`); }
       result = 'Catalog updated; pending contracts retain their original terms.';
     }
   } else if (a.type === 'message') {
@@ -224,7 +225,7 @@ export function applyCommand(s, actor, a, realAt = '2026-01-01T00:00:00.000Z', {
     if (s.status === 'completed') fail('Session completed. Pending obligations are preserved; ask the instructor to extend it.');
     const c = requireCompany(s, actor, a);
     const groups = { offer: 'offers', purchase: 'purchasing', dispatch: 'offers', shifts: 'production', staff: 'production', loan: 'finance', deposit: 'finance', energy: 'energy', invest: 'investments', reorder: 'investments', budget: 'investments' };
-    if (!groups[a.type]) fail('Unknown command.');
+    if (!Object.hasOwn(groups, a.type)) fail('Unknown command.');
     if (!s.features[groups[a.type]].allowed) fail(`The instructor has disabled ${groups[a.type]} decisions.`, 403);
     if (a.type === 'purchase') result = purchase(s, c, a);
     if (a.type === 'dispatch') result = dispatch(s, c, a);
@@ -253,7 +254,8 @@ export function applyCommand(s, actor, a, realAt = '2026-01-01T00:00:00.000Z', {
       schedule(s, c, 'energy', s.hour + energy.delay, { energyId: energy.id, terms: structuredClone(energy) }, `Switch to ${energy.name}`); result = `Switch accepted. Current provider remains effective for ${energy.delay} h.`;
     }
     if (a.type === 'invest') {
-      const inv = INVESTMENTS[a.kind]; if (!inv) fail('Unknown investment.');
+      if (typeof a.kind !== 'string' || !Object.hasOwn(INVESTMENTS, a.kind)) fail('Unknown investment.');
+      const inv = INVESTMENTS[a.kind];
       if (c.investments.some(x => x.kind === a.kind) && !['machine', 'warehouse'].includes(a.kind)) fail('This investment is already active or pending.');
       const pending = c.investments.filter(x => x.kind === a.kind && x.activeAt === null).length;
       if (pending) fail('An investment of this type is already pending.');
@@ -534,22 +536,26 @@ export function assertInvariants(s) {
     if (balance(c, 'cash') < 0) fail('Cash cannot be negative.', 500);
     if (sum(Object.values(c.inventory).map(i => i.value)) !== balance(c, 'inventory')) fail('Inventory valuation does not reconcile.', 500);
     for (const stock of Object.values(c.inventory)) if (!Number.isSafeInteger(stock.qty) || stock.qty < 0 || stock.value < 0) fail('Invalid stock.', 500);
+    const shippedByOrder = new Map();
+    for (const sh of c.shipments) shippedByOrder.set(sh.orderId, (shippedByOrder.get(sh.orderId) || 0) + sh.qty);
     for (const o of c.orders) {
-      const shipped = sum(c.shipments.filter(sh => sh.orderId === o.id).map(sh => sh.qty));
+      const shipped = shippedByOrder.get(o.id) || 0;
       if (o.originalQty !== o.remaining + shipped || o.received > shipped) fail('Order conservation failed.', 500);
     }
   }
   return true;
 }
 export function publicView(s, actor, previewId) {
-  const view = structuredClone(s), isTeacher = actor.role === 'instructor';
+  // Select authorized data before cloning: every classroom poll should copy only
+  // its response, not every company's growing private ledger and order history.
+  const view = { ...s }, isTeacher = actor.role === 'instructor';
   const companyId = isTeacher ? previewId : actor.companyId;
-  view.company = view.companies.find(c => c.id === companyId) || null;
-  if (view.company) { view.company.profit = profit(view.company); view.company.forecast = forecast(s, view.company); }
+  const company = s.companies.find(c => c.id === companyId);
+  view.company = company ? { ...company, profit: profit(company), forecast: forecast(s, company) } : null;
   view.companies = view.companies.map(c => ({ id: c.id, name: c.name, ...(isTeacher ? { cash: balance(c, 'cash'), profit: profit(c), inventory: c.inventory.panel.qty, openUnits: sum(c.orders.map(o => o.remaining)), emissions: c.emissions } : {}) }));
   view.events = view.events.filter(e => isTeacher || e.companyId === companyId);
   view.messages = view.messages.filter(m => canMessage(s, actor, m.channel));
   view.audit = view.audit.filter(a => isTeacher || a.companyId === companyId).map(a => ({ ...a, command: a.command.type === 'message' ? { type: 'message' } : a.command }));
   delete view.rng; delete view.sequence;
-  return view;
+  return structuredClone(view);
 }

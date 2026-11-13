@@ -1,4 +1,5 @@
 import { readExportForm, sendExport } from './export-download.mjs';
+import { readBody } from './read-body.mjs';
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -25,6 +26,7 @@ export function createApp({ store = new Store(process.env.DATA_PATH || '.data/si
       if (!url.pathname.startsWith('/api/')) {
         if (req.method !== 'GET' && req.method !== 'HEAD') fail('Method not allowed.', 405);
         const files = { '/': 'index.html', '/index.html': 'index.html', '/styles.css': 'styles.css', '/theme.css': 'theme.css', '/theme.mjs': 'theme.mjs', '/google-g.png': 'google-g.png', '/app.mjs': 'app.mjs', '/src/engine.mjs': 'src/engine.mjs', '/src/solo.mjs': 'src/solo.mjs', '/src/test-client.mjs': 'src/test-client.mjs', '/src/test-worker.mjs': 'src/test-worker.mjs', '/src/test-classroom.mjs': 'src/test-classroom.mjs', '/src/firebase-client.mjs': 'src/firebase-client.mjs', '/firebase-config.mjs': 'firebase-config.mjs', '/notes/model.md': 'notes/model.md' };
+        files['/src/session-updates.mjs'] = 'src/session-updates.mjs';
         const file = files[url.pathname]; if (!file) fail('Not found.', 404);
         const type = file.endsWith('.mjs') ? 'text/javascript; charset=utf-8' : file.endsWith('.css') ? 'text/css; charset=utf-8' : file.endsWith('.png') ? 'image/png' : file.endsWith('.md') ? 'text/plain; charset=utf-8' : 'text/html; charset=utf-8';
         res.setHeader('Content-Security-Policy', "default-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; img-src 'self' data: https://*.googleusercontent.com; style-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com; frame-src 'self' https://*.firebaseapp.com https://accounts.google.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
@@ -38,7 +40,7 @@ export function createApp({ store = new Store(process.env.DATA_PATH || '.data/si
       let body = {};
       if (req.method === 'POST') {
         if (!req.headers['content-type']?.startsWith('application/json')) fail('Use JSON requests.', 415);
-        let data = ''; for await (const chunk of req) { data += chunk; if (Buffer.byteLength(data) > 16000) fail('Request too large.', 413); }
+        const data = (await readBody(req)).toString('utf8');
         try { body = JSON.parse(data || '{}'); } catch { fail('Invalid JSON.'); }
         if (!body || typeof body !== 'object' || Array.isArray(body)) fail('Expected a JSON object.');
       }
