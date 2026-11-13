@@ -144,7 +144,12 @@ test('student workspace exposes nine categories and shows filtered live stock wi
   h.run(`actor.role = 'student'; page = 'workspace';
     state.recipe = {cell:32,frame:1,controller:2};
     state.company = {
-      inventory:{cell:{qty:64,capacity:128,value:6400,carbon:32},panel:{qty:2,capacity:4,value:25000,carbon:120}},
+      inventory:{
+        cell:{qty:64,capacity:128,value:6400,carbon:32},
+        frame:{qty:6,capacity:12,value:600,carbon:6},
+        controller:{qty:8,capacity:16,value:800,carbon:8},
+        panel:{qty:2,capacity:4,value:25000,carbon:120}
+      },
       purchases:[{item:'cell',qty:240,receivedAt:null}]
     };
     openPanels.add('inventory');`);
@@ -154,6 +159,17 @@ test('student workspace exposes nine categories and shows filtered live stock wi
   const workspace = h.run('studentWorkspace(() => true)');
   assert.equal((workspace.match(/<h2[^>]*>Inventory<\/h2>/g) || []).length, 1);
   assert.match(workspace, /Solar panel[\s\S]*Photo cell[\s\S]*240/);
+  assert.match(workspace, /Needed \/ solar panel/);
+  assert.match(workspace, /Solar panel<\/td><td>[^]*?\/ 4<\/span><\/td><td>—<\/td>/);
+  assert.match(workspace, /Photo cell<\/td><td>[^]*?\/ 128<\/span><\/td><td>32<\/td>/);
+  assert.match(workspace, /Recycled frame<\/td><td>[^]*?\/ 12<\/span><\/td><td>1<\/td>/);
+  assert.match(workspace, /Junction box<\/td><td>[^]*?\/ 16<\/span><\/td><td>2<\/td>/);
+  h.run('delete state.recipe');
+  const legacy = h.run('studentWorkspace(() => true)');
+  assert.match(legacy, /Needed \/ solar module/);
+  assert.match(legacy, /PV cell<\/td><td>[^]*?\/ 128<\/span><\/td><td>24<\/td>/);
+  assert.match(legacy, /Controller<\/td><td>[^]*?\/ 16<\/span><\/td><td>1<\/td>/);
+  h.run('state.recipe = {cell:32,frame:1,controller:2}');
   h.run("inventoryCategories.delete('component')");
   assert.doesNotMatch(h.run('studentWorkspace(() => true)'), /Photo cell/);
   assert.doesNotMatch(h.run("studentWorkspace(key => key !== 'supply')"), /Solar panel/);

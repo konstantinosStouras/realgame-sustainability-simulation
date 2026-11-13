@@ -1,5 +1,5 @@
-import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=6822fffc468a';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=6822fffc468a';
+import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=7beae5b8cfb8';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=7beae5b8cfb8';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -207,7 +207,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=6822fffc468a')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=7beae5b8cfb8')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -261,7 +261,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=6822fffc468a')).testClient();
+      const client = (await import('./src/test-client.mjs?v=7beae5b8cfb8')).testClient();
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -465,6 +465,8 @@ function ordersPage() {
 }
 function inventoryPanel(embedded = false) {
   const c = company();
+  const recipe = productionRecipe(state);
+  const product = itemName(state, 'panel').toLowerCase();
   const category = key => key === 'panel' ? 'finished' : 'component';
   const categories = [['finished', 'Finished'], ['component', 'Components']];
   const filters = embedded ? `<fieldset class="inventory-filters"><legend>Show stock</legend>${categories.map(([id, label]) => check('stock-' + id, label, inventoryCategories.has(id))).join('')}</fieldset>` : '';
@@ -476,12 +478,13 @@ function inventoryPanel(embedded = false) {
       return [
         `<span class="stock-kind ${type}" aria-label="${type === 'finished' ? 'Finished' : 'Component'}">${type === 'finished' ? 'F' : 'C'}</span> ${itemName(state, key)}`,
         `<span class="nowrap"><strong>${number(stock.qty)}</strong> / ${number(stock.capacity)}</span>`,
+        Object.hasOwn(recipe, key) ? number(recipe[key]) : '—',
         stock.qty ? exactMoney(stock.value / stock.qty) : '—',
         ordered ? number(ordered) : '—',
         stock.qty ? precise(stock.carbon / stock.qty) : '—'
       ];
     });
-  return panel(embedded ? '' : 'Inventory', '', `${filters}<div class="inventory-table">${table(['Item', 'Amount / capacity', 'Avg cost / unit', 'Ordered', 'kg CO₂e / unit'], rows, 'Select Finished or Components to show stock.')}</div><p class="form-note inventory-note">Ordered quantities become available at receipt. Stock above capacity costs €0.05 per excess unit per day.</p>`);
+  return panel(embedded ? '' : 'Inventory', '', `${filters}<div class="inventory-table">${table(['Item', 'Amount / capacity', `Needed / ${product}`, 'Avg cost / unit', 'Ordered', 'kg CO₂e / unit'], rows, 'Select Finished or Components to show stock.')}</div><p class="form-note inventory-note">Ordered quantities become available at receipt. Stock above capacity costs €0.05 per excess unit per day.</p>`);
 }
 function suppliersPanel(embedded = false) {
   return `${panel(embedded ? '' : 'Supplier marketplace', 'All orders have a landed fixed fee. Supplier stock is shared across companies.', table(['Supplier / item', 'Unit price', 'Order fee', 'Lead / payment', 'Delivery accuracy', 'Component / freight CO₂e', 'Available / lot', ''], state.catalog.suppliers.filter(s => s.enabled).map(s => [`<strong>${esc(s.name)}</strong><small>${itemName(state, s.item)}</small>`, exactMoney(s.price), exactMoney(s.fee), `${s.lead} h / ${s.term} h<small>Payment after receipt</small>`, `${s.reliability}% on time<small>Up to ${s.maxDelay} h extra</small>`, `${precise(s.carbon)} / ${precise(s.freight)} kg per unit<small>${precise(s.carbon + s.freight)} kg total per unit</small>`, `${number(s.stock)}<small>Minimum ${s.min} · lot ${s.lot}</small>`, button('purchase', 'Order', s.id, 'small', !permitted('purchasing'))])))}`;
@@ -646,7 +649,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=6822fffc468a')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=7beae5b8cfb8')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -781,7 +784,7 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=6822fffc468a')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    try { const client = (await import('./src/test-client.mjs?v=7beae5b8cfb8')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p>' + button('test-leave','Return to classroom') + '</main>'; }
     return;
   }
