@@ -10,17 +10,18 @@ import { MemoryFirestore } from './helpers/memory-firestore.mjs';
 const source = readFileSync(new URL('../app.mjs', import.meta.url), 'utf8').replace(/^import .*;\r?\n/gm, '').split('\nawait startWorkspace();')[0];
 const storage = () => { const values = new Map(); return { values, getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, String(value)), removeItem: key => values.delete(key) }; };
 function client({ state, actor, saved = storage(), backend = 'https://classroom.invalid' }) {
-  const root = {}, dialog = { open: false }, notices = {}, handlers = {};
+  const pendingNotice = { isConnected: false, remove() { this.isConnected = false; } };
+  const root = { querySelector: () => ({ insertAdjacentHTML: (_, html) => { if (html.includes('id="pending-decision"')) pendingNotice.isConnected = true; } }) }, dialog = { open: false }, notices = {}, handlers = {};
   const document = { activeElement: { closest: () => null }, addEventListener: (event, handler) => { handlers[event] = handler; },
-    querySelector: key => ({ '#app': root, '#dialog': dialog, '#toast': notices })[key] || null };
+    querySelector: key => ({ '#app': root, '#dialog': dialog, '#toast': notices, '#pending-decision': pendingNotice.isConnected ? pendingNotice : null })[key] || null };
   const context = vm.createContext({ ...engine, document, sessionStorage: saved, localStorage: storage(), URL, AbortSignal,
     crypto: { randomUUID }, setTimeout: () => 1, clearTimeout() {}, firebaseConfig: {}, classroomBackend: backend,
     location: { hostname: 'classroom.invalid', href: backend + '/?session=' + state.id }, currentState: state, currentActor: actor });
   vm.runInContext(source, context);
   const run = code => vm.runInContext(code, context);
-  run('state = currentState; actor = currentActor; user = actor; sessionId = state.id; render = () => {}; ensureSessionUpdates = () => {};');
+  run('state = currentState; actor = currentActor; user = actor; sessionId = state.id; globalThis.actualRender = render; render = () => {}; ensureSessionUpdates = () => {};');
   const connect = api => { context.testApi = api; run('api = testApi;'); };
-  return { run, context, connect, saved, notices, document, handlers };
+  return { run, context, connect, saved, notices, document, handlers, dialog, pendingNotice };
 }
 async function classroom() {
   const store = new FirestoreStore(new MemoryFirestore());
@@ -146,6 +147,27 @@ test('first-attempt authentication, permission and not-found rejections do not s
     a.connect(f.api(f.student));
     await a.run("command({type:'budget', research:100, marketing:200})");
     assert.equal((await f.view(f.student)).state.company.research, 100);
+    assert.equal((await f.view(f.student)).state.company.deposits.length, 0);
+  }
+});
+
+test('stale pending retry clears its rendered notice when reload already fetched the same current revision', async () => {
+  for (const editing of [false, true]) {
+    const f = await classroom(), original = client(await f.view(f.student));
+    original.connect(async () => { throw new Error('Offline before send'); });
+    await assert.rejects(original.run(`command(${JSON.stringify(deposit)})`));
+    await f.store.command(f.peer, f.state.id, { key: randomUUID(), revision: 0, command: { type: 'budget', research: 100, marketing: 200 } });
+    const reloaded = client({ ...await f.view(f.student), saved: original.saved });
+    reloaded.connect(f.api(f.student)); reloaded.run('actualRender(); globalThis.renders = 0; render = () => { renders++; };');
+    assert.equal(reloaded.pendingNotice.isConnected, true);
+    const draft = { value: 'Still editing' }, focused = { closest: () => editing ? draft : null };
+    reloaded.document.activeElement = focused; reloaded.dialog.open = editing;
+    await assert.rejects(reloaded.run("action('retry-decision', '')"), error => error.status === 409);
+    assert.equal(reloaded.run('state.revision'), 1);
+    assert.equal(pendingKeys(original.saved).length, 0);
+    assert.equal(reloaded.pendingNotice.isConnected, false, 'resolved notice disappears without requiring another revision');
+    assert.equal(reloaded.run('renders'), 0, 'notice cleanup does not replace the current workspace');
+    assert.equal(reloaded.document.activeElement, focused); assert.equal(draft.value, 'Still editing'); assert.equal(reloaded.dialog.open, editing);
     assert.equal((await f.view(f.student)).state.company.deposits.length, 0);
   }
 });
