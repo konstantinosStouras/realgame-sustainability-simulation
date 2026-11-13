@@ -218,25 +218,42 @@ export class FirestoreStore {
     if (command?.type === 'assignment') fail('Use the instructor assignment endpoint to change membership.', 403);
     if (typeof key !== 'string' || key.length < 8 || key.length > 100) fail('A unique request key is required.');
     const requestRef = this.requests.doc(digest(JSON.stringify([user.id, key]))), payload = digest(JSON.stringify({ id, command }));
-    const outcome = await this.db.runTransaction(async tx => {
+    const execute = () => this.db.runTransaction(async tx => {
       const actor = await this.actor(tx, user, id), previous = await tx.get(requestRef);
       if (previous.exists) { if (previous.data().payload !== payload) fail('Request key already used for a different decision.', 409); return { response: previous.data().response }; }
       const ref = this.sessionRef(id), doc = await tx.get(ref);
       if (!doc.exists || doc.data().status === 'deleted') fail('Session not found.', 404);
       const metadata = doc.data();
       const state = await this.readState(tx, ref, metadata);
+      const plainPause = actor.role === 'instructor' && command?.type === 'clock' && command.status === 'paused'
+        && !Array.isArray(command) && Object.keys(command).length === 2 && Object.hasOwn(command, 'type') && Object.hasOwn(command, 'status')
+        && Number.isSafeInteger(revision) && revision >= 0 && revision <= metadata.revision;
+      const previousHour = state.hour;
       const clockNow = this.now(), clock = advanceCloudClock(state, metadata.nextTickAt, clockNow);
-      // A reviewed instructor pause may stop after catch-up in the same commit.
-      // Requiring another round trip could make a one-second clock unpausable.
-      const pauseAfterCatchup = actor.role === 'instructor' && ((command?.type === 'clock' && command.status === 'paused') || ['closeSession', 'deleteSession'].includes(command?.type)) && revision === metadata.revision && state.status === 'running' && clock.nextTickAt > clockNow;
+      // A plain instructor stop has no economic options to review. Other
+      // readers' ticks must not make a one-second clock impossible to pause.
+      // Lifecycle changes still require the exact reviewed metadata revision.
+      const pauseAfterCatchup = (plainPause && (state.status !== 'running' || clock.nextTickAt > clockNow))
+        || (actor.role === 'instructor' && ['closeSession', 'deleteSession'].includes(command?.type) && revision === metadata.revision && state.status === 'running' && clock.nextTickAt > clockNow);
       if (clock.records.length && !pauseAfterCatchup) {
         this.writeState(tx, ref, state, metadata, clock.nextTickAt);
         for (const record of clock.records) this.log(tx, ref, record.actor, record.command, record.realAt, record.revision);
         // Commit elapsed time before reporting a stale decision; throwing here
         // would roll back the ticks and allow a pause to discard elapsed time.
-        return { clockAdvanced: true };
+        return { clockAdvanced: true, retryPause: plainPause, advancedHours: state.hour - previousHour, remainingHours: state.endHour - state.hour };
       }
       if (revision !== state.revision && !pauseAfterCatchup) fail('The session changed. Refreshed state is available; review and submit again.', 409);
+      if (plainPause && ['paused', 'completed'].includes(state.status)) {
+        // Completion may occur during catch-up. A stop must never reopen it,
+        // and an already stopped clock needs no extra simulation revision.
+        if (clock.records.length) {
+          this.writeState(tx, ref, state, metadata, clock.nextTickAt);
+          for (const record of clock.records) this.log(tx, ref, record.actor, record.command, record.realAt, record.revision);
+        }
+        const response = { message: state.status === 'completed' ? 'Session already completed.' : 'Clock already paused.', revision: state.revision };
+        tx.create(requestRef, { userId: user.id, sessionId: id, payload, response, createdAt: this.now() });
+        return { response };
+      }
       const realAt = new Date(this.now()).toISOString();
       const previousSpeed = state.secondsPerHour;
       const message = applyCommand(state, actor, command, realAt); assertInvariants(state);
@@ -249,8 +266,19 @@ export class FirestoreStore {
       tx.create(requestRef, { userId: user.id, sessionId: id, payload, response, createdAt: this.now() });
       return { response };
     });
-    if (outcome.clockAdvanced) fail('The shared clock advanced. Refreshed state is available; review and submit again.', 409);
-    return outcome.response;
+    let remainingPauseBatches;
+    for (;;) {
+      const outcome = await execute();
+      // Keep each transaction bounded, reauthorize every batch, and account for
+      // all elapsed hours before stopping. Only the option-free stop retries.
+      if (outcome.retryPause) {
+        remainingPauseBatches ??= Math.ceil(outcome.remainingHours / 24);
+        if (outcome.advancedHours <= 0 || remainingPauseBatches-- <= 0) fail('The shared clock is still catching up. Retry the pause.', 409);
+        continue;
+      }
+      if (outcome.clockAdvanced) fail('The shared clock advanced. Refreshed state is available; review and submit again.', 409);
+      return outcome.response;
+    }
   }
   async assign(user, id, userId, companyId) {
     if (user.role !== 'instructor') fail('Instructor access required.', 403);

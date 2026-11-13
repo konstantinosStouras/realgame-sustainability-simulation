@@ -36,15 +36,15 @@ test('a reviewed instructor pause commits elapsed ticks and stops atomically wit
   assert.equal(replay.commands.filter(r => r.command.type === 'clock').length, 2);
 });
 
-test('an already stale pause commits due time but cannot bypass reviewed revision checks', async () => {
+test('an already stale plain pause commits due time and stops without reviewing clock-only changes', async () => {
   const f = fixture(), id = await start(f.store);
   f.now(20000);
-  await assert.rejects(f.store.command(teacher, id, { key: 'stale-pause-key', revision: 0, command: { type: 'clock', status: 'paused' } }), error => error.status === 409);
+  await f.store.command(teacher, id, { key: 'stale-pause-key', revision: 0, command: { type: 'clock', status: 'paused' } });
   const current = await f.store.view(teacher, id);
   assert.equal(current.state.hour, 5);
-  assert.equal(current.state.revision, 6);
-  assert.equal(current.state.status, 'running');
-  assert.equal((await f.store.requests.get()).docs.length, 1);
+  assert.equal(current.state.revision, 7);
+  assert.equal(current.state.status, 'paused');
+  assert.equal((await f.store.requests.get()).docs.length, 2);
 });
 
 test('the fastest clock can be paused after a multi-second request without retry starvation', async () => {
@@ -67,12 +67,7 @@ test('a pause cannot discard overdue hours beyond the bounded catch-up batch', a
   await f.store.command(teacher, session.id, { key: 'start-backlog-clock', revision: 0, command: { type: 'clock', status: 'running', secondsPerHour: 1 } });
   f.now(60000);
   const request = { key: 'pause-backlog-clock', revision: 1, command: { type: 'clock', status: 'paused' } };
-  await assert.rejects(f.store.command(teacher, session.id, request), error => error.status === 409);
-  const interim = await f.store.sessionRef(session.id).get();
-  assert.equal(interim.data().hour, 24);
-  assert.equal(interim.data().status, 'running');
-  const reviewed = await f.store.view(teacher, session.id); // catches up the next 24 hours
-  const receipt = await f.store.command(teacher, session.id, { ...request, revision: reviewed.state.revision });
+  const receipt = await f.store.command(teacher, session.id, request);
   const final = await f.store.view(teacher, session.id);
   assert.equal(final.state.hour, 60);
   assert.equal(final.state.status, 'paused');

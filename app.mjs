@@ -1,6 +1,6 @@
-import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=141ab44de424';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=141ab44de424';
-import { watchSession } from './src/session-updates.mjs?v=141ab44de424';
+import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=1d4ffbd8ac92';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=1d4ffbd8ac92';
+import { watchSession } from './src/session-updates.mjs?v=1d4ffbd8ac92';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -83,8 +83,8 @@ const field = (name, label, value, type = 'number', extra = '') => `<label>${esc
 const check = (name, label, on, disabled = false) => `<label class="check"><input name="${esc(name)}" type="checkbox" ${on ? 'checked' : ''} ${disabled ? 'disabled' : ''}>${esc(label)}</label>`;
 const select = (name, label, options, value) => `<label>${esc(label)}<select name="${esc(name)}">${options.map(([id, text]) => `<option value="${esc(id)}" ${id === value ? 'selected' : ''}>${esc(text)}</option>`).join('')}</select></label>`;
 const button = (action, text, id = '', cls = '', disabled = false) => `<button class="${cls}" data-action="${action}" data-id="${esc(id)}" ${disabled ? 'disabled' : ''}>${text}</button>`;
-const table = (headers, rows, empty = 'Nothing here yet.') => rows.length ? `<div class="table-wrap"><table><thead><tr>${headers.map(h => `<th scope="col">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : `<p class="empty">${empty}</p>`;
-const panel = (title, subtitle, body, action = '') => `<section class="panel">${title || subtitle || action ? `<div class="panel-head"><div>${title ? `<h2>${title}</h2>` : ''}${subtitle ? `<p>${subtitle}</p>` : ''}</div>${action}</div>` : ''}${body}</section>`;
+const table = (headers, rows, empty = 'Nothing here yet.') => rows.length ? `<div class="table-wrap" data-view-key="${esc('table:' + JSON.stringify(headers))}"><table><thead><tr>${headers.map(h => `<th scope="col">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : `<p class="empty">${empty}</p>`;
+const panel = (title, subtitle, body, action = '') => `<section class="panel" data-view-key="${esc('panel:' + title)}">${title || subtitle || action ? `<div class="panel-head"><div>${title ? `<h2>${title}</h2>` : ''}${subtitle ? `<p>${subtitle}</p>` : ''}</div>${action}</div>` : ''}${body}</section>`;
 const metric = (label, value, hint, name) => `<article class="metric"><div class="metric-label">${label}${icon(name)}</div><div class="metric-value">${value}</div><small>${hint}</small></article>`;
 const permitted = feature => !isTeacher() && state.status !== 'completed' && state.features[feature]?.allowed;
 function toast(message) { const el = document.querySelector('#toast'); el.textContent = message; clearTimeout(toast.timeout); toast.timeout = setTimeout(() => { el.textContent = ''; }, 9000); }
@@ -121,6 +121,7 @@ async function connectBackend(input) {
 async function load(force = true, afterCommand = false) {
   if (solo) { ({ state, actor } = solo.view(preview)); if (force) render(); return; }
   if (!sessionId) return;
+  if (!force && !afterCommand && busy) { refreshDeferred = true; return; }
   const loadingSession = sessionId, loadingPreview = preview, sequence = ++loadSequence;
   pendingLoads++;
   try {
@@ -128,7 +129,7 @@ async function load(force = true, afterCommand = false) {
     if (sessionId !== loadingSession || preview !== loadingPreview || sequence !== loadSequence || solo) return;
     const changed = !state || data.state.revision !== state.revision || !online;
     // Keep the version that the student actually reviewed while editing a decision.
-    if (!force && !afterCommand && (submittingForms.size || dialog.open || document.activeElement?.closest('form'))) { refreshDeferred = changed; online = true; return; }
+    if (!force && !afterCommand && (busy || submittingForms.size || dialog.open || document.activeElement?.closest('form'))) { refreshDeferred = changed; online = true; return; }
     state = data.state; actor = data.actor; testAccessClosed = false; refreshDeferred = false; online = true; ensureSessionUpdates();
     if ((force || changed) && !dialog.open && (force || (!submittingForms.size && !document.activeElement?.closest('form')))) render();
   } catch (e) {
@@ -141,7 +142,7 @@ async function load(force = true, afterCommand = false) {
 async function command(cmd) {
   if (busy) throw new Error('Another decision is still being submitted. Please wait and try again.'); busy = true;
   const storageKey = `studio-pending:${backend}:${actor.id}:${sessionId}`;
-  let request;
+  let request, interrupted = false;
   try {
     if (testRoom) {
       if (testPending && JSON.stringify(testPending.command) !== JSON.stringify(cmd)) throw new Error('Retry the previous test decision before submitting another.');
@@ -161,9 +162,9 @@ async function command(cmd) {
   } catch (e) {
     if (e.status >= 400 && e.status < 500 && ![408, 429].includes(e.status)) sessionStorage.removeItem(storageKey);
     if (e.status === 409) await load(false, true);
-    if (request && sessionStorage.getItem(storageKey) && !dialog.open && !submittingForms.size) render();
+    interrupted = request && sessionStorage.getItem(storageKey) && !dialog.open && !submittingForms.size;
     throw e;
-  } finally { busy = false; }
+  } finally { busy = false; if (interrupted) render(); }
 }
 async function signIn(result) {
   token = result.token; user = result.user; sessionStorage.setItem('studio-token', token); await enter();
@@ -268,7 +269,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=141ab44de424')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=1d4ffbd8ac92')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -339,7 +340,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=141ab44de424')).testClient();
+      const client = (await import('./src/test-client.mjs?v=1d4ffbd8ac92')).testClient();
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -353,7 +354,7 @@ function accountControls(person = user || actor) {
   const actions = testRoom
     ? (person.role === 'instructor' ? button('test-students', 'Test students') : '')
     : `${button('profile', 'My profile & statistics')}${button('sessions', 'My sessions')}${person.role === 'instructor' ? button('create', 'Create a session', '', '', !!solo) : button('join', 'Join a company', '', '', !!solo)}${person.role === 'instructor' && state ? button('nav', 'Session settings', 'admin') + button('roster', 'Student directory', '', '', !!solo) : ''}`;
-  return `<div class="account-controls"><span data-theme-slot></span><details class="account-menu"><summary aria-label="Account options for ${esc(name)}"><span class="avatar" aria-hidden="true">${esc(initials)}</span><span class="account-name">${esc(name)}</span><svg class="account-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></summary><div class="account-dropdown"><div class="account-heading"><strong>${esc(name)}</strong><small>${testRoom ? 'Practice · ' : ''}${role}</small></div><div class="account-links">${actions}</div><div class="account-footer">${testRoom ? button('test-leave', 'Leave test', '', 'danger') : button('logout', 'Log out', '', 'danger')}</div></div></details></div>`;
+  return `<div class="account-controls"><span data-theme-slot></span><details class="account-menu" data-view-key="account-menu"><summary aria-label="Account options for ${esc(name)}"><span class="avatar" aria-hidden="true">${esc(initials)}</span><span class="account-name">${esc(name)}</span><svg class="account-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></summary><div class="account-dropdown"><div class="account-heading"><strong>${esc(name)}</strong><small>${testRoom ? 'Practice · ' : ''}${role}</small></div><div class="account-links">${actions}</div><div class="account-footer">${testRoom ? button('test-leave', 'Leave test', '', 'danger') : button('logout', 'Log out', '', 'danger')}</div></div></details></div>`;
 }
 const sessionCities = ["athens", "berlin", "cairo", "dubai", "lima", "lisbon", "london", "madrid", "miami", "oslo", "paris", "rome", "seoul", "sydney", "tokyo"];
 const optionalCostField = (name, label, min, placeholder) => `<label>${esc(label)}<input name="${name}" type="number" min="${min}" max="10000" step="0.01" placeholder="${placeholder}"></label>`;
@@ -474,7 +475,7 @@ function workspaceNavigation(admin, visible) {
     return href ? `<a href="${href}" target="_blank" rel="noopener" ${accessibility}>${body}</a>` :
       `<button type="button" data-action="workspace-tool" data-id="${id}" ${accessibility}${current ? ' aria-current="page"' : ''}${active ? ' class="active"' : ''}${unavailable ? ' aria-disabled="true"' : ''}${destinations.length > 1 || id === 'help' ? ' aria-haspopup="dialog"' : ''}>${body}</button>`;
   });
-  return `<header class="workspace-nav"><button type="button" class="mobile-menu-toggle" data-action="toggle-mobile-menu" aria-expanded="false" aria-controls="workspace-sections"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg><span>Menu</span></button><nav id="workspace-sections" class="workspace-tools" aria-label="Workspace">${buttons.join('')}</nav></header>`;
+  return `<header class="workspace-nav" data-view-key="workspace-nav"><button type="button" class="mobile-menu-toggle" data-action="toggle-mobile-menu" aria-expanded="false" aria-controls="workspace-sections"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg><span>Menu</span></button><nav id="workspace-sections" class="workspace-tools" aria-label="Workspace">${buttons.join('')}</nav></header>`;
 }
 
 function studentPanelVisible(id, visible) {
@@ -487,12 +488,68 @@ function workspaceFeatureVisible(key) {
 function studentWorkspace(visible) {
   const panels = [...openPanels].filter(id => studentPanelVisible(id, visible));
   if (!panels.length) return '<p class="empty">Choose a tool from the left menu to open its panel here.</p>';
-  return '<div class="student-panels">' + panels.map(id => {
+  return '<div class="student-panels" data-view-key="student-panels">' + panels.map(id => {
     const [label, , renderPanel] = studentPanels[id];
-    return '<section class="student-pane" aria-labelledby="pane-' + id + '"><div class="pane-title"><h2 id="pane-' + id + '" tabindex="-1">' + label + '</h2>' +
+    return '<section class="student-pane" data-view-key="pane-' + id + '" aria-labelledby="pane-' + id + '"><div class="pane-title"><h2 id="pane-' + id + '" tabindex="-1">' + label + '</h2>' +
       '<button type="button" data-action="close-panel" data-id="' + id + '" aria-label="Close ' + label + '">×</button>' +
-      '</div><div class="pane-content">' + renderPanel() + '</div></section>';
+      '</div><div class="pane-content" data-view-key="pane-content">' + renderPanel() + '</div></section>';
   }).join('') + '</div>';
+}
+// Preserve only ephemeral reading position, never simulation/authentication data
+// or form values. Identity comes from explicit keys, not changing row indexes.
+let renderedInteractionScope = null, renderedInteractionRoot = null;
+function interactionScope() {
+  return JSON.stringify([backend, sessionId, !!solo, !!testRoom, actor?.id, actor?.role,
+    actor?.companyId, preview, company()?.id, page, channel, report, reportRange,
+    [...selectedCompanies].sort(), [...openPanels].sort()]);
+}
+function interactionNodes() {
+  const nodes = new Map();
+  for (const element of root.querySelectorAll('[data-view-key], [id], [name], [data-action], summary')) {
+    const parts = [];
+    for (let node = element; node && node !== root; node = node.parentElement) {
+      const key = node.getAttribute('data-view-key'), id = node.getAttribute('id');
+      if (key !== null) parts.push(['key', key]);
+      else if (id) parts.push(['id', id]);
+      else if (node === element) {
+        const action = node.getAttribute('data-action'), name = node.getAttribute('name');
+        if (action) parts.push(['action', action, node.getAttribute('data-id') || '']);
+        else if (name) parts.push(['control', node.tagName, name]);
+        else if (node.tagName === 'SUMMARY' && node.parentElement?.hasAttribute('data-view-key')) parts.push(['summary']);
+        else break;
+      }
+    }
+    if (!parts.length) continue;
+    const key = JSON.stringify(parts);
+    // An ambiguous control is safer to leave unfocused than to target a peer.
+    nodes.set(key, nodes.has(key) ? null : element);
+  }
+  return nodes;
+}
+function captureInteraction(scope) {
+  if (!root.querySelectorAll || scope !== renderedInteractionScope || root.firstElementChild !== renderedInteractionRoot) return null;
+  const snapshot = { scope, details: [], scroll: [], focus: null, documentScroll: null };
+  for (const [key, element] of interactionNodes()) {
+    if (!element) continue;
+    if (element.tagName === 'DETAILS') snapshot.details.push([key, element.open]);
+    if (element.scrollLeft || element.scrollTop) snapshot.scroll.push([key, element.scrollLeft, element.scrollTop]);
+    // A successful inline submission replaces its form. Refocusing the new
+    // form would make the draft guard defer subsequent live updates forever.
+    if (element === document.activeElement && !element.closest('form')) snapshot.focus = key;
+  }
+  if (document.scrollingElement) snapshot.documentScroll = [document.scrollingElement.scrollLeft, document.scrollingElement.scrollTop];
+  return snapshot;
+}
+function restoreInteraction(snapshot, scope) {
+  if (!snapshot || snapshot.scope !== scope) return;
+  const nodes = interactionNodes();
+  for (const [key, open] of snapshot.details) { const element = nodes.get(key); if (element?.tagName === 'DETAILS') element.open = open; }
+  const focus = nodes.get(snapshot.focus);
+  if (focus && !focus.disabled && !focus.closest('form')) focus.focus?.({ preventScroll: true });
+  for (const [key, left, top] of snapshot.scroll) { const element = nodes.get(key); if (element) { element.scrollLeft = left; element.scrollTop = top; } }
+  if (snapshot.documentScroll && document.scrollingElement) {
+    [document.scrollingElement.scrollLeft, document.scrollingElement.scrollTop] = snapshot.documentScroll;
+  }
 }
 function render() {
   if (testRoom && testAccessClosed) return showTestAccessClosed();
@@ -504,12 +561,15 @@ function render() {
   const c = company(), admin = isTeacher();
   const visible = workspaceFeatureVisible;
   if (!visible(page) || (page === 'workspace' && admin)) page = 'overview';
+  const scope = interactionScope(), interaction = captureInteraction(scope);
   const titles = { workspace: 'Decision workspace', overview: c ? `Let's make progress, ${c.name.split(' ')[0]}.` : 'A classroom in motion.', orders: 'From offer to arrival.', supply: 'Keep your business moving.', production: 'Make capacity count.', finance: 'Follow the money.', energy: 'Build a better footprint.', reports: 'See the whole picture.', messages: 'Better decisions, together.', admin: 'Set the pace of learning.' };
   const subtitles = { workspace: 'Open the panels you need and compare them side by side.', overview: 'Your business, at a glance. Every decision has a next step.', orders: 'Accepted terms stay with each order, from first dispatch to final payment.', supply: 'Balance availability, working capital, and the footprint of every component.', production: 'Coordinate materials, people, machines, and the hours they work.', finance: 'Cash is available money. Profit is revenue earned less costs incurred.', energy: 'Invest now. Track activation and the results over time.', reports: 'Comparable daily results, with every reporting boundary clearly marked.', messages: 'A shared space for announcements, questions, and team decisions.', admin: 'Control the shared clock, classroom access, and teaching parameters.' };
   root.innerHTML = `<div class="layout">${!admin || preview ? workspaceNavigation(admin, visible) : ''}<div class="workspace"><header class="topbar"><div class="breadcrumb">Workspace &nbsp; / &nbsp; <strong>${pages[page] || "Decision workspace"}</strong></div><div class="top-actions">${user?.role === 'instructor' ? button('sessions', 'All sessions', '', 'small') : ''}${accountControls(actor)}</div></header>${testRoom ? `<div class="mode-banner"><span><strong>Temporary test round</strong> · ${esc(actor.name)} · Shared only across these browser tabs. No test data is saved.</span>${admin ? button('test-students', 'Open test student tabs') + button('test-end', 'End test round') : ''}${button('test-leave', 'Leave test')}</div>` : solo ? `<div class="mode-banner"><span><strong>Solo sandbox</strong> · ${solo.isTest ? 'Private test round · changes are discarded when you leave.' : 'Saved in this browser. Switch roles to rehearse; no other people are connected.'}</span>${button('switch-solo', admin ? 'Play a company' : 'Instructor view')}</div>` : health?.demo ? '<div class="mode-banner"><span><strong>Local classroom demo</strong> · Synthetic accounts share durable server state. Demo sign-in is enabled on this computer.</span></div>' : ''}<main id="content" class="content"><div class="page-heading"><div><div class="eyebrow">${esc(state.name)}${c ? ` &nbsp; / &nbsp; ${esc(c.name)}` : ''}</div><h1 tabindex="-1">${esc(titles[page])}</h1><p>${subtitles[page]}</p></div><div class="timebox"><span class="badge ${state.status === 'running' ? '' : 'amber'}">● ${esc(state.status)}</span><strong>${simDate(state.hour)} · simulation</strong><small>Day ${Math.floor(state.hour / 24) + 1} · ends ${simDate(state.endHour)}</small></div></div>${state.status === 'completed' ? `<div class="advice warning"><strong>Session complete. ${state.events.filter(e => e.status === 'pending').length} scheduled events remain.</strong>Pending deliveries, payments, and investments are preserved. The instructor can extend the end date to settle them.</div>` : ''}${admin ? `<div class="toolbar instructor-toolbar" aria-label="Instructor controls">${select('preview', 'Company preview · read-only', [['', 'All companies'], ...state.companies.map(x => [x.id, x.name])], preview || '')}<nav class="instructor-links" aria-label="Instructor pages">${button('nav', 'Session control', 'admin', 'small')}${button('nav', 'Class overview', 'overview', 'small')}${button('nav', 'Reports', 'reports', 'small')}${button('nav', 'Announcements', 'messages', 'small')}</nav></div>` : ''}${!admin && !solo && !testRoom ? `<div class="toolbar" aria-label="Classroom access">${button('join', 'Join another class', '', 'small')}${button('sessions', 'Switch session', '', 'small')}</div>` : ''}${page === "workspace" ? studentWorkspace(visible) : pageBody()}<div class="footer-note"><a href="notes/model.md" target="_blank" rel="noopener">Model & teaching guide ↗</a><br>All amounts are simulated EUR · Emissions in kg CO₂e · Simulation dates use UTC · Live state at ${simDate(state.hour)} · Model v${state.schema}</div></main></div></div>`;
   rememberWorkspaceView();
   const pending = !solo && !testRoom && sessionStorage.getItem(`studio-pending:${backend}:${actor.id}:${sessionId}`);
-  if (pending) root.querySelector('#content').insertAdjacentHTML('afterbegin', `<div class="advice warning"><strong>A decision is awaiting confirmation.</strong>The response was interrupted. Retry with the same request key to confirm the outcome safely. ${button('retry-decision', 'Retry pending decision', '', 'small')}</div>`);
+  if (pending && !busy) root.querySelector('#content').insertAdjacentHTML('afterbegin', `<div class="advice warning"><strong>A decision is awaiting confirmation.</strong>The response was interrupted. Retry with the same request key to confirm the outcome safely. ${button('retry-decision', 'Retry pending decision', '', 'small')}</div>`);
+  restoreInteraction(interaction, scope);
+  renderedInteractionScope = scope; renderedInteractionRoot = root.firstElementChild;
 }
 function pageBody() {
   if (page === 'admin') return adminPage();
@@ -532,7 +592,7 @@ function chart(metricName, unit, { selected = false, range = 30 } = {}) {
   let min = Math.min(0, ...raw) / scale, max = Math.max(1, ...raw) / scale; if (max === min) max++;
   const x = i => 62 + i * 520 / Math.max(1, snaps.length - 1), y = val => 204 - (val / scale - min) / (max - min) * 174;
   const grid = Array.from({ length: 5 }, (_, i) => { const val = min + (max - min) * i / 4, at = 204 - i * 43.5; return `<line class="gridline" x1="62" x2="590" y1="${at}" y2="${at}"/><text text-anchor="end" x="52" y="${at + 4}">${Math.abs(val) >= 1000 ? `${(val / 1000).toFixed(1)}k` : number(val)}</text>`; }).join('');
-  return `<div class="chart-scroll" role="region" aria-label="Time series chart"><svg class="chart" viewBox="-20 -6 660 252" role="group" aria-label="${esc(metricName)} in ${unit}, daily snapshots. Hover, tap, or focus a point for its value. Exact values are available in Reports data tables."><text x="10" y="13">${unit}</text>${grid}${series.map(serie => `<polyline class="chart-line color-${serie.color}" points="${serie.values.map((v, i) => `${x(i)},${y(v)}`).join(' ')}"/>${serie.values.map((v, i) => `<circle class="chart-point c${serie.color}" tabindex="0" role="img" aria-label="${esc(serie.name)} · ${simDate(snaps[i].hour)} · ${unit === 'EUR' ? exactMoney(v) : number(v / scale) + ' ' + esc(unit)}" r="3" cx="${x(i)}" cy="${y(v)}"></circle>`).join('')}`).join('')}${[...new Set([0, Math.floor((snaps.length - 1) / 2), snaps.length - 1])].map(i => `<text text-anchor="middle" x="${x(i)}" y="230">${simDate(snaps[i].hour).split(',')[0]}</text>`).join('')}</svg><div class="chart-tooltip" role="status" hidden></div></div><div class="chart-legend">${series.map(c => `<span><i class="legend-dot c${c.color}"></i>${esc(c.name)}</span>`).join('')}</div>`;
+  return `<div class="chart-scroll" data-view-key="${esc('chart:' + metricName)}" role="region" aria-label="Time series chart"><svg class="chart" viewBox="-20 -6 660 252" role="group" aria-label="${esc(metricName)} in ${unit}, daily snapshots. Hover, tap, or focus a point for its value. Exact values are available in Reports data tables."><text x="10" y="13">${unit}</text>${grid}${series.map(serie => `<polyline class="chart-line color-${serie.color}" points="${serie.values.map((v, i) => `${x(i)},${y(v)}`).join(' ')}"/>${serie.values.map((v, i) => `<circle class="chart-point c${serie.color}" data-view-key="${esc('point:' + serie.id + ':' + snaps[i].hour)}" tabindex="0" role="img" aria-label="${esc(serie.name)} · ${simDate(snaps[i].hour)} · ${unit === 'EUR' ? exactMoney(v) : number(v / scale) + ' ' + esc(unit)}" r="3" cx="${x(i)}" cy="${y(v)}"></circle>`).join('')}`).join('')}${[...new Set([0, Math.floor((snaps.length - 1) / 2), snaps.length - 1])].map(i => `<text text-anchor="middle" x="${x(i)}" y="230">${simDate(snaps[i].hour).split(',')[0]}</text>`).join('')}</svg><div class="chart-tooltip" role="status" hidden></div></div><div class="chart-legend">${series.map(c => `<span><i class="legend-dot c${c.color}"></i>${esc(c.name)}</span>`).join('')}</div>`;
 }
 
 function hideChartTooltip(chart) {
@@ -702,7 +762,7 @@ function inventoryStatementLines(company) {
 }
 function financePage() {
   const c = company(), a = c.accounts;
-  return `<div class="metrics">${metric('Available cash', money(a.cash), 'Live bank balance', 'finance')}${metric('Cumulative profit', money(c.profit), 'Includes depreciation & accrued costs', 'reports')}${metric('Receivables', money(a.receivable), 'Recognized revenue awaiting payment', 'orders')}${metric('Debt & payables', money(-(a.debt || 0) - (a.payable || 0) - (a.interestPayable || 0) - (a.overheadPayable || 0)), 'Includes outstanding obligations', 'finance')}</div><div class="grid2">${panel('Finance your next decision', 'Compare funding dates and repayment schedules.', `<p class="form-note">Bullet loans: 9% simple annual interest. Annuity loans: 8% annual interest with weekly payments. Deposits: 4% simple annual interest. This is a teaching model, not a bank product.</p><div class="toolbar">${button('loan', 'Request bullet loan', '', 'primary', !permitted('finance'))}${button('annuity', 'Request annuity loan', '', '', !permitted('finance'))}${button('deposit', 'Place deposit', '', '', !permitted('finance'))}</div><div class="value-list"><div><span>Inventory at cost</span><strong>${money(a.inventory)}</strong></div><div><span>Purchased goods in transit</span><strong>${money(a.inbound)}</strong></div><div><span>Inventory value in transit</span><strong>${money(a.transit)}</strong></div><div><span>Locked term deposits</span><strong>${money(a.deposits)}</strong></div></div>`)}${panel('Income statement', `Cumulative · live through ${simDate(state.hour)}`, `<div class="value-list"><div><span>Revenue earned at ${state.accounting?.revenueAt === 'dispatch' ? 'dispatch' : 'customer receipt'}</span><strong>${money(-a.revenue)}</strong></div>${inventoryStatementLines(c)}<div><span>Operating costs & depreciation</span><strong>${money(a.expense)}</strong></div>${expenseBreakdown(c.ledger)}<div><span>Interest income</span><strong>${money(-a.interestIncome)}</strong></div><div><span>Profit / loss</span><strong>${money(c.profit)}</strong></div></div>`)}</div>${panel('Scheduled cash movements', 'Committed events only. Excludes future trading, recurring costs, and payments not yet scheduled by receipt.', table(['Simulation time', 'Event', 'Cash movement', 'Status'], c.forecast.map(f => [simDate(f.hour), esc(f.description), exactMoney(f.amount), f.blocked ? esc(f.blocked) : 'Scheduled'])))}${panel('Finance contracts', 'Outstanding loans and locked deposits remain visible at the session end.', table(['Contract', 'Principal', 'Interest at maturity', 'Funding / placement', 'Completion'], [...c.loans.map(l => [esc(l.id), money(l.amount), exactMoney(l.interest), l.fundedAt === null ? 'Pending funding' : simDate(l.fundedAt), l.paidAt === null ? 'Repayment pending' : simDate(l.paidAt)]), ...c.deposits.map(d => [esc(d.id), money(d.amount), exactMoney(d.interest), simDate(d.placedAt), d.maturedAt === null ? `Due ${simDate(d.placedAt + d.term)}` : simDate(d.maturedAt)])]))}${panel('Transaction journal', 'Double-entry ledger · debits positive, credits negative · all values EUR', `<details><summary>Show latest 100 entries (${c.ledger.length} total)</summary>${table(['Time', 'Description', 'Postings'], c.ledger.slice(-100).reverse().map(l => [simDate(l.hour), esc(l.description), Object.entries(l.lines).map(([k, v]) => `${esc(k)}: ${exactMoney(v)}`).join('<br>')]))}</details>`, button('ledger-csv', 'Export ledger', '', 'small'))}`;
+  return `<div class="metrics">${metric('Available cash', money(a.cash), 'Live bank balance', 'finance')}${metric('Cumulative profit', money(c.profit), 'Includes depreciation & accrued costs', 'reports')}${metric('Receivables', money(a.receivable), 'Recognized revenue awaiting payment', 'orders')}${metric('Debt & payables', money(-(a.debt || 0) - (a.payable || 0) - (a.interestPayable || 0) - (a.overheadPayable || 0)), 'Includes outstanding obligations', 'finance')}</div><div class="grid2">${panel('Finance your next decision', 'Compare funding dates and repayment schedules.', `<p class="form-note">Bullet loans: 9% simple annual interest. Annuity loans: 8% annual interest with weekly payments. Deposits: 4% simple annual interest. This is a teaching model, not a bank product.</p><div class="toolbar">${button('loan', 'Request bullet loan', '', 'primary', !permitted('finance'))}${button('annuity', 'Request annuity loan', '', '', !permitted('finance'))}${button('deposit', 'Place deposit', '', '', !permitted('finance'))}</div><div class="value-list"><div><span>Inventory at cost</span><strong>${money(a.inventory)}</strong></div><div><span>Purchased goods in transit</span><strong>${money(a.inbound)}</strong></div><div><span>Inventory value in transit</span><strong>${money(a.transit)}</strong></div><div><span>Locked term deposits</span><strong>${money(a.deposits)}</strong></div></div>`)}${panel('Income statement', `Cumulative · live through ${simDate(state.hour)}`, `<div class="value-list"><div><span>Revenue earned at ${state.accounting?.revenueAt === 'dispatch' ? 'dispatch' : 'customer receipt'}</span><strong>${money(-a.revenue)}</strong></div>${inventoryStatementLines(c)}<div><span>Operating costs & depreciation</span><strong>${money(a.expense)}</strong></div>${expenseBreakdown(c.ledger)}<div><span>Interest income</span><strong>${money(-a.interestIncome)}</strong></div><div><span>Profit / loss</span><strong>${money(c.profit)}</strong></div></div>`)}</div>${panel('Scheduled cash movements', 'Committed events only. Excludes future trading, recurring costs, and payments not yet scheduled by receipt.', table(['Simulation time', 'Event', 'Cash movement', 'Status'], c.forecast.map(f => [simDate(f.hour), esc(f.description), exactMoney(f.amount), f.blocked ? esc(f.blocked) : 'Scheduled'])))}${panel('Finance contracts', 'Outstanding loans and locked deposits remain visible at the session end.', table(['Contract', 'Principal', 'Interest at maturity', 'Funding / placement', 'Completion'], [...c.loans.map(l => [esc(l.id), money(l.amount), exactMoney(l.interest), l.fundedAt === null ? 'Pending funding' : simDate(l.fundedAt), l.paidAt === null ? 'Repayment pending' : simDate(l.paidAt)]), ...c.deposits.map(d => [esc(d.id), money(d.amount), exactMoney(d.interest), simDate(d.placedAt), d.maturedAt === null ? `Due ${simDate(d.placedAt + d.term)}` : simDate(d.maturedAt)])]))}${panel('Transaction journal', 'Double-entry ledger · debits positive, credits negative · all values EUR', `<details data-view-key="ledger-entries"><summary>Show latest 100 entries (${c.ledger.length} total)</summary>${table(['Time', 'Description', 'Postings'], c.ledger.slice(-100).reverse().map(l => [simDate(l.hour), esc(l.description), Object.entries(l.lines).map(([k, v]) => `${esc(k)}: ${exactMoney(v)}`).join('<br>')]))}</details>`, button('ledger-csv', 'Export ledger', '', 'small'))}`;
 }
 function energyPage() {
   const c = company(), pendingEnergy = state.events.find(e => e.companyId === c.id && e.type === 'energy' && e.status === 'pending');
@@ -723,7 +783,7 @@ function reportValue(value, unit) {
 function reportsPage() {
   const [title, unit] = reportTypes[report];
   const snaps = reportSnapshots(reportRange);
-  return `<div class="advice"><strong>Daily reports are frozen at each midnight close.</strong>Last close: ${state.snapshots.length ? simDate(state.snapshots.at(-1).hour) : 'none yet'}. Live operations: ${simDate(state.hour)}. Each close includes that hour’s arrivals, production, demand, automation, costs, and depreciation.</div><div class="toolbar">${select('report', 'Measure', Object.entries(reportTypes).map(([k, [n]]) => [k, n]), report)}${select('range', 'Time window', [['7', 'Last 7 days'], ['30', 'Last 30 days'], ['180', 'Full session']], String(reportRange))}${button('report-csv', 'Export CSV', '', 'small')}</div>${panel(title, `${unit} · daily snapshots`, `<div class="toolbar">${state.companies.map(c => check(`series-${c.id}`, c.name, !selectedCompanies.size || selectedCompanies.has(c.id))).join('')}</div>${chart(report, unit, { selected: true, range: reportRange })}`)}${panel('Exact daily values', 'Accessible data table · one row per company per completed day', `<details><summary>Show report values</summary>${table(['As of (simulation)', 'Company', `${esc(title)} (${unit})`], reportRows(snaps).map(row => [row[0], esc(row[1]), reportValue(row[2], unit)]))}</details>`)}`;
+  return `<div class="advice"><strong>Daily reports are frozen at each midnight close.</strong>Last close: ${state.snapshots.length ? simDate(state.snapshots.at(-1).hour) : 'none yet'}. Live operations: ${simDate(state.hour)}. Each close includes that hour’s arrivals, production, demand, automation, costs, and depreciation.</div><div class="toolbar">${select('report', 'Measure', Object.entries(reportTypes).map(([k, [n]]) => [k, n]), report)}${select('range', 'Time window', [['7', 'Last 7 days'], ['30', 'Last 30 days'], ['180', 'Full session']], String(reportRange))}${button('report-csv', 'Export CSV', '', 'small')}</div>${panel(title, `${unit} · daily snapshots`, `<div class="toolbar">${state.companies.map(c => check(`series-${c.id}`, c.name, !selectedCompanies.size || selectedCompanies.has(c.id))).join('')}</div>${chart(report, unit, { selected: true, range: reportRange })}`)}${panel('Exact daily values', 'Accessible data table · one row per company per completed day', `<details data-view-key="report-values"><summary>Show report values</summary>${table(['As of (simulation)', 'Company', `${esc(title)} (${unit})`], reportRows(snaps).map(row => [row[0], esc(row[1]), reportValue(row[2], unit)]))}</details>`)}`;
 }
 function reportRows(snaps = state.snapshots) { return snaps.flatMap(s => s.companies.filter(c => !selectedCompanies.size || selectedCompanies.has(c.id)).map(c => { const prev = state.snapshots.find(x => x.hour === s.hour - 24)?.companies.find(x => x.id === c.id); let n = report === 'dailySales' ? c.revenue - (prev?.revenue || 0) : report === 'dailyProduction' ? c.production - (prev?.production || 0) : c[report]; if (reportTypes[report][1] === 'EUR') n /= 100; return [simDate(s.hour), c.name, n]; })); }
 function channelOptions() { return [['announcements', 'Instructor announcements'], ...(isTeacher() ? state.companies.map(c => [`teacher:${c.id}`, `Teacher ↔ ${c.name}`]) : [[`team:${actor.companyId}`, 'My team · internal'], [`teacher:${actor.companyId}`, 'Ask the instructor']])]; }
@@ -731,7 +791,7 @@ function messagesPage() {
   const options = channelOptions(); if (!options.some(x => x[0] === channel)) channel = options[0][0];
   const messages = state.messages.filter(m => m.channel === channel);
   const canSend = (state.status !== 'completed' || isTeacher()) && state.features.messaging.allowed && (isTeacher() || channel !== 'announcements');
-  return `<div class="toolbar">${select('channel', 'Conversation', options, channel)}<span class="form-note">Students can message their team or the instructor. Announcements are read-only for students.</span></div>${panel(esc(options.find(x => x[0] === channel)?.[1]), 'Sender identity comes from the signed-in account. Both clocks are labelled.', `<div class="messages">${messages.map(m => `<article class="message ${m.role === 'instructor' ? 'teacher' : ''}"><div class="message-header">${esc(m.senderName)} · ${esc(m.role)}</div><p>${esc(m.text)}</p><small>Real time: ${new Date(m.realAt).toLocaleString('en-GB')} · Simulation: ${simDate(m.hour)}</small></article>`).join('') || '<p class="empty">Start a useful conversation. Messages are saved with this session.</p>'}</div>${canSend ? `<form id="message-form"><label>Your message<textarea name="text" maxlength="2000" placeholder="Share a decision, ask a question, or coordinate a next step…" required></textarea></label>${button('submit', channel === 'announcements' ? 'Post announcement' : 'Send message', '', 'primary')}<div class="error" role="alert"></div></form>` : '<p class="form-note">This conversation is read-only for your role or messaging is disabled.</p>'}`)}`;
+  return `<div class="toolbar">${select('channel', 'Conversation', options, channel)}<span class="form-note">Students can message their team or the instructor. Announcements are read-only for students.</span></div>${panel(esc(options.find(x => x[0] === channel)?.[1]), 'Sender identity comes from the signed-in account. Both clocks are labelled.', `<div class="messages" data-view-key="messages">${messages.map(m => `<article class="message ${m.role === 'instructor' ? 'teacher' : ''}"><div class="message-header">${esc(m.senderName)} · ${esc(m.role)}</div><p>${esc(m.text)}</p><small>Real time: ${new Date(m.realAt).toLocaleString('en-GB')} · Simulation: ${simDate(m.hour)}</small></article>`).join('') || '<p class="empty">Start a useful conversation. Messages are saved with this session.</p>'}</div>${canSend ? `<form id="message-form"><label>Your message<textarea name="text" maxlength="2000" placeholder="Share a decision, ask a question, or coordinate a next step…" required></textarea></label>${button('submit', channel === 'announcements' ? 'Post announcement' : 'Send message', '', 'primary')}<div class="error" role="alert"></div></form>` : '<p class="form-note">This conversation is read-only for your role or messaging is disabled.</p>'}`)}`;
 }
 function adminPage() {
   if (!isTeacher()) return '';
@@ -884,7 +944,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=141ab44de424')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=1d4ffbd8ac92')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -1019,7 +1079,7 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=141ab44de424')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    try { const client = (await import('./src/test-client.mjs?v=1d4ffbd8ac92')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p>' + (e.status === 403 ? button('retry-start', 'Try again', '', 'primary') : '') + button('test-leave','Return to classroom') + '</main>'; }
     return;
   }
