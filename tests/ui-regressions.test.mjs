@@ -179,7 +179,8 @@ test('student workspace exposes nine categories and shows filtered live stock wi
   assert.match(workspace, /2 solar panels from stock on hand/);
   assert.match(workspace, /After incoming orders: 4 solar panels \(2 more\)/);
   assert.match(workspace, /Limiting after receipt: Junction box<\/span>/);
-  assert.match(workspace, /first<small><\/small><\/td><td>16 × Photo cell<\/td><td>4 Jan, 01:00<\/td><td>0<\/td><td>2<\/td>.*later<small><\/small><\/td><td>224 × Photo cell<\/td><td>4 Jan, 03:00<\/td><td>\+2<\/td><td>4<\/td>/);
+  assert.match(workspace, /<th scope="col">Total buildable<\/th><th scope="col">Limiting components<\/th>/);
+  assert.match(workspace, /first<small><\/small><\/td><td>16 × Photo cell<\/td><td>4 Jan, 01:00<\/td><td>0<\/td><td>2<\/td><td>Photo cell<\/td>.*later<small><\/small><\/td><td>224 × Photo cell<\/td><td>4 Jan, 03:00<\/td><td>\+2<\/td><td>4<\/td><td>Junction box<\/td>/);
   assert.doesNotMatch(workspace, /received<small>/);
   assert.match(workspace, /Limiting: Photo cell<\/span>/);
   assert.match(workspace, /Photo cell<\/td><td>[^]*?\/ 128<\/span><\/td><td>32 <span class="badge amber">Limiting<\/span><\/td>/);
@@ -191,7 +192,8 @@ test('student workspace exposes nine categories and shows filtered live stock wi
   assert.match(legacy, /2 solar modules from stock on hand/);
   assert.match(legacy, /After incoming orders: 6 solar modules \(4 more\)/);
   assert.match(legacy, /Limiting after receipt: Recycled frame<\/span>/);
-  assert.match(legacy, /16 × PV cell<\/td><td>4 Jan, 01:00<\/td><td>\+1<\/td><td>3<\/td>/);
+  assert.match(legacy, /16 × PV cell<\/td><td>4 Jan, 01:00<\/td><td>\+1<\/td><td>3<\/td><td>PV cell<\/td>/);
+  assert.match(legacy, /224 × PV cell<\/td><td>4 Jan, 03:00<\/td><td>\+3<\/td><td>6<\/td><td>Recycled frame<\/td>/);
   assert.match(legacy, /PV cell<\/td><td>[^]*?\/ 128<\/span><\/td><td>24 <span class="badge amber">Limiting<\/span><\/td>/);
   assert.match(legacy, /Controller<\/td><td>[^]*?\/ 16<\/span><\/td><td>1<\/td>/);
   h.run('state.recipe = {cell:32,frame:1,controller:2}');
@@ -199,6 +201,7 @@ test('student workspace exposes nine categories and shows filtered live stock wi
   const tied = h.run('studentWorkspace(() => true)');
   assert.match(tied, /Limiting: Photo cell, Junction box<\/span>/);
   assert.match(tied, /After incoming orders: 2 solar panels \(0 more\)/);
+  assert.match(tied, /16 × Photo cell<\/td><td>4 Jan, 01:00<\/td><td>0<\/td><td>2<\/td><td>Photo cell, Junction box<\/td>/);
   h.run('state.company.inventory.cell.qty = 0');
   assert.match(h.run('studentWorkspace(() => true)'), /0 solar panels from stock on hand/);
   h.run("inventoryCategories.delete('component')");
