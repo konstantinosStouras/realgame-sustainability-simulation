@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { randomUUID } from 'node:crypto';
-import { itemName, productionRecipe } from '../src/engine.mjs';
+import { applyCommand, createSession, itemName, productionRecipe } from '../src/engine.mjs';
 
 // Unit harness for the original UI functions. It does not open a browser or
 // access a real service. The coordinator separately verifies rendered behavior.
@@ -21,7 +21,7 @@ function harness(hostname = 'localhost') {
     document, localStorage: storage(), sessionStorage: storage(), crypto: { randomUUID },
     setTimeout: () => 1, clearTimeout: () => {}, URL, AbortSignal,
     FormData: class extends Map { constructor(form) { super(form.values); } },
-    itemName, productionRecipe, INVESTMENTS: {}, FEATURES: [], firebaseConfig: {}, classroomBackend: 'https://classroom.example', location: { hostname, href: 'https://' + hostname + '/' }, renderCount: 0,
+    applyCommand, createSession, itemName, productionRecipe, INVESTMENTS: {}, FEATURES: [], firebaseConfig: {}, classroomBackend: 'https://classroom.example', location: { hostname, href: 'https://' + hostname + '/' }, renderCount: 0,
     activeTestForm: null
   });
   context.history = { replaceState: (_, __, href) => { context.location.href = href; } };
@@ -131,12 +131,15 @@ test('dispatch with no finished stock gives an explanation instead of a zero-qua
 
 test('settings that complete a session do not attempt a rejected follow-up clock command', async () => {
   const h = harness();
-  h.run("state.name='Test'; state.status='paused'; state.hour=312; state.endHour=720; state.secondsPerHour=4; submitted=[]; modal=(title, body, submit)=>{ settingsSubmit=submit; }; command=async cmd=>{submitted.push(cmd); if(cmd.type==='configure')state.status='completed';};");
+  h.run("state=createSession({name:'Test'}); health={atomicSessionSettings:true}; state.status='paused'; state.hour=312; state.endHour=720; state.secondsPerHour=4; submitted=[]; modal=(title, body, submit)=>{ settingsSubmit=submit; }; command=async cmd=>{submitted.push(cmd); applyCommand(state, actor, cmd);};");
   await h.run("action('settings', '')");
   h.context.settingsFields = new Map([['name','Test'],['days','13'],['speed','4']]);
   await h.run('settingsSubmit(settingsFields)');
   assert.equal(h.run('submitted.length'), 1);
   assert.equal(h.run('submitted[0].type'), 'configure');
+  assert.equal(h.run('submitted[0].secondsPerHour'), 4);
+  assert.equal(h.run('state.endHour'), 312);
+  assert.equal(h.run('state.status'), 'completed');
 });
 
 test('truck badge counts each order with units left to dispatch', () => {

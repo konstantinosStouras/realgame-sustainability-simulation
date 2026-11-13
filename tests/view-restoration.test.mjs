@@ -67,10 +67,11 @@ test('invalid preferences and unavailable storage cannot break classroom loading
 
 for (const temporary of [false, true]) {
   test(`student refresh restores pages and ordered workspace panels (${temporary ? 'temporary' : 'server'} classroom)`, async () => {
-    const enter = temporary ? "enterTest({credentials:{roomId:'class-one',key:'temporary-key'},call:async () => testView})" : 'enter()';
+    const enter = temporary ? "enterTest({credentials:{roomId:'class-one',key:'temporary-key'},call:async () => testView,subscribe:listener => { testListener=listener; return () => {}; }})" : 'enter()';
     for (const page of ['overview','orders','supply','production','finance','energy','reports','messages','workspace']) {
       const options={id:'student-one',role:'student'};
       const original=setup(new Map(),options); await original.run(enter);
+      if(temporary) assert.equal(original.run('typeof testListener'), 'function');
       original.run(`page=${JSON.stringify(page)}; openPanels.add('inventory'); openPanels.add('finance'); openPanels.add('messages'); inventoryCategories.delete('finished'); report='emissions'; reportRange=7; channel='team:company-1'; render();`);
       const refreshed=setup(original.values,options); await refreshed.run(enter);
       assert.equal(refreshed.run('page'),page);
