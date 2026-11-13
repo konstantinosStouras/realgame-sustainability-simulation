@@ -1,6 +1,6 @@
 # Sustainability Studio: original model and teaching guide
 
-This is an independently authored business simulation, not a reconstruction of RealGame's proprietary engine. All catalogues, formulas, text, code, and interface assets here are original. Private research remains excluded from the repository and deployment.
+This is an independently authored business simulation. All catalogues, formulas, text, code, and interface assets here are original. Private research remains excluded from the repository and deployment.
 
 ## Start a class
 
