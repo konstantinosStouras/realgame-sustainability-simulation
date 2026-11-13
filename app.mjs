@@ -1,5 +1,10 @@
-import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=756fd4bb2acc';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=756fd4bb2acc';
+<<<<<<< HEAD
+import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=aa6dc4782c6e';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=aa6dc4782c6e';
+=======
+import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=aa6dc4782c6e';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=aa6dc4782c6e';
+>>>>>>> origin/main
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -207,7 +212,11 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=756fd4bb2acc')).firebase;
+<<<<<<< HEAD
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=aa6dc4782c6e')).firebase;
+=======
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=aa6dc4782c6e')).firebase;
+>>>>>>> origin/main
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -261,7 +270,11 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=756fd4bb2acc')).testClient();
+<<<<<<< HEAD
+      const client = (await import('./src/test-client.mjs?v=aa6dc4782c6e')).testClient();
+=======
+      const client = (await import('./src/test-client.mjs?v=aa6dc4782c6e')).testClient();
+>>>>>>> origin/main
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -394,7 +407,7 @@ function workspaceNavigation(admin, visible) {
     return href ? `<a href="${href}" target="_blank" rel="noopener" ${accessibility}>${body}</a>` :
       `<button type="button" data-action="workspace-tool" data-id="${id}" ${accessibility}${current ? ' aria-current="page"' : ''}${active ? ' class="active"' : ''}${unavailable ? ' aria-disabled="true"' : ''}${destinations.length > 1 || id === 'help' ? ' aria-haspopup="dialog"' : ''}>${body}</button>`;
   });
-  return `<header class="workspace-nav"><nav class="workspace-tools" aria-label="Workspace">${buttons.join('')}</nav></header>`;
+  return `<header class="workspace-nav"><button type="button" class="mobile-menu-toggle" data-action="toggle-mobile-menu" aria-expanded="false" aria-controls="workspace-sections"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg><span>Menu</span></button><nav id="workspace-sections" class="workspace-tools" aria-label="Workspace">${buttons.join('')}</nav></header>`;
 }
 
 function studentPanelVisible(id, visible) {
@@ -487,6 +500,12 @@ function inventoryPanel(embedded = false) {
   const c = company();
   const recipe = productionRecipe(state);
   const product = itemName(state, 'panel').toLowerCase();
+  const materialLimits = Object.entries(recipe).map(([key, needed]) =>
+    [key, Math.floor((c.inventory[key]?.qty ?? 0) / needed)]
+  );
+  const buildable = Math.min(...materialLimits.map(([, count]) => count));
+  const limiting = materialLimits.filter(([, count]) => count === buildable).map(([key]) => key);
+  const buildSummary = `<p class="inventory-build"><strong>${number(buildable)} ${product}${buildable === 1 ? '' : 's'} from stock on hand</strong><span>Limiting: ${limiting.map(key => itemName(state, key)).join(', ')}</span></p>`;
   const category = key => key === 'panel' ? 'finished' : 'component';
   const categories = [['finished', 'Finished'], ['component', 'Components']];
   const filters = embedded ? `<fieldset class="inventory-filters"><legend>Show stock</legend>${categories.map(([id, label]) => check('stock-' + id, label, inventoryCategories.has(id))).join('')}</fieldset>` : '';
@@ -498,13 +517,13 @@ function inventoryPanel(embedded = false) {
       return [
         `<span class="stock-kind ${type}" aria-label="${type === 'finished' ? 'Finished' : 'Component'}">${type === 'finished' ? 'F' : 'C'}</span> ${itemName(state, key)}`,
         `<span class="nowrap"><strong>${number(stock.qty)}</strong> / ${number(stock.capacity)}</span>`,
-        Object.hasOwn(recipe, key) ? number(recipe[key]) : '—',
+        Object.hasOwn(recipe, key) ? `${number(recipe[key])}${limiting.includes(key) ? ' <span class="badge amber">Limiting</span>' : ''}` : '—',
         stock.qty ? exactMoney(stock.value / stock.qty) : '—',
         ordered ? number(ordered) : '—',
         stock.qty ? precise(stock.carbon / stock.qty) : '—'
       ];
     });
-  return panel(embedded ? '' : 'Inventory', '', `${filters}<div class="inventory-table">${table(['Item', 'Amount / capacity', `Needed / ${product}`, 'Avg cost / unit', 'Ordered', 'kg CO₂e / unit'], rows, 'Select Finished or Components to show stock.')}</div><p class="form-note inventory-note">Ordered quantities become available at receipt. Stock above capacity costs €0.05 per excess unit per day.</p>`);
+  return panel(embedded ? '' : 'Inventory', '', `${buildSummary}${filters}<div class="inventory-table">${table(['Item', 'Amount / capacity', `Needed / ${product}`, 'Avg cost / unit', 'Ordered', 'kg CO₂e / unit'], rows, 'Select Finished or Components to show stock.')}</div><p class="form-note inventory-note">Buildable quantity reflects materials only. Ordered quantities become available at receipt. Stock above capacity costs €0.05 per excess unit per day.</p>`);
 }
 function suppliersPanel(embedded = false) {
   return `${panel(embedded ? '' : 'Supplier marketplace', 'All orders have a landed fixed fee. Supplier stock is shared across companies.', table(['Supplier / item', 'Unit price', 'Order fee', 'Lead / payment', 'Delivery accuracy', 'Component / freight CO₂e', 'Available / lot', ''], state.catalog.suppliers.filter(s => s.enabled).map(s => [`<strong>${esc(s.name)}</strong><small>${itemName(state, s.item)}</small>`, exactMoney(s.price), exactMoney(s.fee), `${s.lead} h / ${s.term} h<small>Payment after receipt</small>`, `${s.reliability}% on time<small>Up to ${s.maxDelay} h extra</small>`, `${precise(s.carbon)} / ${precise(s.freight)} kg per unit<small>${precise(s.carbon + s.freight)} kg total per unit</small>`, `${number(s.stock)}<small>Minimum ${s.min} · lot ${s.lot}</small>`, button('purchase', 'Order', s.id, 'small', !permitted('purchasing'))])))}`;
@@ -607,6 +626,7 @@ function openDispatch(id) {
   const update = () => { const f = new FormData(dialog.querySelector('form')), route = routes.find(r => r.id === f.get('routeId')), qty = value(f, 'qty'); dialog.querySelector('#dispatch-quote').innerHTML = `<strong>${exactMoney(route.fixed + route.unit * qty)} freight ${route.term ? 'due ' + simDate(state.hour + route.term) : 'paid now'} · ${number(route.carbonFixed + route.carbonUnit * qty)} kg CO₂e</strong>Estimated arrival: ${simDate(state.hour + route.hours)}. ${route.reliability}% on time; up to ${route.maxDelay} h carrier delay.${qty < o.remaining ? '<br>Partial dispatch: the unshipped quantity stays open.' : ''}${state.hour + route.hours > o.dueAt ? '<br>Expected late: satisfaction penalty at receipt.' : state.hour + route.hours < o.dueAt - 24 ? '<br>More than 24 h early: small satisfaction penalty at receipt.' : ''}`; };
   dialog.querySelector('form').addEventListener('input', update); update();
 }
+<<<<<<< HEAD
 function sessionSettingsCommand(current, form) {
   const hours = Number(form.get('days')) * 24, rounded = Math.round(hours);
   if (!Number.isFinite(hours) || Math.abs(hours - rounded) > 1e-8) throw new Error('Duration must be a whole number of simulation hours.');
@@ -619,7 +639,31 @@ function sessionSettingsCommand(current, form) {
   }
   return command;
 }
+=======
+function closeMobileMenu() {
+  const toggle = root.querySelector('.mobile-menu-toggle');
+  if (!toggle) return;
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.closest('.workspace-nav').classList.remove('mobile-menu-open');
+}
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && root.querySelector('.mobile-menu-open')) {
+    closeMobileMenu();
+    root.querySelector('.mobile-menu-toggle')?.focus();
+  }
+});
+
+>>>>>>> origin/main
 async function action(name, id) {
+  if (name === 'toggle-mobile-menu') {
+    const toggle = root.querySelector('.mobile-menu-toggle');
+    const open = toggle.getAttribute('aria-expanded') !== 'true';
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.closest('.workspace-nav').classList.toggle('mobile-menu-open', open);
+    return;
+  }
+  if (name === 'workspace-tool') closeMobileMenu();
   if (name === 'workspace-tool') {
     const tool = workspaceTools.find(tool => tool.id === id);
     const admin = isTeacher();
@@ -686,7 +730,11 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=756fd4bb2acc')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+<<<<<<< HEAD
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=aa6dc4782c6e')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+=======
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=aa6dc4782c6e')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+>>>>>>> origin/main
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -768,7 +816,7 @@ document.addEventListener('click', async event => {
   b.disabled = true; b.setAttribute('aria-busy', 'true');
   try {
     await action(b.dataset.action, b.dataset.id);
-    if (!dialog.open && page !== 'workspace' && (workspaceChoice || b.closest('.workspace-nav'))) root.querySelector('.page-heading h1')?.focus();
+    if (b.dataset.action !== 'toggle-mobile-menu' && !dialog.open && page !== 'workspace' && (workspaceChoice || b.closest('.workspace-nav'))) root.querySelector('.page-heading h1')?.focus();
   } catch (e) { toast(e.message); } finally { b.disabled = false; b.removeAttribute('aria-busy'); }
 });
 document.addEventListener('submit', async event => {
@@ -821,7 +869,11 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=756fd4bb2acc')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+<<<<<<< HEAD
+    try { const client = (await import('./src/test-client.mjs?v=aa6dc4782c6e')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+=======
+    try { const client = (await import('./src/test-client.mjs?v=aa6dc4782c6e')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+>>>>>>> origin/main
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p>' + button('test-leave','Return to classroom') + '</main>'; }
     return;
   }

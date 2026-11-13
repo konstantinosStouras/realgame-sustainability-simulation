@@ -168,6 +168,7 @@
 .inventory-table :is(th, td):not(:first-child) { text-align: right; white-space: nowrap; }
 .inventory-table td:first-child { white-space: nowrap; }
 .inventory-note { margin: 8px 0 0; }
+.inventory-build { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; margin: 0 0 8px; font-size: 12px; }
 .stock-kind { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-right: 4px; border-radius: 50%; font-size:0.875rem; font-weight: 700; background: #233a31; color: white; }
 .stock-kind.component { background: #d9e9a9; color: #233a31; }
 @media (max-width: 980px) {
@@ -347,4 +348,18 @@ td { line-height: 1.5; }
   .workspace-tool-desktop { display: none; }
   .workspace-tool-short { display: block; font-size: 10px; line-height: 1.2; white-space: normal; overflow-wrap: anywhere; }
   .workspace .content { padding-inline: 12px; }
+}
+
+/* Mobile navigation opens on demand and leaves the simulation full width. */
+.mobile-menu-toggle { display: none; }
+.layout:not(:has(.workspace-nav)) { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 700px) {
+  .layout { display: block; }
+  .workspace-nav { height: auto; max-height: 100dvh; padding: 6px 12px; }
+  .mobile-menu-toggle { display: inline-flex; min-height: 44px; background: transparent; color: inherit; border-color: currentColor; }
+  .workspace-nav .workspace-tools { display: none; }
+  .workspace-nav.mobile-menu-open .workspace-tools { display: flex; padding-top: 8px; }
+  .workspace-tools > :is(button, a) { flex-direction: row; justify-content: flex-start; gap: 12px; min-height: 48px; padding: 8px 12px; }
+  .workspace-tool-desktop { display: block; font-size: 14px; }
+  .workspace-tool-short { display: none; }
 }
