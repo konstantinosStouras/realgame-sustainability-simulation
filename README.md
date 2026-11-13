@@ -2,7 +2,7 @@
 
 An original sustainability/business simulation with an authoritative hourly engine, instructor controls, student companies, durable messages, a double-entry ledger, and data-driven daily plots.
 
-- Main website: https://www.stouras.com/sustainability-simulation/
+- Main website: https://www.stouras.com/realgame-sustainability-simulation/
 - Firebase project: `stouras-sustainability-2026`
 - Firebase hosted interface: https://stouras-sustainability-2026.web.app/
 - [Economic rules and teaching guide](notes/model.md)
