@@ -1,6 +1,6 @@
-import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=43f44409cec1';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=43f44409cec1';
-import { watchSession } from './src/session-updates.mjs?v=43f44409cec1';
+import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=2d390f77e037';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=2d390f77e037';
+import { watchSession } from './src/session-updates.mjs?v=2d390f77e037';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -40,13 +40,42 @@ function ensureSessionUpdates() {
   const watch = watchSession({
     url: `${backend}/api/sessions/${encodeURIComponent(id)}/updates`, revision: state.revision,
     token: () => firebaseClient.token(),
-    changed: () => { if (current()) void load(false); },
+    changed: () => current() ? refreshInBackground() : undefined,
     closed: () => { if (current()) clearClosedSession(); }
   });
   liveSession = { id, watch };
 }
 const submittingForms = new Set();
 let loadSequence = 0, pendingLoads = 0;
+let backgroundRefresh = null, refreshDeferred = false;
+const loadWaiters = new Set();
+function refreshInBackground() {
+  if (solo || !sessionId) return Promise.resolve();
+  const matches = job => job.id === sessionId && job.preview === preview && job.backend === backend;
+  if (backgroundRefresh && matches(backgroundRefresh)) { backgroundRefresh.again = true; return backgroundRefresh.task; }
+  const job = {id:sessionId, preview, backend, again:true};
+  backgroundRefresh = job;
+  job.task = (async () => {
+    // Let callers in the same event turn share this task before starting a read.
+    await Promise.resolve();
+    try {
+      while (job.again && matches(job) && !solo) {
+        if (pendingLoads) await new Promise(resolve => loadWaiters.add(resolve));
+        if (!matches(job) || solo) break;
+        job.again = false;
+        await load(false);
+      }
+    } finally { if (backgroundRefresh === job) backgroundRefresh = null; }
+  })();
+  return job.task;
+}
+function needsBackgroundPoll() {
+  if (solo || !state || busy || pendingLoads || document.hidden) return false;
+  // Running views drive authoritative clock catch-up. A healthy subscription
+  // already reports paused changes; offline and deferred drafts need a retry.
+  const draftClosed = !submittingForms.size && !dialog.open && !document.activeElement?.closest('form');
+  return state.status === 'running' || !online || (refreshDeferred && draftClosed) || liveSession?.id !== sessionId || !liveSession?.watch.healthy;
+}
 const isTeacher = () => actor?.role === 'instructor';
 const company = () => state?.company;
 const simDate = hour => { const date = new Date(Date.parse(state?.startDate || '2026-01-01T00:00:00Z') + hour * 3600000); return date.toLocaleString('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }); };
@@ -99,15 +128,15 @@ async function load(force = true, afterCommand = false) {
     if (sessionId !== loadingSession || preview !== loadingPreview || sequence !== loadSequence || solo) return;
     const changed = !state || data.state.revision !== state.revision || !online;
     // Keep the version that the student actually reviewed while editing a decision.
-    if (!force && !afterCommand && (submittingForms.size || dialog.open || document.activeElement?.closest('form'))) { online = true; return; }
-    state = data.state; actor = data.actor; testAccessClosed = false; online = true; ensureSessionUpdates();
+    if (!force && !afterCommand && (submittingForms.size || dialog.open || document.activeElement?.closest('form'))) { refreshDeferred = changed; online = true; return; }
+    state = data.state; actor = data.actor; testAccessClosed = false; refreshDeferred = false; online = true; ensureSessionUpdates();
     if ((force || changed) && !dialog.open && (force || (!submittingForms.size && !document.activeElement?.closest('form')))) render();
   } catch (e) {
     if (sessionId !== loadingSession || preview !== loadingPreview || sequence !== loadSequence || solo) return;
     if (testRoom && e.status === 410) { endTestView(); return; }
     if (testRoom && e.status === 403) { showTestAccessClosed(); return; }
     if (!testRoom && [403, 404].includes(e.status)) { clearClosedSession(); return; }
-    online = false; if (force) throw e; const status = document.querySelector('#connection'); if (status) status.textContent = 'Connection interrupted · reconnecting'; } finally { pendingLoads--; }
+    online = false; if (force) throw e; const status = document.querySelector('#connection'); if (status) status.textContent = 'Connection interrupted · reconnecting'; } finally { pendingLoads--; if (!pendingLoads) { for (const resolve of loadWaiters) resolve(); loadWaiters.clear(); } }
 }
 async function command(cmd) {
   if (busy) throw new Error('Another decision is still being submitted. Please wait and try again.'); busy = true;
@@ -239,7 +268,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=43f44409cec1')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=2d390f77e037')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -289,7 +318,7 @@ async function enterTest(client) {
   client.subscribe(event => {
     if (testRoom !== client || !sessionId) return;
     if (event === 'ended') endTestView();
-    else if (event === 'changed') void load(false);
+    else if (event === 'changed') void refreshInBackground();
   });
   // Cover changes between the initial view and registering the listener.
   await load(false);
@@ -310,7 +339,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=43f44409cec1')).testClient();
+      const client = (await import('./src/test-client.mjs?v=2d390f77e037')).testClient();
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -838,7 +867,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=43f44409cec1')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=2d390f77e037')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -973,7 +1002,7 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=43f44409cec1')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    try { const client = (await import('./src/test-client.mjs?v=2d390f77e037')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p>' + (e.status === 403 ? button('retry-start', 'Try again', '', 'primary') : '') + button('test-leave','Return to classroom') + '</main>'; }
     return;
   }
@@ -1000,11 +1029,11 @@ async function startWorkspace() {
   }
 }
 await startWorkspace();
-setInterval(() => { if (!solo && state && !busy && !pendingLoads && !document.hidden) load(false); }, 3000);
+setInterval(() => { if (needsBackgroundPoll()) void refreshInBackground(); }, 3000);
 
 window.addEventListener('popstate', () => { if (user && !solo) enter().catch(e => toast(e.message)); });
 
 // Suspended browser tabs resync as soon as they become visible again.
 document.addEventListener('visibilitychange', () => {
-  if (!solo && sessionId && !document.hidden) void load(false);
+  if (!solo && sessionId && !document.hidden) void refreshInBackground();
 });

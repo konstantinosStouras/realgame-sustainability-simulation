@@ -19,14 +19,28 @@ const verifyFirebase = async uid => ({ uid, name: uid, email_verified: true, ins
 async function listen(server) {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
-  return { origin, call: async (path, token = 'synthetic-teacher', body) => {
-    const response = await fetch(origin + path, {
-      method: body === undefined ? 'GET' : 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) })
+  // Model 120 student connections even when 240 duplicate requests are pending.
+  // Bound transport sockets, not submitted work; errors are never retried here.
+  const agent = new http.Agent({ keepAlive: true, maxSockets: 120, maxFreeSockets: 120 });
+  server.once('close', () => agent.destroy());
+  return { origin, call: (path, token = 'synthetic-teacher', body) => new Promise((resolve, reject) => {
+    const payload = body === undefined ? undefined : JSON.stringify(body);
+    const request = http.request(origin + path, {
+      agent, method: payload === undefined ? 'GET' : 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json',
+        ...(payload === undefined ? {} : { 'Content-Length': Buffer.byteLength(payload) }) }
+    }, response => {
+      const chunks = [];
+      response.on('data', chunk => chunks.push(chunk));
+      response.on('error', reject);
+      response.on('end', () => {
+        try { resolve({ status: response.statusCode, body: JSON.parse(Buffer.concat(chunks).toString('utf8')) }); }
+        catch (error) { reject(error); }
+      });
     });
-    return { status: response.status, body: await response.json() };
-  } };
+    request.on('error', reject);
+    request.end(payload);
+  }) };
 }
 const close = server => new Promise(resolve => server.close(resolve));
 

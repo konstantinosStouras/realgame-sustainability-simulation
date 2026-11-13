@@ -10,6 +10,7 @@ export class FirestoreStore {
   constructor(db, { prefix = 'studio', now = Date.now } = {}) {
     if (!/^[a-zA-Z][a-zA-Z0-9_]{0,60}$/.test(prefix)) throw new Error('Invalid Firestore namespace');
     this.db = db; this.prefix = prefix; this.now = now;
+    this.viewClockTasks = new Map();
     for (const name of ['Users', 'Sessions', 'Members', 'Invites', 'Requests']) this[name.toLowerCase()] = db.collection(prefix + name);
   }
   userRef(id) { return this.users.doc(digest(id)); }
@@ -18,8 +19,8 @@ export class FirestoreStore {
   async firebaseUser(claims) {
     if (!claims.uid || !claims.email_verified) fail('Verified Firebase identity required.', 403);
     const user = { id: `firebase:${claims.uid}`, username: `firebase-${claims.uid}`, name: String(claims.name || 'Student').slice(0, 80), role: claims.instructor === true ? 'instructor' : 'student' };
-    const ref = this.userRef(user.id), old = await ref.get();
-    if (!old.exists || JSON.stringify(old.data()) !== JSON.stringify(user)) await ref.set(user);
+    const ref = this.userRef(user.id), old = await ref.get(), previous = old.exists ? old.data() : null;
+    if (!previous || Object.entries(user).some(([key, value]) => previous[key] !== value)) await ref.set(user);
     return user;
   }
   async actor(tx, user, id) {
@@ -107,23 +108,49 @@ export class FirestoreStore {
       return { sessionId };
     });
   }
-  async view(user, id, preview) {
+  async readViewSnapshot(user, id) {
     return this.db.runTransaction(async tx => {
       const actor = await this.actor(tx, user, id), ref = this.sessionRef(id), doc = await tx.get(ref);
       if (!doc.exists || doc.data().status === 'deleted') fail('Session not found.', 404);
       const metadata = doc.data(), state = await this.readState(tx, ref, metadata);
+      return { actor, state, nextTickAt: metadata.nextTickAt };
+    }, { readOnly: true });
+  }
+  async catchUpViewClock(id) {
+    // A classroom-wide update wakes every browser. Share only the clock work,
+    // never a user's authorization or filtered response. Firestore still
+    // serializes this transaction against commands and other function instances.
+    if (this.viewClockTasks.has(id)) return this.viewClockTasks.get(id);
+    const task = this.db.runTransaction(async tx => {
+      const ref = this.sessionRef(id), doc = await tx.get(ref);
+      if (!doc.exists || doc.data().status === 'deleted') fail('Session not found.', 404);
+      const metadata = doc.data();
+      if (metadata.status !== 'running' || metadata.nextTickAt > this.now()) return;
+      const state = await this.readState(tx, ref, metadata);
       const clock = advanceCloudClock(state, metadata.nextTickAt, this.now());
-      if (clock.records.length) {
-        this.writeState(tx, ref, state, metadata, clock.nextTickAt);
-        for (const record of clock.records) this.log(tx, ref, record.actor, record.command, record.realAt, record.revision);
-      }
-      return { actor, state: publicView(state, actor, preview), catchingUp: state.status === 'running' && clock.nextTickAt <= this.now() };
+      if (!clock.records.length) return;
+      this.writeState(tx, ref, state, metadata, clock.nextTickAt);
+      for (const record of clock.records) this.log(tx, ref, record.actor, record.command, record.realAt, record.revision);
     });
+    this.viewClockTasks.set(id, task);
+    try { await task; }
+    finally { if (this.viewClockTasks.get(id) === task) this.viewClockTasks.delete(id); }
+  }
+  async view(user, id, preview) {
+    let snapshot = await this.readViewSnapshot(user, id);
+    const isDue = value => value.state.status === 'running' && value.nextTickAt != null && value.nextTickAt <= this.now();
+    if (isDue(snapshot)) {
+      await this.catchUpViewClock(id);
+      // Membership and access can change while the clock transaction waits.
+      // Reauthorize and read metadata/chunks together at a new consistent time.
+      snapshot = await this.readViewSnapshot(user, id);
+    }
+    return { actor: snapshot.actor, state: publicView(snapshot.state, snapshot.actor, preview), catchingUp: isDue(snapshot) };
   }
   async updates(user, id, revision, signal) {
     if (!Number.isSafeInteger(revision) || revision < 0) fail('Invalid session revision.');
     // Reauthorize every connection; no state reads, clock advances or writes.
-    await this.db.runTransaction(tx => this.actor(tx, user, id));
+    await this.db.runTransaction(tx => this.actor(tx, user, id), { readOnly: true });
     return waitForSessionUpdate(this.sessionRef(id), revision, user.role !== 'instructor', signal);
   }
   async roster(user, id) {
@@ -135,7 +162,7 @@ export class FirestoreStore {
       const invites = await tx.get(this.invites.where('sessionId', '==', id));
       const users = members.empty ? [] : await tx.getAll(...members.docs.map(m => this.userRef(m.data().userId)));
       return { members: users.filter(u => u.exists).map(u => ({ ...u.data(), companyId: members.docs.find(m => m.data().userId === u.data().id).data().companyId })), invites: invites.docs.map(i => ({ code: i.data().code, companyId: i.data().companyId })) };
-    });
+    }, { readOnly: true });
   }
   async command(user, id, request) {
     const { key, revision, command } = request;
@@ -162,8 +189,10 @@ export class FirestoreStore {
       }
       if (revision !== state.revision && !pauseAfterCatchup) fail('The session changed. Refreshed state is available; review and submit again.', 409);
       const realAt = new Date(this.now()).toISOString();
+      const previousSpeed = state.secondsPerHour;
       const message = applyCommand(state, actor, command, realAt); assertInvariants(state);
-      const nextTickAt = state.status !== 'running' ? null : command.type === 'clock' ? this.now() + state.secondsPerHour * 1000 : metadata.nextTickAt;
+      const speedChanged = state.secondsPerHour !== previousSpeed;
+      const nextTickAt = state.status !== 'running' ? null : command.type === 'clock' || speedChanged ? this.now() + state.secondsPerHour * 1000 : metadata.nextTickAt;
       this.writeState(tx, ref, state, metadata, nextTickAt);
       for (const record of clock.records) this.log(tx, ref, record.actor, record.command, record.realAt, record.revision);
       this.log(tx, ref, actor, command, realAt, state.revision);
@@ -200,7 +229,7 @@ export class FirestoreStore {
       const current = await this.readState(tx, ref, doc.data());
       const initial = await this.readState(tx, ref, doc.data(), true);
       return testTemplate(initial, current);
-    });
+    }, { readOnly: true });
   }
   async replay(user, id) {
     if (user.role !== 'instructor') fail('Instructor access required.', 403);
@@ -212,7 +241,7 @@ export class FirestoreStore {
       const records = await tx.get(ref.collection('commands').orderBy('revision'));
       const commands = records.docs.map(d => { const { actor, command, realAt } = d.data(); if (command.type === 'message' && !canMessage(state, { ...user, companyId: null }, command.channel)) command.text = '[private message redacted]'; return { actor, command, realAt }; });
       return { initial, commands, complete: true, missingAssignments: 0, note: 'Economic replay includes assignments. Private chat text is redacted; accounts and membership records are not recreated.' };
-    });
+    }, { readOnly: true });
   }
   async runDueClocks() {
     const running = await this.sessions.where('status', '==', 'running').get();

@@ -58,7 +58,7 @@ test('browser reconnects with new revision and handles closure without polling d
   const watch=watchSession({url:'https://invalid/updates',token:async()=>'mock',revision:1,
     changed:()=>events.push('changed'),closed:()=>events.push('closed'),
     fetcher:async(url,options)=>{urls.push(url);assert.equal(options.headers.Authorization,'Bearer mock');return {ok:true,status:200,json:async()=>urls.length===1?{revision:2}:{closed:true}};}});
-  await watch.task;assert.deepEqual(events,['changed','closed']);assert.match(urls[1],/revision=2$/);
+  await watch.task;assert.deepEqual(events,['changed','closed']);assert.equal(new URL(urls[1]).searchParams.get('revision'),'2');
 });
 test('browser clears denied sessions and ignores responses after navigation', async () => {
   for(const status of [401,403,404]) {
