@@ -227,3 +227,10 @@ dialog .dialog-toolbar .close{position:static;min-width:44px;flex-shrink:0}
   .account-menu { position: static; }
   .account-dropdown { max-width: 100%; }
 }
+/* Hide mobile scrollbars in both themes without changing scroll behaviour. */
+@media (max-width: 700px) {
+  html, body, .account-dropdown { scrollbar-width: none; }
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar,
+  .account-dropdown::-webkit-scrollbar { display: none; width: 0; height: 0; }
+}

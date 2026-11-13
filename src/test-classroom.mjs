@@ -1,4 +1,4 @@
-import { createSession, applyCommand, tick, publicView, assertInvariants, fail } from './engine.mjs?v=97cf81d04e1b';
+import { createSession, applyCommand, tick, publicView, assertInvariants, fail } from './engine.mjs?v=8f3b6743c10d';
 
 // This model is held only by a SharedWorker. No storage, network or Firebase APIs.
 export class TestClassroom {
