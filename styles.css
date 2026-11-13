@@ -386,3 +386,10 @@ td { line-height: 1.5; }
 @media (min-width: 701px) and (max-height: 570px) {
   .workspace-nav { position: static; height: auto; }
 }
+
+/* Shared data-point interaction for every simulation chart. */
+.chart-scroll { position: relative; }
+.chart-point { cursor: crosshair; }
+.chart-point.is-highlighted, .chart-point:focus-visible { r: 6; stroke: var(--text); stroke-width: 2; outline: none; }
+.chart-tooltip { position: absolute; z-index: 2; left: 8px; right: 8px; bottom: calc(100% + 4px); padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--text); box-shadow: 0 4px 16px #0003; font-size: 14px; line-height: 1.4; pointer-events: none; overflow-wrap: anywhere; }
+.chart-tooltip[hidden] { display: none; }
