@@ -14,5 +14,5 @@ const verifyFirebase = async token => {
   try { const claims = await getAuth(app).verifyIdToken(token, true); if (!claims.email_verified) fail('Verify your email before joining a classroom.', 403); return claims; }
   catch (error) { if (error.status) throw error; fail('Firebase sign-in expired or is invalid. Please sign in again.', 401); }
 };
-export const classroom = onRequest({ ...runtime, concurrency: 20, invoker: 'public' }, createCloudHandler({ store, verifyFirebase, projectId, allowedOrigins: ['https://www.stouras.com', 'https://stouras.com', `https://${projectId}.web.app`, `https://${projectId}.firebaseapp.com`] }));
+export const classroom = onRequest({ ...runtime, concurrency: 80, invoker: 'public' }, createCloudHandler({ store, verifyFirebase, projectId, allowedOrigins: ['https://www.stouras.com', 'https://stouras.com', `https://${projectId}.web.app`, `https://${projectId}.firebaseapp.com`] }));
 export const classroomClock = onSchedule({ ...runtime, maxInstances: 1, schedule: 'every 1 minutes', timeZone: 'Europe/London', retryCount: 0 }, () => store.runDueClocks());

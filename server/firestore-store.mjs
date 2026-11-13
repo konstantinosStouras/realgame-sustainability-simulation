@@ -1,4 +1,5 @@
 import { requireOpen } from './session-access.mjs';
+import { waitForSessionUpdate } from './session-updates.mjs';
 import { testTemplate } from './test-template.mjs';
 import { sessionId } from '../src/session-id.mjs';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -118,6 +119,12 @@ export class FirestoreStore {
       }
       return { actor, state: publicView(state, actor, preview), catchingUp: state.status === 'running' && clock.nextTickAt <= this.now() };
     });
+  }
+  async updates(user, id, revision, signal) {
+    if (!Number.isSafeInteger(revision) || revision < 0) fail('Invalid session revision.');
+    // Reauthorize every connection; no state reads, clock advances or writes.
+    await this.db.runTransaction(tx => this.actor(tx, user, id));
+    return waitForSessionUpdate(this.sessionRef(id), revision, user.role !== 'instructor', signal);
   }
   async roster(user, id) {
     if (user.role !== 'instructor') fail('Instructor access required.', 403);

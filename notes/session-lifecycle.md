@@ -30,3 +30,9 @@ The browser must support module SharedWorkers. Unsupported browsers show an expl
 The shared worker now notifies authenticated room tabs after accepted decisions and clock changes, and broadcasts a terminal event when the round ends. Notifications contain only the room identifier and event type; each tab fetches its own authorized view. Ending a round closes decision dialogs, clears the displayed state and invalidates pending view responses. Hidden tabs no longer depend on the visible-tab polling interval. Browsers can suspend pages entirely; a visibility-change refresh covers their return. Draft decision forms are preserved until submission or dismissal rather than overwritten by a teammate's update.
 
 Verification for this change uses mocked message ports and a stub UI only. No new simulation sessions, student accounts, Firebase records or test downloads were created.
+
+### Real-session updates
+
+Firebase classrooms now hold an authenticated, bounded update request backed by a Firestore metadata listener. A committed revision wakes connected student and instructor tabs immediately; reconnects include the last observed revision. The existing state API still controls visibility and transaction authorization. Closed/deleted sessions clear student views and decision dialogs and invalidate pending reads; the transaction rejects subsequent student decisions before reading economic state or prior receipts. Active decision drafts are preserved on ordinary updates; closure always overrides them. Suspended tabs refresh when visible. Polling remains a recovery fallback.
+
+Listeners are removed on change, disconnect, error or a 25-second idle timeout. No client Firestore permissions were opened. Protocol-only mock checks cover notification, cleanup, authorization, reconnects, stale responses, closure UI and rejected post-closure commands; no accounts or simulation data were created.

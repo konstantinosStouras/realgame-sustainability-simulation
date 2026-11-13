@@ -1,5 +1,6 @@
-import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=43f9e5e57936';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=43f9e5e57936';
+import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=5badc203e0fb';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=5badc203e0fb';
+import { watchSession } from './src/session-updates.mjs?v=5badc203e0fb';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -15,6 +16,28 @@ const savedBackend = localStorage.getItem('studio-backend') || '';
 let backend = localWorkspace ? savedBackend : (/^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(savedBackend) ? classroomBackend : savedBackend || classroomBackend), token = sessionStorage.getItem('studio-token') || '';
 let state, actor, user, sessions = [], sessionId, preview, page = 'overview', channel = 'announcements', report = 'profit', reportRange = 30, selectedCompanies = new Set(), solo = null, health = null, roster = null, busy = false, online = true, firebaseClient = null;
 let testRoom = null, testPending = null;
+let liveSession = null;
+function stopSessionUpdates() { liveSession?.watch.stop(); liveSession = null; }
+function clearClosedSession() {
+  stopSessionUpdates(); ++loadSequence;
+  state = null; actor = null; sessionId = null; roster = null;
+  if (dialog.open) dialog.close();
+  renderLobby('This session is closed or no longer available. Further decisions are blocked.');
+}
+function ensureSessionUpdates() {
+  if (testRoom || solo || !sessionId || !state || !health?.sessionUpdates) { stopSessionUpdates(); return; }
+  if (liveSession?.id === sessionId) return;
+  stopSessionUpdates();
+  const id = sessionId;
+  const current = () => liveSession?.id === id && sessionId === id && !testRoom && !solo;
+  const watch = watchSession({
+    url: `${backend}/api/sessions/${encodeURIComponent(id)}/updates`, revision: state.revision,
+    token: () => firebaseClient.token(),
+    changed: () => { if (current()) void load(false); },
+    closed: () => { if (current()) clearClosedSession(); }
+  });
+  liveSession = { id, watch };
+}
 const submittingForms = new Set();
 let loadSequence = 0, pendingLoads = 0;
 const isTeacher = () => actor?.role === 'instructor';
@@ -70,12 +93,12 @@ async function load(force = true, afterCommand = false) {
     const changed = !state || data.state.revision !== state.revision || !online;
     // Keep the version that the student actually reviewed while editing a decision.
     if (!force && !afterCommand && (submittingForms.size || dialog.open || document.activeElement?.closest('form'))) { online = true; return; }
-    state = data.state; actor = data.actor; online = true;
-    if ((force || changed) && !dialog.open && (force || (!submittingForms.size && !document.activeElement?.closest(testRoom ? 'form' : 'form, details[open]')))) render();
+    state = data.state; actor = data.actor; online = true; ensureSessionUpdates();
+    if ((force || changed) && !dialog.open && (force || (!submittingForms.size && !document.activeElement?.closest('form')))) render();
   } catch (e) {
     if (sessionId !== loadingSession || preview !== loadingPreview || sequence !== loadSequence || solo) return;
     if (testRoom && e.status === 410) { endTestView(); return; }
-    if (!testRoom && [403, 404].includes(e.status)) { state = null; actor = null; sessionId = null; if (dialog.open) dialog.close(); renderLobby(e.message); return; }
+    if (!testRoom && [403, 404].includes(e.status)) { clearClosedSession(); return; }
     online = false; if (force) throw e; const status = document.querySelector('#connection'); if (status) status.textContent = 'Connection interrupted · reconnecting'; } finally { pendingLoads--; }
 }
 async function command(cmd) {
@@ -200,6 +223,7 @@ function firebaseForm() {
     </div>`;
 }
 function renderWelcome() {
+  stopSessionUpdates();
   renderLocalWelcome();
   if (!health || health.auth === 'firebase') {
     const panel = root.querySelector('.welcome-layout > .panel');
@@ -207,7 +231,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=43f9e5e57936')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=5badc203e0fb')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -241,6 +265,7 @@ function endTestView() {
   root.innerHTML = '<main class="welcome"><h1>Test round ended</h1><p>Its temporary data has been discarded.</p>' + button('test-leave','Return to classroom') + '</main>';
 }
 async function enterTest(client) {
+  stopSessionUpdates();
   const view = await client.call('view'); testRoom = client; solo = null;
   state = view.state; actor = view.actor; user = actor; sessionId = state.id; preview = undefined;
   sessions = []; page = actor.role === 'instructor' ? 'admin' : 'overview';
@@ -275,7 +300,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=43f9e5e57936')).testClient();
+      const client = (await import('./src/test-client.mjs?v=5badc203e0fb')).testClient();
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -331,12 +356,14 @@ function sessionButton(action, label, id = '', cls = '') {
   return '<span class="session-action-hint">' + button(action,label,id,cls).replace('<button ', '<button aria-describedby="' + esc(hintId) + '" ') + '<span class="session-tooltip" role="tooltip" id="' + esc(hintId) + '">' + esc(sessionHints[action]) + '</span></span>';
 }
 function renderAdminHome() {
+  stopSessionUpdates();
   const active = sessions.filter(s => s.status !== 'completed'), past = sessions.filter(s => s.status === 'completed');
   const cards = list => list.map(s => `<article class="session-card"><div class="session-card-heading"><h3>${esc(s.name)}</h3><span class="badge session-status">${esc(s.status === 'completed' ? 'Closed' : s.status)}</span></div><p class="session-meta">Simulation hour ${number(s.hour)}</p><div class="session-actions" role="group" aria-label="Actions for ${esc(s.name)}">${sessionButton('open-session', 'Open', s.id, 'session-open')}${sessionButton('copy-session', 'Copy link', s.id)}${sessionButton('session-export', '↓ Export data', s.id, 'session-export')}${sessionButton('session-test', 'Test', s.id)}${s.status !== 'completed' ? sessionButton('session-close', 'Close', s.id) : ''}${sessionButton('session-delete', 'Delete', s.id, 'session-danger')}</div><div class="session-access">${sessionButton('session-codes', 'Company join codes ↗', s.id, 'session-access-button')}<small>Session ${esc(s.id)}</small></div></article>`).join('') || '<p class="empty">No sessions here yet.</p>';
   root.innerHTML = `<div class="admin-home"><header class="admin-header">${brand}${accountControls(user)}</header><main id="content"><div class="page-heading"><div><p class="eyebrow">Instructor workspace</p><h1>Sustainability Studio admin</h1><p>Manage your sessions and set up each learning task.</p></div></div><div class="admin-columns"><aside><details class="panel"><summary>Create session</summary><form id="create-session-form">${createSessionFields()}${button('submit', 'Create session', '', 'primary')}<div class="error" role="alert"></div></form></details></aside><div><details class="panel" open><summary>Active sessions <span>${active.length} sessions</span></summary><p class="form-note">Open a session to manage your classroom. Paused sessions appear here too.</p>${active.length ? sessionButton('sessions-delete', 'Delete all active sessions', '', 'session-danger session-bulk') : ''}${cards(active)}</details><details class="panel"><summary>Past sessions <span>${past.length} sessions</span></summary>${cards(past)}</details></div></div></main></div>`;
 }
 
 function renderLobby(error = '', requested = '', needsCompany = false) {
+  stopSessionUpdates();
   state = null; actor = null;
   root.innerHTML = '<main class="welcome" id="content">' + brand + '<h1>Enter your session ID</h1><p>Enter the ID provided by your instructor. Only sessions open to students can be entered.</p><section class="panel"><form id="session-entry-form">' + field('sessionId', 'Session ID', requested, 'text', 'maxlength="100" autocomplete="off"') + (needsCompany ? field('code', 'Company join code', '', 'text', 'autocomplete="off"') + '<p>Your instructor’s company code assigns you to the correct team.</p>' : '') + button('submit', 'Enter session', '', 'primary') + '<div class="error" role="alert">' + esc(error) + '</div></form></section>' + (user?.role === 'instructor' ? button('sessions', 'All sessions') : '') + button('logout', 'Sign out') + '</main>';
 }
@@ -755,7 +782,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=43f9e5e57936')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=5badc203e0fb')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -890,7 +917,7 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=43f9e5e57936')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    try { const client = (await import('./src/test-client.mjs?v=5badc203e0fb')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p>' + button('test-leave','Return to classroom') + '</main>'; }
     return;
   }
@@ -923,5 +950,5 @@ window.addEventListener('popstate', () => { if (user && !solo) enter().catch(e =
 
 // Suspended browser tabs resync as soon as they become visible again.
 document.addEventListener('visibilitychange', () => {
-  if (testRoom && sessionId && !document.hidden) void load(false);
+  if (!solo && sessionId && !document.hidden) void load(false);
 });
