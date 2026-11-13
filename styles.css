@@ -168,6 +168,7 @@
 .inventory-table :is(th, td):not(:first-child) { text-align: right; white-space: nowrap; }
 .inventory-table td:first-child { white-space: nowrap; }
 .inventory-note { margin: 8px 0 0; }
+.inventory-build { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; margin: 0 0 8px; font-size: 12px; }
 .stock-kind { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-right: 4px; border-radius: 50%; font-size:0.875rem; font-weight: 700; background: #233a31; color: white; }
 .stock-kind.component { background: #d9e9a9; color: #233a31; }
 @media (max-width: 980px) {
