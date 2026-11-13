@@ -22,7 +22,7 @@ Review also caught and corrected a focus-restoration regression before release: 
 - A purchase of 10 recycled frames cost EUR 298.20. Purchase history showed receipt on 3 January at 07:00 and payment on 6 January at 07:00. Shared supplier availability changed after purchase.
 - The initial ten-day session completed, blocked further student decisions, and showed no pending events. The instructor extended it to thirty days; the students could re-enter with their existing membership and workspace panels.
 - The seven-day report showed exactly 21 rows for three companies, spanning 5–11 January, with negative profit values and cents preserved.
-- The CSV export button was exercised, but the browser automation's download event did not return a file. Download completion is therefore not claimed from this browser run; CSV serialization and download lifecycle remain covered by automated tests.
+- The CSV export button was exercised, but the browser automation's download event did not return a file during this round. A [subsequent Chrome download verification](chrome-csv-downloads-2026-11-13.md) completed the native Save As dialog and verified actual report and ledger files against the synthetic classroom data.
 
 ## Validation
 
