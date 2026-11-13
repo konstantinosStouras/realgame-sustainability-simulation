@@ -294,8 +294,12 @@ td { line-height: 1.5; }
 .stock-kind { width: 24px; height: 24px; }
 .avatar { width: 36px; height: 36px; flex-shrink: 0; }
 .workspace-tool-label { width: 220px; max-width: calc(100vw - 32px); }
-.chart-scroll { overflow-x: auto; }
-.chart { min-width: 660px; }
+.chart-scroll { width: 100%; min-width: 0; }
+.chart { width: 100%; min-width: 0; }
+@media (max-width: 700px) {
+  .chart text { font-size: 26px; }
+  .chart-line { vector-effect: non-scaling-stroke; stroke-width: 2; }
+}
 @media (max-width: 700px) {
   .workspace-nav { position: static; padding: 8px; }
   .workspace-tools { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; gap: 4px; }
