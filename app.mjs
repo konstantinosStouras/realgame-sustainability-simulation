@@ -1,6 +1,6 @@
-import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=2ab28fd34fe9';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=2ab28fd34fe9';
-import { watchSession } from './src/session-updates.mjs?v=2ab28fd34fe9';
+import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=3f117225dd9c';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=3f117225dd9c';
+import { watchSession } from './src/session-updates.mjs?v=3f117225dd9c';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -160,6 +160,7 @@ async function load(force = true, afterCommand = false) {
     // Keep the version that the student actually reviewed while editing a decision.
     if (!force && !afterCommand && (busy || submittingForms.size || dialog.open || document.activeElement?.closest('form'))) { refreshDeferred = changed; online = true; updateConnectionNotice(); return; }
     state = data.state; actor = data.actor; testAccessClosed = false; refreshDeferred = false; online = true; updateConnectionNotice(); ensureSessionUpdates();
+    if (dialog.open) dialog.querySelector?.('form')?.refreshContext?.();
     if ((force || changed) && !dialog.open && (force || (!submittingForms.size && !document.activeElement?.closest('form')))) render();
   } catch (e) {
     if (!current()) return;
@@ -310,7 +311,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=2ab28fd34fe9')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=3f117225dd9c')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -381,7 +382,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=2ab28fd34fe9')).testClient();
+      const client = (await import('./src/test-client.mjs?v=3f117225dd9c')).testClient();
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -875,11 +876,50 @@ function csv(name, rows) {
 const value = (data, key) => Number(data.get(key));
 function openDispatch(id) {
   const o = company().orders.find(x => x.id === id), routes = state.catalog.routes.filter(r => r.enabled);
+  if (!o || o.remaining === 0) { modal('No open quantity to dispatch', '<p>This order has already been dispatched or is no longer available. Review your current orders.</p>'); return; }
   if (!routes.length) { modal('No transport routes available', '<p>The instructor has disabled all transport routes. Your order remains open. Ask the instructor to enable a route before dispatching.</p>'); return; }
   if (company().inventory.panel.qty < 1) { modal('No modules available to dispatch', '<p>Your finished-goods inventory is empty. The order remains open. Receive any needed components and produce modules, then return to dispatch.</p>'); return; }
-  modal(`Dispatch ${id}`, `<p class="form-note">Original order: ${o.originalQty} modules. Still to dispatch: ${o.remaining}. Stock available: ${company().inventory.panel.qty}. Promised arrival: ${simDate(o.dueAt)}.</p><div class="form-grid">${field('qty', 'Modules to dispatch', Math.min(o.remaining, company().inventory.panel.qty), 'number', `min="1" max="${Math.min(o.remaining, company().inventory.panel.qty)}"`)}${select('routeId', 'Transport route', routes.map(r => [r.id, `${r.name} · ${r.hours} h`]), routes[0]?.id)}</div><div id="dispatch-quote" class="advice"></div><p class="form-note">Each split shipment pays its own fixed fee. Revenue is recognized at customer receipt, with payment ${o.payment} h later.</p>`, data => command({ type: 'dispatch', orderId: id, qty: value(data, 'qty'), routeId: data.get('routeId') }), 'Confirm dispatch');
-  const update = () => { const f = new FormData(dialog.querySelector('form')), route = routes.find(r => r.id === f.get('routeId')), qty = value(f, 'qty'); dialog.querySelector('#dispatch-quote').innerHTML = `<strong>${exactMoney(route.fixed + route.unit * qty)} freight ${route.term ? 'due ' + simDate(state.hour + route.term) : 'paid now'} · ${number(route.carbonFixed + route.carbonUnit * qty)} kg CO₂e</strong>Estimated arrival: ${simDate(state.hour + route.hours)}. ${route.reliability}% on time; up to ${route.maxDelay} h carrier delay.${qty < o.remaining ? '<br>Partial dispatch: the unshipped quantity stays open.' : ''}${state.hour + route.hours > o.dueAt ? '<br>Expected late: satisfaction penalty at receipt.' : state.hour + route.hours < o.dueAt - 24 ? '<br>More than 24 h early: small satisfaction penalty at receipt.' : ''}`; };
-  dialog.querySelector('form').addEventListener('input', update); update();
+  modal(`Dispatch ${id}`, `<p id="dispatch-context" class="form-note"></p><div class="form-grid">${field('qty', 'Modules to dispatch', Math.min(o.remaining, company().inventory.panel.qty), 'number', `min="1" max="${Math.min(o.remaining, company().inventory.panel.qty)}"`)}${select('routeId', 'Transport route', routes.map(r => [r.id, `${r.name} · ${r.hours} h`]), routes[0]?.id)}</div><div id="dispatch-quote" class="advice"></div><p id="dispatch-terms" class="form-note"></p>`, data => command({ type: 'dispatch', orderId: id, qty: value(data, 'qty'), routeId: data.get('routeId') }), 'Confirm dispatch');
+  const form = dialog.querySelector('form');
+  form.refreshContext = () => updateDispatchContext(id, form, true);
+  form.addEventListener('input', () => updateDispatchContext(id, form)); form.refreshContext();
+}
+function updateDispatchContext(id, form, refreshRoutes = false) {
+  const c = company(), order = c?.orders.find(o => o.id === id), stock = c?.inventory.panel.qty || 0;
+  const quantity = form.querySelector('[name=qty]'), choice = form.querySelector('[name=routeId]'), quote = form.querySelector('#dispatch-quote');
+  // Keep the draft controls and their values. Refresh only authoritative facts,
+  // validation bounds and route labels after a reviewed conflict response.
+  quantity.max = String(Math.min(order?.remaining || 0, stock));
+  quantity.setCustomValidity(!order || !order.remaining ? 'This order has no remaining quantity to dispatch.' : !stock ? 'No modules are currently available to dispatch.' : '');
+  form.querySelector('#dispatch-context').textContent = order ? `Original order: ${order.originalQty} modules. Still to dispatch: ${order.remaining}. Stock available: ${stock}. Promised arrival: ${simDate(order.dueAt)}.` : 'This order is no longer available. Review your current orders.';
+  form.querySelector('#dispatch-terms').textContent = order ? `Each split shipment pays its own fixed fee. Revenue is recognized at customer receipt, with payment ${order.payment} h later.` : '';
+  if (refreshRoutes) {
+    const selected = choice.value, routes = state.catalog.routes.filter(r => r.enabled);
+    if (selected && !routes.some(r => r.id === selected)) routes.push({ id: selected, name: 'Previously selected route unavailable', enabled: false });
+    choice.innerHTML = routes.map(r => `<option value="${esc(r.id)}" ${r.id === selected ? 'selected' : ''} ${r.enabled ? '' : 'disabled'}>${esc(r.name)}${r.enabled ? ` · ${r.hours} h` : ''}</option>`).join('');
+    choice.value = selected;
+  }
+  const route = state.catalog.routes.find(r => r.id === choice.value && r.enabled), qty = Number(quantity.value);
+  choice.setCustomValidity(route ? '' : 'Choose an available transport route.');
+  if (!route || !order || !order.remaining || !stock) { quote.textContent = !route ? 'The selected route is unavailable. Choose an enabled route before submitting.' : 'Dispatch is currently unavailable. Your quantity and route draft have been preserved.'; return; }
+  quote.innerHTML = `<strong>${exactMoney(route.fixed + route.unit * qty)} freight ${route.term ? 'due ' + simDate(state.hour + route.term) : 'paid now'} · ${number(route.carbonFixed + route.carbonUnit * qty)} kg CO₂e</strong>Estimated arrival: ${simDate(state.hour + route.hours)}. ${route.reliability}% on time; up to ${route.maxDelay} h carrier delay.${qty < order.remaining ? '<br>Partial dispatch: the unshipped quantity stays open.' : ''}${state.hour + route.hours > order.dueAt ? '<br>Expected late: satisfaction penalty at receipt.' : state.hour + route.hours < order.dueAt - 24 ? '<br>More than 24 h early: small satisfaction penalty at receipt.' : ''}`;
+}
+function openPurchase(id) {
+  const supplier = state.catalog.suppliers.find(s => s.id === id);
+  if (!supplier) return;
+  modal(`Order ${itemName(state, supplier.item)}`, `<p id="purchase-context" class="form-note"></p>${field('qty', 'Quantity', supplier.min, 'number', `min="${supplier.min}" max="${supplier.stock}" step="${supplier.lot}"`)}<div id="purchase-quote" class="advice"></div>`, f => command({ type: 'purchase', supplierId: id, qty: value(f, 'qty') }), 'Place purchase');
+  const form = dialog.querySelector('form');
+  form.refreshContext = () => updatePurchaseContext(id, form);
+  form.addEventListener('input', form.refreshContext); form.refreshContext();
+}
+function updatePurchaseContext(id, form) {
+  const supplier = state.catalog.suppliers.find(s => s.id === id), quantity = form.querySelector('[name=qty]'), context = form.querySelector('#purchase-context'), quote = form.querySelector('#purchase-quote');
+  quantity.setCustomValidity(supplier?.enabled ? '' : 'This supplier is currently unavailable.');
+  if (!supplier) { context.textContent = 'This supplier is no longer available.'; quote.textContent = ''; return; }
+  quantity.min = String(supplier.min); quantity.max = String(supplier.stock); quantity.step = String(supplier.lot);
+  context.textContent = `${supplier.name} · ${exactMoney(supplier.price)} per unit + ${exactMoney(supplier.fee)} order fee. Supplier stock available: ${supplier.stock}. Estimated receipt ${simDate(state.hour + supplier.lead)}; payment ${supplier.term} h after actual receipt. Minimum ${supplier.min}; lots of ${supplier.lot}.${supplier.enabled ? '' : ' This supplier is currently disabled.'}`;
+  const qty = Number(quantity.value);
+  quote.textContent = `${exactMoney(qty * supplier.price + supplier.fee)} committed payable · ${number(qty * (supplier.carbon + supplier.freight))} kg CO₂e. Cash is paid after receipt, not now.`;
 }
 function sessionSettingsCommand(current, form) {
   const hours = Number(form.get('days')) * 24, rounded = Math.round(hours);
@@ -985,7 +1025,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=2ab28fd34fe9')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=3f117225dd9c')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -999,11 +1039,7 @@ async function action(name, id) {
     modal('Edit sales offer', `<div class="form-grid">${field('price', 'Price per module (EUR)', o.price / 100, 'number', 'min="50" max="10000" step="0.01"')}${field('delivery', 'Delivery promise (hours)', o.delivery, 'number', 'min="6" max="720"')}${field('min', 'Minimum quantity', o.min, 'number', 'min="1"')}${field('max', 'Maximum quantity', o.max, 'number', 'min="1"')}${field('payment', 'Payment after receipt (hours)', o.payment, 'number', 'min="0" max="720"')}${check('enabled', 'Offer active', o.enabled)}</div>`, f => command({ type: 'offer', offerId: id, price: Math.round(value(f, 'price') * 100), delivery: value(f, 'delivery'), min: value(f, 'min'), max: value(f, 'max'), payment: value(f, 'payment'), enabled: f.has('enabled') }), 'Save offer');
   }
   if (name === 'dispatch') openDispatch(id);
-  if (name === 'purchase') {
-    const sup = state.catalog.suppliers.find(x => x.id === id);
-    modal(`Order ${itemName(state, sup.item)}`, `<p class="form-note">${esc(sup.name)} · ${exactMoney(sup.price)} per unit + ${exactMoney(sup.fee)} order fee. Estimated receipt ${simDate(state.hour + sup.lead)}; payment ${sup.term} h after actual receipt. Minimum ${sup.min}; lots of ${sup.lot}.</p>${field('qty', 'Quantity', sup.min, 'number', `min="${sup.min}" max="${sup.stock}" step="${sup.lot}"`)}<div id="purchase-quote" class="advice"></div>`, f => command({ type: 'purchase', supplierId: id, qty: value(f, 'qty') }), 'Place purchase');
-    const update = () => { const qty = Number(dialog.querySelector('[name=qty]').value); dialog.querySelector('#purchase-quote').textContent = `${exactMoney(qty * sup.price + sup.fee)} committed payable · ${number(qty * (sup.carbon + sup.freight))} kg CO₂e. Cash is paid after receipt, not now.`; }; dialog.querySelector('form').addEventListener('input', update); update();
-  }
+  if (name === 'purchase') openPurchase(id);
   if (name === 'staff') modal('Change staffing', `<p class="form-note">${c.workers} current workers. Enter a positive number to recruit or negative to reduce. Recruitment costs €250 per worker; severance €500. Effective in 48 h.</p>${field('delta', 'Change in workers', 1, 'number', 'min="-20" max="20"')}`, f => command({ type: 'staff', delta: value(f, 'delta') }));
   if (name === 'annuity') modal('Request annuity loan', '<p class="form-note">Funding in 48 simulation hours. The first weekly payment is due one week after the request. Annual interest is 8%.</p>' + field('amount', 'Principal (EUR)', 10000, 'number', 'min="1000" max="150000" step="0.01"') + field('weeks', 'Term (weeks)', 2, 'number', 'min="1" max="20"'), f => command({ type: 'loan', plan: 'annuity', repaymentAnchor: 'request', amount: Math.round(value(f, 'amount') * 100), weeks: value(f, 'weeks') }));
   if (name === 'loan') modal('Request bullet loan', '<p class="form-note">Funds arrive in 24 simulation hours. Principal and 9% simple annual interest are repaid at maturity.</p>' + field('amount', 'Principal (EUR)', 10000, 'number', 'min="1000" max="150000" step="0.01"') + field('days', 'Term (days)', 7, 'number', 'min="7" max="90"'), f => command({ type: 'loan', amount: Math.round(value(f, 'amount') * 100), term: value(f, 'days') * 24 }));
@@ -1120,7 +1156,7 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=2ab28fd34fe9')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    try { const client = (await import('./src/test-client.mjs?v=3f117225dd9c')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p>' + (e.status === 403 ? button('retry-start', 'Try again', '', 'primary') : '') + button('test-leave','Return to classroom') + '</main>'; }
     return;
   }
