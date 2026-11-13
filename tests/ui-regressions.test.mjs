@@ -139,6 +139,17 @@ test('settings that complete a session do not attempt a rejected follow-up clock
   assert.equal(h.run('submitted[0].type'), 'configure');
 });
 
+test('truck badge counts each order with units left to dispatch', () => {
+  const h = harness();
+  h.run('state.company = { orders: [{ remaining: 10 }, { remaining: 2 }, { remaining: 0 }] }');
+  const navigation = h.run('workspaceNavigation(false, () => true)');
+  assert.match(navigation, /class="dispatch-count" aria-hidden="true">2<\/span>/);
+  assert.match(navigation, /2 orders waiting to be dispatched/);
+  assert.doesNotMatch(h.run("workspaceNavigation(false, key => key !== 'orders')"), /dispatch-count/);
+  h.run('state.company.orders.forEach(order => { order.remaining = 0; })');
+  assert.doesNotMatch(h.run('workspaceNavigation(false, () => true)'), /dispatch-count/);
+});
+
 test('student workspace exposes nine categories and shows filtered live stock with one Inventory heading', () => {
   const h = harness();
   h.run(`actor.role = 'student'; page = 'workspace';

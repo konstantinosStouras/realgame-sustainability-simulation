@@ -34,6 +34,23 @@
   text-decoration: none;
 }
 .workspace-tools .icon { width: 40px; height: 40px; }
+.workspace-tool-icon { position: relative; display: inline-flex; flex-shrink: 0; }
+.dispatch-count {
+  position: absolute;
+  top: -4px;
+  left: calc(100% - 8px);
+  min-width: 18px;
+  padding: 2px 4px;
+  border-radius: 999px;
+  background: #006bc7;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+}
 .workspace-tools > :focus-visible { outline: 2px solid white; outline-offset: -3px; }
 .workspace-tools > .active { background: #505050; }
 .workspace-tools > [aria-disabled="true"] { opacity: .65; cursor: default; }
