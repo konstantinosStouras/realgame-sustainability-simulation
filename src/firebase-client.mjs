@@ -1,4 +1,4 @@
-import { firebaseConfig } from '../firebase-config.mjs?v=91302f6e8b50';
+import { firebaseConfig } from '../firebase-config.mjs?v=0078b6fd6403';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/13.3.0/firebase-app.js';
 import { getAuth, setPersistence, browserSessionPersistence, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendEmailVerification, sendPasswordResetEmail, signOut } from 'https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js';
 const app = initializeApp(firebaseConfig);

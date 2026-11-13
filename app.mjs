@@ -1,5 +1,5 @@
-import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=91302f6e8b50';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=91302f6e8b50';
+import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=0078b6fd6403';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=0078b6fd6403';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -207,7 +207,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=91302f6e8b50')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=0078b6fd6403')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -261,7 +261,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=91302f6e8b50')).testClient();
+      const client = (await import('./src/test-client.mjs?v=0078b6fd6403')).testClient();
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -293,7 +293,7 @@ const sessionHints = {
   'copy-session': 'Copy a link to this session. Effect on students: they still need to sign in and belong to a company; the link does not grant access.',
   'session-export': 'Download the session replay and results. Effect on students: their session is unchanged. The export may contain participant names; keep it private.',
   'session-test': 'Create a temporary practice round with simulated students, each assigned to one company, in separate browser tabs. Effect on students: real accounts and assessed results are unchanged. No test decisions are saved to Firebase.',
-  'session-close': 'Stop play and move the session to Past sessions, retaining results. Effect on students: students can no longer submit decisions; results remain available for read-only review.',
+  'session-close': 'Stop play and move the session to Past sessions, retaining results. Effect on students: students can no longer open the session or submit decisions. Instructors retain access to results.',
   'session-delete': 'Archive the session and remove it from session lists. Stored records are retained. Effect on students: they lose access to this session; their accounts remain.',
   'session-codes': 'View company join codes and the student directory. Effect on students: sharing a company code lets a signed-in student join that company.',
   'sessions-delete': 'Archive all active sessions and remove them from session lists, retaining stored records. Effect on students: they lose access to those sessions; their accounts remain.'
@@ -588,6 +588,18 @@ function openDispatch(id) {
   const update = () => { const f = new FormData(dialog.querySelector('form')), route = routes.find(r => r.id === f.get('routeId')), qty = value(f, 'qty'); dialog.querySelector('#dispatch-quote').innerHTML = `<strong>${exactMoney(route.fixed + route.unit * qty)} freight ${route.term ? 'due ' + simDate(state.hour + route.term) : 'paid now'} · ${number(route.carbonFixed + route.carbonUnit * qty)} kg CO₂e</strong>Estimated arrival: ${simDate(state.hour + route.hours)}. ${route.reliability}% on time; up to ${route.maxDelay} h carrier delay.${qty < o.remaining ? '<br>Partial dispatch: the unshipped quantity stays open.' : ''}${state.hour + route.hours > o.dueAt ? '<br>Expected late: satisfaction penalty at receipt.' : state.hour + route.hours < o.dueAt - 24 ? '<br>More than 24 h early: small satisfaction penalty at receipt.' : ''}`; };
   dialog.querySelector('form').addEventListener('input', update); update();
 }
+function sessionSettingsCommand(current, form) {
+  const hours = Number(form.get('days')) * 24, rounded = Math.round(hours);
+  if (!Number.isFinite(hours) || Math.abs(hours - rounded) > 1e-8) throw new Error('Duration must be a whole number of simulation hours.');
+  const command = { type: 'configure', studentAccess: form.has('studentAccess'), name: form.get('name') };
+  // A closed session can end before day one or between days. Saving unrelated
+  // settings must preserve that exact end and must not reopen the session.
+  if (rounded !== current.endHour) {
+    if (rounded < Math.max(24, current.hour) || rounded > 4320) throw new Error('Choose a duration of at least one day, no earlier than the current simulation hour, and at most 180 days.');
+    command.endHour = rounded;
+  }
+  return command;
+}
 async function action(name, id) {
   if (name === 'workspace-tool') {
     const tool = workspaceTools.find(tool => tool.id === id);
@@ -623,12 +635,12 @@ async function action(name, id) {
   if (['session-close', 'session-delete', 'sessions-delete'].includes(name)) {
     if (!health?.sessionLifecycle) { modal('Server update needed', '<p>This classroom server needs the session-management update before sessions can be closed or deleted.</p>'); return; }
     const deleting = name !== 'session-close', targets = name === 'sessions-delete' ? sessions.filter(s => s.status !== 'completed') : sessions.filter(s => s.id === id);
-    modal(deleting ? 'Delete sessions?' : 'Close session?', '<p>' + (deleting ? 'Remove these sessions from everyone’s list and revoke access. Stored records are retained on the server; this does not permanently erase data. Export anything you need first.' : 'Stop the clock and move this session to Past sessions. Results remain available to instructors. Extend its duration in settings to resume.') + '</p><ul>' + targets.map(s => '<li>' + esc(s.name) + '</li>').join('') + '</ul>' + (deleting ? field('confirmation', 'Type DELETE to confirm', '', 'text', 'pattern="DELETE" autocomplete="off"') : ''), async f => {
+    const completed = new Set();
+    modal(deleting ? 'Delete sessions?' : 'Close session?', '<p>' + (deleting ? 'Remove these sessions from everyone’s list and revoke access. Stored records are retained on the server; this does not permanently erase data. Export anything you need first.' : 'Stop the clock and move this session to Past sessions. Students lose access to this session. Results remain available to instructors. Extend its duration in settings to resume.') + '</p><ul>' + targets.map(s => '<li>' + esc(s.name) + '</li>').join('') + '</ul>' + (deleting ? field('confirmation', 'Type DELETE to confirm', '', 'text', 'pattern="DELETE" autocomplete="off"') : ''), async f => {
       if (deleting && f.get('confirmation') !== 'DELETE') throw new Error('Type DELETE to confirm.');
-      let done = 0;
-      try { for (const target of targets) { await lifecycleRequest(target.id, deleting ? 'deleteSession' : 'closeSession'); done++; } }
-      catch (error) { await enter(); throw new Error(done + ' of ' + targets.length + ' sessions updated. ' + error.message + ' Refresh and retry remaining sessions.'); }
-      await enter(); toast(done + (deleting ? ' sessions deleted.' : ' session closed.'));
+      try { for (const target of targets) { if (completed.has(target.id)) continue; await lifecycleRequest(target.id, deleting ? 'deleteSession' : 'closeSession'); completed.add(target.id); } }
+      catch (error) { await enter(); throw new Error(completed.size + ' of ' + targets.length + ' sessions updated. ' + error.message + ' Retry to update only the remaining sessions.'); }
+      await enter(); toast(completed.size + (deleting ? ' sessions deleted.' : ' session closed.'));
     }, deleting ? 'Delete sessions' : 'Close session'); return;
   }
   if (name === 'session-export') {
@@ -655,7 +667,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=91302f6e8b50')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=0078b6fd6403')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -684,7 +696,7 @@ async function action(name, id) {
   if (name === 'reorder') { const policy = c.reorder[id]; modal(`Replenishment · ${itemName(state, id)}`, `${select('supplierId', 'Preferred supplier', state.catalog.suppliers.filter(s => s.item === id && s.enabled).map(s => [s.id, `${s.name} · lot ${s.lot}`]), policy?.supplierId)}<div class="form-grid">${field('point', 'Reorder point (stock + incoming)', policy?.point || (id === 'cell' ? 6000 : 250), 'number', 'min="0"')}${field('qty', 'Quantity per order', policy?.qty || (id === 'cell' ? 7200 : 300), 'number', 'min="1"')}</div>${check('enabled', 'Enable this policy', policy?.enabled ?? true)}<p class="form-note">Only runs after the replenishment investment is active. The assistant reports blocked orders and retries hourly.</p>`, f => command({ type: 'reorder', supplierId: f.get('supplierId'), point: value(f, 'point'), qty: value(f, 'qty'), enabled: f.has('enabled') })); }
   if (name === 'step') { if (id === 'custom') modal('Advance the simulation', field('hours', 'Hours to advance (1–168)', 24, 'number', 'min="1" max="168"'), f => command({ type: 'step', hours: value(f, 'hours') }), 'Advance'); else { await command({ type: 'step', hours: Number(id) }); render(); } }
   if (name === 'clock') { await command({ type: 'clock', status: id }); render(); }
-  if (name === 'settings') modal('Session settings', `${check('studentAccess', 'Open session to students', state.studentAccess !== false)}${field('name', 'Session name', state.name, 'text', 'maxlength="120"')}<div class="form-grid">${field('days', 'Total duration from start (days)', state.endHour / 24, 'number', `min="${Math.ceil(state.hour / 24)}" max="180"`)}${field('speed', 'Real seconds per simulation hour', state.secondsPerHour, 'number', 'min="1" max="120"')}</div>`, async f => { await command({ type: 'configure', studentAccess: f.has('studentAccess'), name: f.get('name'), endHour: value(f, 'days') * 24 }); if (state.status !== 'completed' && !solo) await command({ type: 'clock', status: state.status, secondsPerHour: value(f, 'speed') }); }, 'Save settings');
+  if (name === 'settings') modal('Session settings', `${check('studentAccess', 'Open session to students', state.studentAccess !== false)}${field('name', 'Session name', state.name, 'text', 'maxlength="120"')}<div class="form-grid">${field('days', 'Total duration from start (days)', state.endHour / 24, 'number', `min="${Math.min(state.endHour, Math.max(24, state.hour)) / 24}" max="180" step="any"`)}${field('speed', 'Real seconds per simulation hour', state.secondsPerHour, 'number', 'min="1" max="120"')}</div>`, async f => { await command(sessionSettingsCommand(state, f)); if (state.status !== 'completed' && !solo) await command({ type: 'clock', status: state.status, secondsPerHour: value(f, 'speed') }); }, 'Save settings');
   if (name === 'events') modal('Pending & completed outcomes', table(['Company', 'Outcome', 'Scheduled time', 'State'], state.events.filter(e => !c || e.companyId === c.id).slice().sort((a, b) => a.at - b.at).map(e => [esc(state.companies.find(c => c.id === e.companyId)?.name), esc(e.description), simDate(e.at), esc(e.blocked || e.status)])));
   if (name === 'create') modal('Create a classroom session', createSessionFields(), createClassroom, 'Create session');
   if (name === 'join') { selectSession(null); renderLobby(); return; }
@@ -790,7 +802,7 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=91302f6e8b50')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    try { const client = (await import('./src/test-client.mjs?v=0078b6fd6403')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p>' + button('test-leave','Return to classroom') + '</main>'; }
     return;
   }
