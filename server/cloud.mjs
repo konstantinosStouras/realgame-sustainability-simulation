@@ -17,5 +17,7 @@ const verifyFirebase = async token => {
 // 120 idle student watches must leave room for their simultaneous API reads.
 // Live measurements showed slot exhaustion at 80 while CPU and memory had room.
 // Keep the two-instance compute cap; allow 320 in-flight requests across it.
-export const classroom = onRequest({ ...runtime, concurrency: 160, invoker: 'public' }, createCloudHandler({ store, verifyFirebase, projectId, allowedOrigins: ['https://www.stouras.com', 'https://stouras.com', `https://${projectId}.web.app`, `https://${projectId}.firebaseapp.com`] }));
+// Concurrent full-history responses reached 559 MiB in the 60-day live probe.
+// Give HTTP response buffers headroom without increasing the clock's allocation.
+export const classroom = onRequest({ ...runtime, memory: '1GiB', concurrency: 160, invoker: 'public' }, createCloudHandler({ store, verifyFirebase, projectId, allowedOrigins: ['https://www.stouras.com', 'https://stouras.com', `https://${projectId}.web.app`, `https://${projectId}.firebaseapp.com`] }));
 export const classroomClock = onSchedule({ ...runtime, maxInstances: 1, schedule: 'every 1 minutes', timeZone: 'Europe/London', retryCount: 0 }, () => store.runDueClocks());
