@@ -220,3 +220,10 @@ dialog .dialog-toolbar .close{position:static;min-width:44px;flex-shrink:0}
 @media (max-width: 360px) {
   .session-actions .session-action-hint:nth-child(n) > .session-tooltip { left: 0; right: auto; }
 }
+/* Size the phone dropdown against its available header width, not 100vw,
+   which includes the scrollbar and can push a right-aligned menu off-screen. */
+@media (max-width: 480px) {
+  .account-controls { position: relative; width: 100%; justify-content: flex-end; }
+  .account-menu { position: static; }
+  .account-dropdown { max-width: 100%; }
+}
