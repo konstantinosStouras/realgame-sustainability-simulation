@@ -92,7 +92,7 @@ test('cloud HTTP sends equivalent JSON directly with unchanged auth, errors and 
     assert.equal(response.headers.get('cache-control'), 'no-store');
     assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
     assert.equal(response.headers.get('access-control-allow-origin'), 'https://classroom.example');
-    assert.equal(response.headers.get('vary'), 'Origin');
+    assert.equal(response.headers.get('vary'), 'Origin, Accept-Encoding');
     assert.equal(serialized, 1);
     const invalid = await get('invalid'); assert.equal(invalid.status, 401); await invalid.json();
     assert.equal(serialized, 1, 'invalid authentication never reaches projection');

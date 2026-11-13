@@ -1,6 +1,7 @@
 import { readExportForm, sendExport } from './export-download.mjs';
 import { readBody } from './read-body.mjs';
 import { fail } from '../src/engine.mjs';
+import { sendViewResponse } from './view-response.mjs';
 
 export function createCloudHandler({ store, verifyFirebase, projectId, allowedOrigins }) {
   const origins = new Set(allowedOrigins);
@@ -49,8 +50,8 @@ export function createCloudHandler({ store, verifyFirebase, projectId, allowedOr
       }
       if (!action && req.method === 'GET') {
         const preview = url.searchParams.get('company');
-        if (store.viewJSON) return sendJSON(200, await store.viewJSON(user, id, preview));
-        return send(200, await store.view(user, id, preview));
+        const json = store.viewJSON ? await store.viewJSON(user, id, preview) : JSON.stringify(await store.view(user, id, preview));
+        return await sendViewResponse(req, res, json);
       }
       if (action === 'command' && req.method === 'POST') return send(200, await store.command(user, id, body));
       if (action === 'roster' && req.method === 'GET') return send(200, await store.roster(user, id));

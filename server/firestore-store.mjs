@@ -7,14 +7,17 @@ import { createSession, applyCommand, assertInvariants, publicView, publicViewJS
 import { encodeState, decodeStateWithSize, digest, advanceCloudClock } from './cloud-state.mjs';
 
 export class FirestoreStore {
-  constructor(db, { prefix = 'studio', now = Date.now, viewCacheMaxBytes = 32 * 1024 * 1024, viewCacheTtlMs = 30000 } = {}) {
+  constructor(db, { prefix = 'studio', now = Date.now, viewCacheMaxBytes = 32 * 1024 * 1024, viewCacheTtlMs = 30000, viewJSONCacheMaxBytes = 24 * 1024 * 1024 } = {}) {
     if (!/^[a-zA-Z][a-zA-Z0-9_]{0,60}$/.test(prefix)) throw new Error('Invalid Firestore namespace');
     if (!Number.isSafeInteger(viewCacheMaxBytes) || viewCacheMaxBytes < 0 || !Number.isSafeInteger(viewCacheTtlMs) || viewCacheTtlMs < 0) throw new Error('Invalid view cache limits');
+    if (!Number.isSafeInteger(viewJSONCacheMaxBytes) || viewJSONCacheMaxBytes < 0) throw new Error('Invalid serialized view cache limit');
     this.db = db; this.prefix = prefix; this.now = now;
     this.viewClockTasks = new Map();
     this.commandWrites = new Map();
     this.viewSnapshots = new Map(); this.viewSnapshotTasks = new Map();
     this.viewCacheBytes = 0; this.viewCacheMaxBytes = viewCacheMaxBytes; this.viewCacheTtlMs = viewCacheTtlMs;
+    this.viewJSONIndex = new WeakMap(); this.viewJSONCache = new Map();
+    this.viewJSONCacheBytes = 0; this.viewJSONCacheMaxBytes = viewJSONCacheMaxBytes;
     for (const name of ['Users', 'Sessions', 'Members', 'Invites', 'Requests']) this[name.toLowerCase()] = db.collection(prefix + name);
   }
   userRef(id) { return this.users.doc(digest(id)); }
@@ -191,11 +194,40 @@ export class FirestoreStore {
     const { actor, state, catchingUp } = await this.currentViewSnapshot(user, id);
     return { actor, state: publicView(state, actor, preview), catchingUp };
   }
+  serializeViewState(state, actor, preview) {
+    // Student projection/message visibility depends only on role and company.
+    // Every caller already passed fresh authorization. Never cache its actor
+    // envelope, membership, access decision, or an instructor preview.
+    if (actor.role !== 'student' || !state.companies.some(c => c.id === actor.companyId)) return publicViewJSON(state, actor, preview);
+    for (const [key, entry] of this.viewJSONCache) if (entry.expiresAt <= this.now()) {
+      this.viewJSONCache.delete(key); this.viewJSONCacheBytes -= entry.bytes;
+    }
+    let companies = this.viewJSONIndex.get(state);
+    const cachedKey = companies?.get(actor.companyId), cached = this.viewJSONCache.get(cachedKey);
+    if (cached) {
+      this.viewJSONCache.delete(cachedKey); this.viewJSONCache.set(cachedKey, cached);
+      return cached.json;
+    }
+    const json = publicViewJSON(state, actor, preview), bytes = Buffer.byteLength(json);
+    if (this.viewCacheTtlMs && bytes <= this.viewJSONCacheMaxBytes) {
+      while (this.viewJSONCache.size && (this.viewJSONCache.size >= 48 || this.viewJSONCacheBytes + bytes > this.viewJSONCacheMaxBytes)) {
+        const key = this.viewJSONCache.keys().next().value, entry = this.viewJSONCache.get(key);
+        this.viewJSONCache.delete(key); this.viewJSONCacheBytes -= entry.bytes;
+      }
+      // The global LRU retains only immutable text. Its keys must never hold a
+      // state reference, or small projections could pin many large histories.
+      if (!companies) { companies = new Map(); this.viewJSONIndex.set(state, companies); }
+      const key = {}; companies.set(actor.companyId, key);
+      this.viewJSONCache.set(key, { json, bytes, expiresAt: this.now() + this.viewCacheTtlMs });
+      this.viewJSONCacheBytes += bytes;
+    }
+    return json;
+  }
   async viewJSON(user, id, preview) {
     const { actor, state, catchingUp } = await this.currentViewSnapshot(user, id);
     // Each component is JSON encoded; the state is never exposed as mutable
     // references. Authorization and clock catch-up are shared with view().
-    return `{"actor":${JSON.stringify(actor)},"state":${publicViewJSON(state, actor, preview)},"catchingUp":${JSON.stringify(catchingUp)}}`;
+    return `{"actor":${JSON.stringify(actor)},"state":${this.serializeViewState(state, actor, preview)},"catchingUp":${JSON.stringify(catchingUp)}}`;
   }
   async updates(user, id, revision, signal) {
     if (!Number.isSafeInteger(revision) || revision < 0) fail('Invalid session revision.');

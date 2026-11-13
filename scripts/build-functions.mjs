@@ -2,7 +2,7 @@ import { mkdir, copyFile, readFile, writeFile } from 'node:fs/promises';
 // Only deploy original backend code and dependency manifests, never private/
 // research, local accounts/databases, credentials, tests or environment files.
 const files = ['server/cloud.mjs', 'server/export-download.mjs', 'server/test-template.mjs', 'server/session-access.mjs', 'server/session-updates.mjs', 'server/cloud-http.mjs', 'server/cloud-state.mjs', 'server/firestore-store.mjs', 'src/engine.mjs', 'src/session-id.mjs', 'package-lock.json'];
-files.push('server/read-body.mjs');
+files.push('server/read-body.mjs', 'server/view-response.mjs');
 for (const file of files) {
   const destination = new URL(`../.cloud-functions/${file}`, import.meta.url);
   await mkdir(new URL('.', destination), { recursive: true });
