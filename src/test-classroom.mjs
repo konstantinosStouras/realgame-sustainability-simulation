@@ -1,4 +1,4 @@
-import { createSession, applyCommand, tick, publicView, assertInvariants, fail } from './engine.mjs?v=606baf9c5b5c';
+import { createSession, applyCommand, tick, publicView, assertInvariants, fail } from './engine.mjs?v=e79d8b7a57f9';
 
 // This model is held only by a SharedWorker. No storage, network or Firebase APIs.
 export class TestClassroom {
@@ -17,7 +17,7 @@ export class TestClassroom {
   }
   actor(key) { const person = this.people.find(p => p.key === key); if (!person) fail('This test tab link is invalid.', 403); const { key: _, ...actor } = person; return actor; }
   requireAccess(actor) {
-    if (actor.role === 'student' && (this.state.studentAccess === false || this.state.status === 'completed')) fail('This test session is completed or closed to students. Ask the instructor to reopen it.', 403);
+    if (actor.role === 'student' && this.state.studentAccess === false) fail('This test session is closed to students. Ask the instructor to reopen it.', 403);
   }
   roster(key) { if (this.actor(key).role !== 'instructor') fail('Instructor access required.', 403); return structuredClone(this.people); }
   view(key, preview) { const actor = this.actor(key); this.requireAccess(actor); return { actor, state: publicView(this.state, actor, preview) }; }

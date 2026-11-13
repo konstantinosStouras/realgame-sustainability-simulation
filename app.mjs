@@ -1,6 +1,6 @@
-import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=606baf9c5b5c';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=606baf9c5b5c';
-import { watchSession } from './src/session-updates.mjs?v=606baf9c5b5c';
+import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=e79d8b7a57f9';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=e79d8b7a57f9';
+import { watchSession } from './src/session-updates.mjs?v=e79d8b7a57f9';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -44,7 +44,7 @@ function showTestAccessClosed() {
   ++loadSequence;
   state = null; actor = null; roster = null; testAccessClosed = true;
   if (dialog.open) dialog.close();
-  root.innerHTML = '<main class="welcome" id="content"><h1>Test classroom access is closed</h1><p>Your instructor has closed access or completed this test round. Decisions are blocked. You can return when access reopens.</p>' + button('test-retry', 'Try again', '', 'primary') + button('test-leave', 'Leave test') + '</main>';
+  root.innerHTML = '<main class="welcome" id="content"><h1>Test classroom access is closed</h1><p>Your instructor has closed access to this test round. Decisions are blocked. You can return when access reopens.</p>' + button('test-retry', 'Try again', '', 'primary') + button('test-leave', 'Leave test') + '</main>';
 }
 let liveSession = null;
 function stopSessionUpdates() { liveSession?.watch.stop(); liveSession = null; }
@@ -157,11 +157,13 @@ async function load(force = true, afterCommand = false) {
     const data = await api(`/sessions/${sessionId}${preview ? `?company=${encodeURIComponent(preview)}` : ''}`);
     if (!current()) return;
     const changed = !state || data.state.revision !== state.revision || !online;
-    // Keep the version that the student actually reviewed while editing a decision.
-    if (!force && !afterCommand && (busy || submittingForms.size || dialog.open || document.activeElement?.closest('form'))) { refreshDeferred = changed; online = true; updateConnectionNotice(); return; }
+    const completedNow = data.state.status === 'completed' && state?.status !== 'completed';
+    // Preserve reviewed drafts during play, but completion must retire decision forms.
+    if (!force && !afterCommand && !completedNow && (busy || submittingForms.size || dialog.open || document.activeElement?.closest('form'))) { refreshDeferred = changed; online = true; updateConnectionNotice(); return; }
     state = data.state; actor = data.actor; testAccessClosed = false; refreshDeferred = false; online = true; updateConnectionNotice(); ensureSessionUpdates();
+    if (completedNow && dialog.open) dialog.close();
     if (dialog.open) dialog.querySelector?.('form')?.refreshContext?.();
-    if ((force || changed) && !dialog.open && (force || (!submittingForms.size && !document.activeElement?.closest('form')))) render();
+    if ((force || changed) && !dialog.open && (force || completedNow || (!submittingForms.size && !document.activeElement?.closest('form')))) render();
   } catch (e) {
     if (!current()) return;
     if (testRoom && e.status === 410) { endTestView(); return; }
@@ -311,7 +313,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=606baf9c5b5c')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=e79d8b7a57f9')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -382,7 +384,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=606baf9c5b5c')).testClient();
+      const client = (await import('./src/test-client.mjs?v=e79d8b7a57f9')).testClient();
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -606,7 +608,7 @@ function render() {
   const scope = interactionScope(), interaction = captureInteraction(scope);
   const titles = { workspace: 'Decision workspace', overview: c ? `Let's make progress, ${c.name.split(' ')[0]}.` : 'A classroom in motion.', orders: 'From offer to arrival.', supply: 'Keep your business moving.', production: 'Make capacity count.', finance: 'Follow the money.', energy: 'Build a better footprint.', reports: 'See the whole picture.', messages: 'Better decisions, together.', admin: 'Set the pace of learning.' };
   const subtitles = { workspace: 'Open the panels you need and compare them side by side.', overview: 'Your business, at a glance. Every decision has a next step.', orders: 'Accepted terms stay with each order, from first dispatch to final payment.', supply: 'Balance availability, working capital, and the footprint of every component.', production: 'Coordinate materials, people, machines, and the hours they work.', finance: 'Cash is available money. Profit is revenue earned less costs incurred.', energy: 'Invest now. Track activation and the results over time.', reports: 'Comparable daily results, with every reporting boundary clearly marked.', messages: 'A shared space for announcements, questions, and team decisions.', admin: 'Control the shared clock, classroom access, and teaching parameters.' };
-  root.innerHTML = `<div class="layout">${!admin || preview ? workspaceNavigation(admin, visible) : ''}<div class="workspace"><header class="topbar"><div class="breadcrumb">Workspace &nbsp; / &nbsp; <strong>${pages[page] || "Decision workspace"}</strong></div><div class="top-actions">${user?.role === 'instructor' ? button('sessions', 'All sessions', '', 'small') : ''}${accountControls(actor)}</div></header>${testRoom ? `<div class="mode-banner"><span><strong>Temporary test round</strong> · ${esc(actor.name)} · Shared only across these browser tabs. No test data is saved.</span>${admin ? button('test-students', 'Open test student tabs') + button('test-end', 'End test round') : ''}${button('test-leave', 'Leave test')}</div>` : solo ? `<div class="mode-banner"><span><strong>Solo sandbox</strong> · ${solo.isTest ? 'Private test round · changes are discarded when you leave.' : 'Saved in this browser. Switch roles to rehearse; no other people are connected.'}</span>${button('switch-solo', admin ? 'Play a company' : 'Instructor view')}</div>` : health?.demo ? '<div class="mode-banner"><span><strong>Local classroom demo</strong> · Synthetic accounts share durable server state. Demo sign-in is enabled on this computer.</span></div>' : ''}<main id="content" class="content">${connectionNotice()}<div class="page-heading"><div><div class="eyebrow">${esc(state.name)}${c ? ` &nbsp; / &nbsp; ${esc(c.name)}` : ''}</div><h1 tabindex="-1">${esc(titles[page])}</h1><p>${subtitles[page]}</p></div><div class="timebox"><span class="badge ${state.status === 'running' ? '' : 'amber'}">● ${esc(state.status)}</span><strong>${simDate(state.hour)} · simulation</strong><small>Day ${Math.floor(state.hour / 24) + 1} · ends ${simDate(state.endHour)}</small></div></div>${state.status === 'completed' ? `<div class="advice warning"><strong>Session complete. ${state.events.filter(e => e.status === 'pending').length} scheduled events remain.</strong>Pending deliveries, payments, and investments are preserved. The instructor can extend the end date to settle them.</div>` : ''}${admin ? `<div class="toolbar instructor-toolbar" aria-label="Instructor controls">${select('preview', 'Company preview · read-only', [['', 'All companies'], ...state.companies.map(x => [x.id, x.name])], preview || '')}<nav class="instructor-links" aria-label="Instructor pages">${button('nav', 'Session control', 'admin', 'small')}${button('nav', 'Class overview', 'overview', 'small')}${button('nav', 'Reports', 'reports', 'small')}${button('nav', 'Announcements', 'messages', 'small')}</nav></div>` : ''}${!admin && !solo && !testRoom ? `<div class="toolbar" aria-label="Classroom access">${button('join', 'Join another class', '', 'small')}${button('sessions', 'Switch session', '', 'small')}</div>` : ''}${page === "workspace" ? studentWorkspace(visible) : pageBody()}<div class="footer-note"><a href="notes/model.md" target="_blank" rel="noopener">Model & teaching guide ↗</a><br>All amounts are simulated EUR · Emissions in kg CO₂e · Simulation dates use UTC · Live state at ${simDate(state.hour)} · Model v${state.schema}</div></main></div></div>`;
+  root.innerHTML = `<div class="layout">${!admin || preview ? workspaceNavigation(admin, visible) : ''}<div class="workspace"><header class="topbar"><div class="breadcrumb">Workspace &nbsp; / &nbsp; <strong>${pages[page] || "Decision workspace"}</strong></div><div class="top-actions">${user?.role === 'instructor' ? button('sessions', 'All sessions', '', 'small') : ''}${accountControls(actor)}</div></header>${testRoom ? `<div class="mode-banner"><span><strong>Temporary test round</strong> · ${esc(actor.name)} · Shared only across these browser tabs. No test data is saved.</span>${admin ? button('test-students', 'Open test student tabs') + button('test-end', 'End test round') : ''}${button('test-leave', 'Leave test')}</div>` : solo ? `<div class="mode-banner"><span><strong>Solo sandbox</strong> · ${solo.isTest ? 'Private test round · changes are discarded when you leave.' : 'Saved in this browser. Switch roles to rehearse; no other people are connected.'}</span>${button('switch-solo', admin ? 'Play a company' : 'Instructor view')}</div>` : health?.demo ? '<div class="mode-banner"><span><strong>Local classroom demo</strong> · Synthetic accounts share durable server state. Demo sign-in is enabled on this computer.</span></div>' : ''}<main id="content" class="content">${connectionNotice()}<div class="page-heading"><div><div class="eyebrow">${esc(state.name)}${c ? ` &nbsp; / &nbsp; ${esc(c.name)}` : ''}</div><h1 tabindex="-1">${esc(titles[page])}</h1><p>${subtitles[page]}</p></div><div class="timebox"><span class="badge ${state.status === 'running' ? '' : 'amber'}">● ${esc(state.status)}</span><strong>${simDate(state.hour)} · simulation</strong><small>Day ${Math.floor(state.hour / 24) + 1} · ends ${simDate(state.endHour)}</small></div></div>${state.status === 'completed' ? `<div class="advice warning"><strong>Session complete. ${state.events.filter(e => e.status === 'pending').length} scheduled events remain.</strong>${admin ? 'Pending deliveries, payments, and investments are preserved. The instructor can extend the end date to settle them.' : 'Final reports and CSV downloads remain available. New decisions are disabled.'}</div>` : ''}${admin ? `<div class="toolbar instructor-toolbar" aria-label="Instructor controls">${select('preview', 'Company preview · read-only', [['', 'All companies'], ...state.companies.map(x => [x.id, x.name])], preview || '')}<nav class="instructor-links" aria-label="Instructor pages">${button('nav', 'Session control', 'admin', 'small')}${button('nav', 'Class overview', 'overview', 'small')}${button('nav', 'Reports', 'reports', 'small')}${button('nav', 'Announcements', 'messages', 'small')}</nav></div>` : ''}${!admin && !solo && !testRoom ? `<div class="toolbar" aria-label="Classroom access">${button('join', 'Join another class', '', 'small')}${button('sessions', 'Switch session', '', 'small')}</div>` : ''}${page === "workspace" ? studentWorkspace(visible) : pageBody()}<div class="footer-note"><a href="notes/model.md" target="_blank" rel="noopener">Model & teaching guide ↗</a><br>All amounts are simulated EUR · Emissions in kg CO₂e · Simulation dates use UTC · Live state at ${simDate(state.hour)} · Model v${state.schema}</div></main></div></div>`;
   rememberWorkspaceView();
   const pending = !solo && !testRoom && sessionStorage.getItem(`studio-pending:${backend}:${actor.id}:${sessionId}`);
   if (pending && !busy) root.querySelector('#content').insertAdjacentHTML('afterbegin', `<div id="pending-decision" class="advice warning"><strong>A decision is awaiting confirmation.</strong>The response was interrupted. Retry with the same request key to confirm the outcome safely. ${button('retry-decision', 'Retry pending decision', '', 'small')}</div>`);
@@ -1025,7 +1027,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=606baf9c5b5c')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=e79d8b7a57f9')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -1156,7 +1158,7 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=606baf9c5b5c')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    try { const client = (await import('./src/test-client.mjs?v=e79d8b7a57f9')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p>' + (e.status === 403 ? button('retry-start', 'Try again', '', 'primary') : '') + button('test-leave','Return to classroom') + '</main>'; }
     return;
   }

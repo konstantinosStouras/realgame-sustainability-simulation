@@ -62,11 +62,11 @@ test('closing student access revokes existing test views and decisions until reo
   assert.equal(room.view(student.key).state.company.purchases.length, 2);
 });
 
-test('completed test classrooms revoke student views and reopen after an instructor extension', () => {
+test('completed test classrooms retain student reports, reject decisions, and reopen after extension', () => {
   const room = classroom(), [teacher, student] = room.people;
   room.command(teacher.key, request(room, {type:'closeSession'}));
-  assert.throws(() => room.view(student.key), error => error.status === 403);
-  assert.throws(() => room.command(student.key, request(room, {type:'message', channel:`team:${student.companyId}`, text:'Closed'})), error => error.status === 403);
+  assert.equal(room.view(student.key).state.status,'completed');
+  assert.throws(() => room.command(student.key, request(room, {type:'message', channel:`team:${student.companyId}`, text:'Closed'})), error => error.status === 409);
   room.command(teacher.key, request(room, {type:'configure', endHour:48}));
   assert.equal(room.view(student.key).state.status, 'paused');
 });

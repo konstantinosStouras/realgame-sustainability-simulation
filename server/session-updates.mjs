@@ -16,7 +16,7 @@ export function waitForSessionUpdate(ref, revision, student, signal, timeoutMs =
     try {
       unsubscribe = ref.onSnapshot(doc => {
         const data = doc.exists ? doc.data() : null;
-        if (!data || data.status === 'deleted' || (student && (data.status === 'completed' || data.studentAccess === false))) {
+        if (!data || data.status === 'deleted' || (student && data.studentAccess === false)) {
           finish({ closed: true });
         } else if (data.revision !== revision) finish({ revision: data.revision });
       }, error => finish(null, error));

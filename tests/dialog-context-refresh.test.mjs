@@ -9,7 +9,7 @@ function storage(){const data=new Map();return{getItem:k=>data.get(k)||null,setI
 function control(value=''){return{value,innerHTML:'',textContent:'',validationMessage:'',setCustomValidity(message){this.validationMessage=message;}};}
 function harness(){
  const fields={'[name=qty]':control('30'),'[name=routeId]':control('rail'),'#dispatch-context':control(),'#dispatch-terms':control(),'#dispatch-quote':control(),'#purchase-context':control(),'#purchase-quote':control()};
- const listeners={},form={querySelector:s=>fields[s],addEventListener:(type,fn)=>{listeners[type]=fn;}},dialog={open:true,querySelector:()=>form};
+ const listeners={},form={querySelector:s=>fields[s],addEventListener:(type,fn)=>{listeners[type]=fn;}},dialog={open:true,querySelector:()=>form,close(){this.open=false;}};
  const document={activeElement:fields['[name=qty]'],querySelector:s=>s==='#dialog'?dialog:s==='#app'?{}:null,addEventListener(){}};
  const ctx=vm.createContext({document,URL,AbortSignal,location:{hostname:'localhost',href:'http://localhost/'},localStorage:storage(),sessionStorage:storage(),crypto:{randomUUID},setTimeout:()=>1,clearTimeout(){},firebaseConfig:{},classroomBackend:'',FormData:class extends Map{constructor(){super([['qty',fields['[name=qty]'].value],['routeId',fields['[name=routeId]'].value]]);}},itemName:()=> 'frame',renders:0});
  vm.runInContext(source,ctx);
@@ -68,4 +68,13 @@ test('background refresh during editing remains deferred until an explicit autho
  await h.run('load(false)');assert.equal(h.run('state.revision'),1);assert.match(h.fields['#dispatch-context'].textContent,/Stock available: 372/);
  await h.run('load(false,true)');assert.equal(h.run('state.revision'),2);assert.match(h.fields['#dispatch-context'].textContent,/Stock available: 341/);
  assert.equal(h.fields['[name=qty]'].value,'30');assert.equal(h.fields['[name=routeId]'].value,'rail');
+});
+
+test('live completion retires an open decision draft and renders the final report workspace',async()=>{
+ const h=harness();h.run("openDispatch('order-110')");
+ const fresh=structuredClone(h.state);fresh.revision=2;fresh.status='completed';
+ h.ctx.apiImplementation=async()=>({state:fresh,actor:{id:'synthetic-student',role:'student',companyId:'company-1'}});h.run('api=apiImplementation;');
+ await h.run('load(false)');
+ assert.equal(h.run('state.status'),'completed');assert.equal(h.dialog.open,false);assert.equal(h.ctx.renders,1);
+ assert.equal(h.run("permitted('offers')"),false);
 });

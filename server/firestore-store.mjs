@@ -1,4 +1,4 @@
-import { requireOpen } from './session-access.mjs';
+import { requireOpen, requireReadable } from './session-access.mjs';
 import { waitForSessionUpdate } from './session-updates.mjs';
 import { testTemplate } from './test-template.mjs';
 import { sessionId } from '../src/session-id.mjs';
@@ -36,7 +36,7 @@ export class FirestoreStore {
     if (!member.exists) fail('You are not a member of this session.', 403);
     const session = await tx.get(this.sessionRef(id));
     if (!session.exists || session.data().status === 'deleted') fail('Session not found.', 404);
-    requireOpen(session.data());
+    requireReadable(session.data());
     return { ...user, companyId: member.data().companyId };
   }
   async readState(tx, ref, metadata, initial = false) {
@@ -125,9 +125,10 @@ export class FirestoreStore {
       const session = await tx.get(this.sessionRef(id));
       if (!session.exists || session.data().status === 'deleted') fail('Session not found.', 404);
       if (user.role === 'instructor') return { sessionId: id };
-      requireOpen(session.data());
+      requireReadable(session.data());
       const member = this.memberRef(id, user.id), old = await tx.get(member);
       if (old.exists) return { sessionId: id };
+      requireOpen(session.data());
       if (!code) return { requiresCompanyCode: true };
       if (typeof code !== 'string' || code.length > 100) fail('Invalid company join code.');
       const invite = await tx.get(this.invites.doc(digest(code.trim())));

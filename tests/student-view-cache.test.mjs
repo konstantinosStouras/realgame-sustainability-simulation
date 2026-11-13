@@ -71,7 +71,8 @@ test('cached serialization cannot reuse membership, access, roles, instructor pr
  await assert.rejects(f.store.viewJSON(user,f.id),{status:403});
  await assert.rejects(f.store.viewJSON({...user,id:'outsider'},f.id),{status:403});
  await f.store.sessionRef(f.id).set({studentAccess:true,status:'completed'},{merge:true});
- await assert.rejects(f.store.viewJSON(user,f.id),{status:403});
+ assert.equal(JSON.parse(await f.store.viewJSON(user,f.id)).state.company.id,'company-2');
+ await assert.rejects(f.store.viewJSON({...user,id:'outsider'},f.id),{status:403});
 });
 
 test('serialized cache charges UTF8 bytes, expires, evicts LRU, bypasses oversize and never pins state references',()=>{

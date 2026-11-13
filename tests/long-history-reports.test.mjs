@@ -102,3 +102,17 @@ test('partial current days do not reduce the last seven completed daily reports'
   const rows = h.context.captured.at(-1).data.split('\r\n').slice(1);
   assert.equal(rows.length,7); assert.ok(rows.every(row=>row.endsWith(',"8"')));
 });
+
+test('completed students keep report and ledger CSV exports while financial decisions stay disabled',async()=>{
+  const h=harness();
+  h.run("actor={id:'student',role:'student',companyId:'company-1'};user=actor;preview=null;report='cash';reportRange=180;selectedCompanies.add('company-1');");
+  const finance=h.run('financePage()'),reports=h.run('reportsPage()');
+  for(const action of ['loan','annuity','deposit'])assert.match(finance,new RegExp(`data-action="${action}"[^>]*disabled`));
+  assert.doesNotMatch(finance,/data-action="ledger-csv"[^>]*disabled/);
+  assert.doesNotMatch(reports,/data-action="report-csv"[^>]*disabled/);
+  await h.run("action('report-csv');action('ledger-csv');");
+  assert.equal(h.context.captured[0].name,'daily-report.csv');
+  assert.equal(h.context.captured[0].data.split('\r\n').length,61);
+  assert.equal(h.context.captured[1].name,'transaction-journal.csv');
+  assert.equal(h.context.captured[1].data.split('\r\n').length,5);
+});

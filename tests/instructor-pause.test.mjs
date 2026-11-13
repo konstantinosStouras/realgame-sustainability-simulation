@@ -63,7 +63,9 @@ test('pause catch-up completes naturally without reopening and repeated stopped 
   const view = await f.store.view(teacher, f.id);
   assert.equal(view.state.status, 'completed'); assert.equal(view.state.hour, 24);
   assert.equal((await verifyReplay(f)).filter(r => r.command.type === 'clock').length, 1);
-  await assert.rejects(f.store.view(student, f.id), { status: 403 });
+  const finalStudentView = await f.store.view(student, f.id);
+  assert.equal(finalStudentView.state.status,'completed');
+  assert.equal(finalStudentView.state.snapshots.length,1);
   const paused = await fixture();
   await paused.store.command(teacher, paused.id, { key: 'first-plain-pause', revision: 1, command: pause });
   const second = await paused.store.command(teacher, paused.id, { key: 'another-plain-pause', revision: 0, command: pause });

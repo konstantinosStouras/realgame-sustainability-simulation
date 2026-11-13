@@ -222,7 +222,7 @@ export function applyCommand(s, actor, a, realAt = '2026-01-01T00:00:00.000Z', {
     const message = { id: uid(s, 'message'), channel, text: cleanText(a.text, 'Message', 2000), senderId: actor.id, senderName: actor.name, role: actor.role, companyId: actor.companyId || null, hour: s.hour, realAt };
     s.messages.push(message); result = 'Message sent.';
   } else {
-    if (s.status === 'completed') fail('Session completed. Pending obligations are preserved; ask the instructor to extend it.');
+    if (s.status === 'completed') fail('Session completed. Final reports remain available; new decisions are disabled.', 409);
     const c = requireCompany(s, actor, a);
     const groups = { offer: 'offers', purchase: 'purchasing', dispatch: 'offers', shifts: 'production', staff: 'production', loan: 'finance', deposit: 'finance', energy: 'energy', invest: 'investments', reorder: 'investments', budget: 'investments' };
     if (!Object.hasOwn(groups, a.type)) fail('Unknown command.');

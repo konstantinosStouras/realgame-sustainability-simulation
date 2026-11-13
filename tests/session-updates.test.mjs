@@ -19,14 +19,21 @@ test('committed revisions wake listeners immediately and expose only revision', 
   ref.emit({ revision: 2, privateField: 'must not escape' });
   assert.deepEqual(await pending, { revision: 2 }); assert.equal(ref.removed, 1);
 });
-test('closure, deletion, access removal and disconnect release listeners', async () => {
-  for (const metadata of [{status:'completed'}, {status:'deleted'}, {studentAccess:false}, null]) {
+test('deletion, access removal and disconnect release listeners', async () => {
+  for (const metadata of [{status:'deleted'}, {studentAccess:false}, null]) {
     const ref = reference(), pending = waitForSessionUpdate(ref, 1, true);
     ref.emit(metadata); assert.deepEqual(await pending, {closed:true}); assert.equal(ref.removed,1);
   }
   const ref=reference(), controller=new AbortController();
   const pending=waitForSessionUpdate(ref,1,true,controller.signal);
   controller.abort(); assert.deepEqual(await pending,{cancelled:true}); assert.equal(ref.removed,1);
+});
+
+test('completion wakes students with the final revision instead of revoking report access', async () => {
+  const ref = reference(), pending = waitForSessionUpdate(ref, 1, true);
+  ref.emit({status:'completed',studentAccess:true,revision:2});
+  assert.deepEqual(await pending,{revision:2});
+  assert.equal(ref.removed,1);
 });
 test('unchanged listeners expire cleanly; instructors retain closed results', async () => {
   const ref=reference(), pending=waitForSessionUpdate(ref,1,false,undefined,5);
