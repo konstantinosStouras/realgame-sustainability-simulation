@@ -211,3 +211,12 @@ dialog .dialog-toolbar .close{position:static;min-width:44px;flex-shrink:0}
   button,.button { transition:background .15s,border-color .15s,color .15s,box-shadow .15s; }
 }
 @media (prefers-reduced-motion:reduce) { button,.button { transition:none; } }
+
+/* Keep action help inside the viewport at every button-grid breakpoint. */
+.session-actions .session-tooltip { max-width: min(280px, calc(100vw - 112px)); }
+@media (min-width: 481px) {
+  .session-actions .session-action-hint:nth-child(3n) > .session-tooltip { left: auto; right: 0; }
+}
+@media (max-width: 360px) {
+  .session-actions .session-action-hint:nth-child(n) > .session-tooltip { left: 0; right: auto; }
+}
