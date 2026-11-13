@@ -1,6 +1,6 @@
-import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=5badc203e0fb';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=5badc203e0fb';
-import { watchSession } from './src/session-updates.mjs?v=5badc203e0fb';
+import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=97cf81d04e1b';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=97cf81d04e1b';
+import { watchSession } from './src/session-updates.mjs?v=97cf81d04e1b';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -231,7 +231,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=5badc203e0fb')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=97cf81d04e1b')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -300,7 +300,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=5badc203e0fb')).testClient();
+      const client = (await import('./src/test-client.mjs?v=97cf81d04e1b')).testClient();
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -492,8 +492,49 @@ function chart(metricName, unit, { selected = false, range = 30 } = {}) {
   let min = Math.min(0, ...raw) / scale, max = Math.max(1, ...raw) / scale; if (max === min) max++;
   const x = i => 62 + i * 520 / Math.max(1, snaps.length - 1), y = val => 204 - (val / scale - min) / (max - min) * 174;
   const grid = Array.from({ length: 5 }, (_, i) => { const val = min + (max - min) * i / 4, at = 204 - i * 43.5; return `<line class="gridline" x1="62" x2="590" y1="${at}" y2="${at}"/><text text-anchor="end" x="52" y="${at + 4}">${Math.abs(val) >= 1000 ? `${(val / 1000).toFixed(1)}k` : number(val)}</text>`; }).join('');
-  return `<div class="chart-scroll" role="region" aria-label="Time series chart"><svg class="chart" viewBox="-20 -6 660 252" role="img" aria-label="${esc(metricName)} in ${unit}, daily snapshots. Exact values are available in Reports data tables."><text x="10" y="13">${unit}</text>${grid}${series.map(serie => `<polyline class="chart-line color-${serie.color}" points="${serie.values.map((v, i) => `${x(i)},${y(v)}`).join(' ')}"/>${serie.values.map((v, i) => `<circle class="c${serie.color}" r="3" cx="${x(i)}" cy="${y(v)}"><title>${esc(serie.name)} · ${simDate(snaps[i].hour)} · ${number(v / scale)} ${unit}</title></circle>`).join('')}`).join('')}${[...new Set([0, Math.floor((snaps.length - 1) / 2), snaps.length - 1])].map(i => `<text text-anchor="middle" x="${x(i)}" y="230">${simDate(snaps[i].hour).split(',')[0]}</text>`).join('')}</svg></div><div class="chart-legend">${series.map(c => `<span><i class="legend-dot c${c.color}"></i>${esc(c.name)}</span>`).join('')}</div>`;
+  return `<div class="chart-scroll" role="region" aria-label="Time series chart"><svg class="chart" viewBox="-20 -6 660 252" role="group" aria-label="${esc(metricName)} in ${unit}, daily snapshots. Hover, tap, or focus a point for its value. Exact values are available in Reports data tables."><text x="10" y="13">${unit}</text>${grid}${series.map(serie => `<polyline class="chart-line color-${serie.color}" points="${serie.values.map((v, i) => `${x(i)},${y(v)}`).join(' ')}"/>${serie.values.map((v, i) => `<circle class="chart-point c${serie.color}" tabindex="0" role="img" aria-label="${esc(serie.name)} · ${simDate(snaps[i].hour)} · ${unit === 'EUR' ? exactMoney(v) : number(v / scale) + ' ' + esc(unit)}" r="3" cx="${x(i)}" cy="${y(v)}"></circle>`).join('')}`).join('')}${[...new Set([0, Math.floor((snaps.length - 1) / 2), snaps.length - 1])].map(i => `<text text-anchor="middle" x="${x(i)}" y="230">${simDate(snaps[i].hour).split(',')[0]}</text>`).join('')}</svg><div class="chart-tooltip" role="status" hidden></div></div><div class="chart-legend">${series.map(c => `<span><i class="legend-dot c${c.color}"></i>${esc(c.name)}</span>`).join('')}</div>`;
 }
+
+function hideChartTooltip(chart) {
+  chart.querySelector('.chart-tooltip').hidden = true;
+  chart.querySelectorAll('.chart-point.is-highlighted').forEach(point => point.classList.remove('is-highlighted'));
+}
+function showChartTooltip(point) {
+  const chart = point.closest('.chart-scroll'), tooltip = chart.querySelector('.chart-tooltip');
+  chart.querySelectorAll('.chart-point.is-highlighted').forEach(other => other.classList.remove('is-highlighted'));
+  point.classList.add('is-highlighted');
+  tooltip.textContent = point.getAttribute('aria-label');
+  tooltip.hidden = false;
+}
+function chartPointAt(event) {
+  const chart = event.target.closest?.('.chart-scroll');
+  if (!chart) return;
+  let nearest, distance = Infinity;
+  chart.querySelectorAll('.chart-point').forEach(point => {
+    const box = point.getBoundingClientRect();
+    const d = Math.hypot(event.clientX - box.x - box.width / 2, event.clientY - box.y - box.height / 2);
+    if (d < distance) { nearest = point; distance = d; }
+  });
+  if (nearest && distance <= 28) showChartTooltip(nearest);
+  else hideChartTooltip(chart);
+}
+document.addEventListener('pointermove', event => { if (event.pointerType !== 'touch') chartPointAt(event); });
+document.addEventListener('click', chartPointAt);
+document.addEventListener('pointerout', event => {
+  const chart = event.target.closest?.('.chart-scroll');
+  if (chart && !chart.contains(event.relatedTarget)) hideChartTooltip(chart);
+});
+document.addEventListener('focusin', event => {
+  if (event.target.matches?.('.chart-point')) showChartTooltip(event.target);
+});
+document.addEventListener('focusout', event => {
+  const chart = event.target.closest?.('.chart-scroll');
+  if (chart && !chart.contains(event.relatedTarget)) hideChartTooltip(chart);
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') document.querySelectorAll('.chart-scroll').forEach(hideChartTooltip);
+});
+
 function pendingEvents(limit = 6) {
   const events = state.events.filter(e => e.status === 'pending' && (!company() || e.companyId === company().id)).sort((a, b) => a.at - b.at).slice(0, limit);
   return events.length ? `<div class="timeline">${events.map(e => `<div class="timeline-item"><strong>${esc(e.description)}</strong><small>${simDate(e.at)} · ${e.blocked ? esc(e.blocked) : 'Scheduled'}</small></div>`).join('')}</div>` : '<p class="empty">No pending events. Your next decision starts here.</p>';
@@ -540,6 +581,7 @@ function inventoryPanel(embedded = false) {
     return { buildable, limiting: limits.filter(([, count]) => count === buildable).map(([key]) => key) };
   };
   const { buildable, limiting } = materialCapacity();
+  const limitingNames = keys => keys.map(key => itemName(state, key)).join(', ');
   let forecast = { buildable, limiting };
   const deliveries = pending.map(purchase => {
     incoming.set(purchase.item, (incoming.get(purchase.item) ?? 0) + purchase.qty);
@@ -552,15 +594,15 @@ function inventoryPanel(embedded = false) {
       `${number(purchase.qty)} × ${itemName(state, purchase.item)}`,
       simDate(purchase.expectedAt) + eta,
       extra ? '+' + number(extra) : '0',
-      number(forecast.buildable)
+      number(forecast.buildable),
+      limitingNames(forecast.limiting)
     ];
   });
   const extra = forecast.buildable - buildable;
   const productCount = count => `${number(count)} ${product}${count === 1 ? '' : 's'}`;
-  const limitingNames = keys => keys.map(key => itemName(state, key)).join(', ');
   const buildSummary = `<p class="inventory-build"><strong>${productCount(buildable)} from stock on hand</strong><span>Limiting: ${limitingNames(limiting)}</span></p>
     <p class="inventory-build"><strong>After incoming orders: ${productCount(forecast.buildable)} (${number(extra)} more)</strong><span>Limiting after receipt: ${limitingNames(forecast.limiting)}</span></p>`;
-  const timeline = deliveries.length ? panel('Incoming deliveries', 'Expected times use the simulation clock. Orders with the same estimate are listed in purchase order.', table(['Purchase', 'Delivery', 'Expected arrival', 'Extra from delivery', 'Total buildable'], deliveries)) : '';
+  const timeline = deliveries.length ? panel('Incoming deliveries', 'Expected times use the simulation clock. Orders with the same estimate are listed in purchase order.', table(['Purchase', 'Delivery', 'Expected arrival', 'Extra from delivery', 'Total buildable', 'Limiting components'], deliveries)) : '';
   const category = key => key === 'panel' ? 'finished' : 'component';
   const categories = [['finished', 'Finished'], ['component', 'Components']];
   const filters = embedded ? `<fieldset class="inventory-filters"><legend>Show stock</legend>${categories.map(([id, label]) => check('stock-' + id, label, inventoryCategories.has(id))).join('')}</fieldset>` : '';
@@ -684,7 +726,9 @@ function openDispatch(id) {
 function sessionSettingsCommand(current, form) {
   const hours = Number(form.get('days')) * 24, rounded = Math.round(hours);
   if (!Number.isFinite(hours) || Math.abs(hours - rounded) > 1e-8) throw new Error('Duration must be a whole number of simulation hours.');
-  const command = { type: 'configure', studentAccess: form.has('studentAccess'), name: form.get('name') };
+  const speed = Number(form.get('speed'));
+  if (!Number.isInteger(speed) || speed < 1 || speed > 120) throw new Error('Choose a clock speed from 1 to 120 seconds per simulation hour.');
+  const command = { type: 'configure', studentAccess: form.has('studentAccess'), name: form.get('name'), secondsPerHour: speed };
   // A closed session can end before day one or between days. Saving unrelated
   // settings must preserve that exact end and must not reopen the session.
   if (rounded !== current.endHour) {
@@ -782,7 +826,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=5badc203e0fb')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=97cf81d04e1b')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -811,7 +855,7 @@ async function action(name, id) {
   if (name === 'reorder') { const policy = c.reorder[id]; modal(`Replenishment · ${itemName(state, id)}`, `${select('supplierId', 'Preferred supplier', state.catalog.suppliers.filter(s => s.item === id && s.enabled).map(s => [s.id, `${s.name} · lot ${s.lot}`]), policy?.supplierId)}<div class="form-grid">${field('point', 'Reorder point (stock + incoming)', policy?.point || (id === 'cell' ? 6000 : 250), 'number', 'min="0"')}${field('qty', 'Quantity per order', policy?.qty || (id === 'cell' ? 7200 : 300), 'number', 'min="1"')}</div>${check('enabled', 'Enable this policy', policy?.enabled ?? true)}<p class="form-note">Only runs after the replenishment investment is active. The assistant reports blocked orders and retries hourly.</p>`, f => command({ type: 'reorder', supplierId: f.get('supplierId'), point: value(f, 'point'), qty: value(f, 'qty'), enabled: f.has('enabled') })); }
   if (name === 'step') { if (id === 'custom') modal('Advance the simulation', field('hours', 'Hours to advance (1–168)', 24, 'number', 'min="1" max="168"'), f => command({ type: 'step', hours: value(f, 'hours') }), 'Advance'); else { await command({ type: 'step', hours: Number(id) }); render(); } }
   if (name === 'clock') { await command({ type: 'clock', status: id }); render(); }
-  if (name === 'settings') modal('Session settings', `${check('studentAccess', 'Open session to students', state.studentAccess !== false)}${field('name', 'Session name', state.name, 'text', 'maxlength="120"')}<div class="form-grid">${field('days', 'Total duration from start (days)', state.endHour / 24, 'number', `min="${Math.min(state.endHour, Math.max(24, state.hour)) / 24}" max="180" step="any"`)}${field('speed', 'Real seconds per simulation hour', state.secondsPerHour, 'number', 'min="1" max="120"')}</div>`, async f => { await command(sessionSettingsCommand(state, f)); if (state.status !== 'completed' && !solo) await command({ type: 'clock', status: state.status, secondsPerHour: value(f, 'speed') }); }, 'Save settings');
+  if (name === 'settings') modal('Session settings', `${check('studentAccess', 'Open session to students', state.studentAccess !== false)}${field('name', 'Session name', state.name, 'text', 'maxlength="120"')}<div class="form-grid">${field('days', 'Total duration from start (days)', state.endHour / 24, 'number', `min="${Math.min(state.endHour, Math.max(24, state.hour)) / 24}" max="180" step="any"`)}${field('speed', 'Real seconds per simulation hour', state.secondsPerHour, 'number', 'min="1" max="120"')}</div>`, async f => { if (!solo && !testRoom && !health?.atomicSessionSettings) throw new Error('The classroom backend needs the Settings update before changes can be saved.'); await command(sessionSettingsCommand(state, f)); }, 'Save settings');
   if (name === 'events') modal('Pending & completed outcomes', table(['Company', 'Outcome', 'Scheduled time', 'State'], state.events.filter(e => !c || e.companyId === c.id).slice().sort((a, b) => a.at - b.at).map(e => [esc(state.companies.find(c => c.id === e.companyId)?.name), esc(e.description), simDate(e.at), esc(e.blocked || e.status)])));
   if (name === 'create') modal('Create a classroom session', createSessionFields(), createClassroom, 'Create session');
   if (name === 'join') { selectSession(null); renderLobby(); return; }
@@ -917,7 +961,7 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=5badc203e0fb')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    try { const client = (await import('./src/test-client.mjs?v=97cf81d04e1b')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p>' + button('test-leave','Return to classroom') + '</main>'; }
     return;
   }

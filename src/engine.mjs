@@ -195,6 +195,7 @@ export function applyCommand(s, actor, a, realAt = '2026-01-01T00:00:00.000Z', {
       s.status = a.status; result = `Clock ${s.status}.`;
     }
     if (a.type === 'configure') {
+      if (a.secondsPerHour !== undefined) s.secondsPerHour = integer(a.secondsPerHour, 'Seconds per hour', 1, 120);
       if (a.studentAccess !== undefined) s.studentAccess = bool(a.studentAccess, 'Student access');
       if (a.name !== undefined) s.name = cleanText(a.name, 'Session name');
       if (a.endHour !== undefined) { s.endHour = integer(a.endHour, 'End hour', Math.max(24, s.hour), 4320); if (s.hour >= s.endHour) s.status = 'completed'; else if (s.status === 'completed') s.status = 'paused'; }
