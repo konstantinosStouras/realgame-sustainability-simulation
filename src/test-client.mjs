@@ -1,6 +1,6 @@
 export function testClient(credentials = {}) {
   if (!globalThis.SharedWorker) throw new Error('Multi-tab test rounds need a browser with SharedWorker support. Open this page in a current desktop Chrome, Edge, Firefox or Safari browser.');
-  const worker = new SharedWorker(new URL('./test-worker.mjs?v=c4f08ce12bb7', import.meta.url), {type:'module',name:'sustainability-test-classrooms'});
+  const worker = new SharedWorker(new URL('./test-worker.mjs?v=6822fffc468a', import.meta.url), {type:'module',name:'sustainability-test-classrooms'});
   const pending = new Map(); let failed = false;
   worker.port.onmessage = ({data}) => {
     const request = pending.get(data.requestId); if (!request) return;

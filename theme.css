@@ -139,11 +139,11 @@ dialog .dialog-toolbar .close{position:static;min-width:44px;flex-shrink:0}
 .account-menu .avatar { width:34px; height:34px; flex-shrink:0; font-size:12px; font-weight:650; letter-spacing:.02em; }
 .account-chevron { width:16px; height:16px; flex-shrink:0; fill:none; stroke:currentColor; stroke-width:1.5; transition:transform .15s; }
 .account-menu[open] .account-chevron { transform:rotate(180deg); }
-.account-dropdown { position:absolute; right:0; top:calc(100% + 10px); width:296px; max-width:calc(100vw - 32px); max-height:min(70dvh,560px); overflow:auto; padding:8px; border:1px solid var(--line); border-radius:14px; background:#fff; box-shadow:0 16px 48px #173a311a,0 3px 8px #173a3108; z-index:60; }
+.account-dropdown { position:absolute; right:0; top:calc(100% + 10px); width:320px; max-width:calc(100vw - 32px); max-height:min(70dvh,560px); overflow:auto; padding:8px; border:1px solid var(--line); border-radius:14px; background:#fff; box-shadow:0 16px 48px #173a311a,0 3px 8px #173a3108; z-index:60; }
 .account-heading { padding:14px 12px 16px; margin-bottom:6px; border-bottom:1px solid var(--line); }
-.account-heading strong { display:block; font-size:14px; font-weight:650; line-height:1.5; color:var(--text); overflow-wrap:anywhere; }
-.account-heading small { display:block; margin-top:3px; font-size:12px; line-height:1.5; color:var(--muted); }
-.account-dropdown button { display:flex; justify-content:flex-start; width:100%; min-height:44px; margin:0; padding:11px 12px; border:0; border-radius:6px; background:transparent; color:var(--text); font-family:inherit; font-size:14px; font-weight:450; line-height:1.5; text-align:left; box-shadow:none; }
+.account-heading strong { display:block; font-size:16px; font-weight:650; line-height:1.5; color:var(--text); overflow-wrap:anywhere; }
+.account-heading small { display:block; margin-top:3px; font-size:14px; line-height:1.5; color:var(--muted); }
+.account-dropdown button { display:flex; justify-content:flex-start; width:100%; min-height:44px; margin:0; padding:11px 12px; border:0; border-radius:6px; background:transparent; color:var(--text); font-family:inherit; font-size:16px; font-weight:500; line-height:1.5; text-align:left; box-shadow:none; }
 .account-dropdown button:hover:not(:disabled), .account-dropdown button:focus-visible { background:var(--soft); color:var(--ink); }
 .account-dropdown button:focus-visible { outline:2px solid var(--green); outline-offset:-2px; }
 .account-footer { border-top:1px solid var(--line); margin-top:6px; padding-top:6px; }
