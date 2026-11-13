@@ -20,10 +20,16 @@ export async function runLiveLoad({ admin, db, apiKey, base, output, manifest, s
   let manifestWrite = Promise.resolve();
   const saveManifest = () => { const contents=JSON.stringify({run,identities,sessions}); return manifestWrite=manifestWrite.then(()=>writeFile(manifest,contents)); };
   const limit = async (items, concurrency, fn) => {
-    let next = 0; const results = [];
+    let next = 0, failure; const results = [];
     await Promise.all(Array.from({ length: concurrency }, async () => {
-      while (next < items.length) { const i = next++; results[i] = await fn(items[i], i); }
-    })); return results;
+      while (!failure && next < items.length) {
+        const i = next++;
+        try { results[i] = await fn(items[i], i); } catch (error) { failure ||= error; }
+      }
+    }));
+    // Drain already-started account creation before cleanup can begin.
+    if (failure) throw failure;
+    return results;
   };
   async function identity(i) {
     const uid = `${run}-${i}`, email = `${uid}@example.invalid`, password = randomBytes(24).toString('hex');
@@ -31,24 +37,52 @@ export async function runLiveLoad({ admin, db, apiKey, base, output, manifest, s
     await admin.createUser({ uid, email, password, emailVerified: true, displayName: `Synthetic load participant ${i}` });
     if (i === 0) await admin.setCustomUserClaims(uid, { instructor: true });
     const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, returnSecureToken: true })
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, returnSecureToken: true }), signal: AbortSignal.timeout(15000)
     });
     const data = await response.json();
     if (!response.ok) throw new Error(`Synthetic sign-in failed: ${response.status} ${data.error?.message}`);
-    return { uid, token: data.idToken };
+    return { uid, token: data.idToken, refreshToken: data.refreshToken, expiresAt: Date.now() + Number(data.expiresIn) * 1000 };
   }
-  async function call(phase, path, who, body, timeout = 45000) {
+  async function refreshIdentity(who) {
+    if (who.refreshing) return who.refreshing;
+    who.refreshing = (async () => {
+      const response = await fetch(`https://securetoken.googleapis.com/v1/token?key=${apiKey}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: who.refreshToken }), signal: AbortSignal.timeout(15000)
+      });
+      const data = await response.json();
+      assert.equal(response.status, 200, 'Synthetic identity refresh failed');
+      assert.ok(data.id_token && data.refresh_token);
+      who.token = data.id_token; who.refreshToken = data.refresh_token; who.expiresAt = Date.now() + Number(data.expires_in) * 1000;
+    })();
+    try { await who.refreshing; } finally { delete who.refreshing; }
+  }
+  async function call(phase, path, who, body, timeout = 15000, faultOptions = {}) {
     const start = performance.now(); let status = 0, value, wireBytes, decodedBytes, encoding;
+    let injected = false, wireStatus;
     try {
+      // Keep refresh failures inside the measured result so Promise.all drains
+      // the whole wave before an assertion can trigger synthetic cleanup.
+      if (who?.expiresAt < Date.now() + 60000) await refreshIdentity(who);
       const response = await new Promise((resolve,reject)=>{
+        let abortTimer;
         const request=https.request(base+path,{agent,method:body===undefined?'GET':'POST',headers:{Origin:'https://www.stouras.com','Content-Type':'application/json','Accept-Encoding':'gzip',...(who?{Authorization:`Bearer ${who.token}`}:{})},signal:AbortSignal.timeout(timeout)},res=>{
           const chunks=[];res.on('data',chunk=>chunks.push(chunk));res.on('error',reject);res.on('end',()=>{try{const bytes=Buffer.concat(chunks),decoded=res.headers['content-encoding']==='gzip'?gunzipSync(bytes):bytes;resolve({status:res.statusCode,text:decoded.toString('utf8'),bytes:bytes.length,encoding:res.headers['content-encoding']||'identity'});}catch(e){reject(e);}});
-        });request.on('error',reject);request.end(body===undefined?undefined:JSON.stringify(body));
+        });
+        request.on('close',()=>clearTimeout(abortTimer));
+        if (faultOptions.fault === 'abort-after-send') request.once('finish',()=>{
+          abortTimer=setTimeout(()=>{ injected=true; request.destroy(Object.assign(new Error('Injected connection loss after send'),{code:'INJECTED_DISCONNECT'})); },faultOptions.abortAfterMs??50);
+        });
+        request.on('error',reject);request.end(body===undefined?undefined:JSON.stringify(body));
       });
       status = response.status; wireBytes=response.bytes;decodedBytes=Buffer.byteLength(response.text);encoding=response.encoding;value = JSON.parse(response.text);
+      if (faultOptions.fault === 'discard-response' && status === 200) {
+        wireStatus = status; status = 0; injected = true; value = { error: 'Injected loss of accepted response' };
+      }
     } catch (e) { value = { error: `${e.name}: ${e.code || e.cause?.code || e.message}` }; }
-    samples.push({ phase, status, ms: Math.round(performance.now() - start),wireBytes,decodedBytes,encoding, ...(status >= 500 || !status ? { error: value.error } : {}) });
-    return { status, value };
+    const sample={ phase, status, ms: Math.round(performance.now() - start),wireBytes,decodedBytes,encoding, ...(injected?{injectedFault:faultOptions.fault,wireStatus}:{}), ...(status >= 500 || !status ? { error: value.error } : {}) };
+    samples.push(sample);
+    return { status, value, sample, ...(injected?{fault:faultOptions.fault}: {}) };
   }
   const requireOk = r => { assert.ok(r.status >= 200 && r.status < 300, `Unexpected status ${r.status}: ${JSON.stringify(r.value)}`); return r.value; };
   const summary = phase => {
@@ -75,7 +109,8 @@ export async function runLiveLoad({ admin, db, apiKey, base, output, manifest, s
     const members=requireOk(await call('roster',endpoint+'/roster',teacher)).members;
     assert.equal(members.length,121);for(let i=1;i<=12;i++)assert.equal(members.filter(m=>m.companyId===`company-${i}`).length,10);
     checks.membership=true;
-    if(scenario) await scenario({run,students,teacher,endpoint,call,requireOk,checks,db,summary,session,samples});
+    if(scenario) await scenario({run,students,teacher,endpoint,call,requireOk,checks,db,summary,session,samples,refreshIdentity,
+      abortCall:(phase,path,who,body,options={})=>call(phase,path,who,body,options.timeoutMs??15000,{fault:'abort-after-send',abortAfterMs:options.abortAfterMs??50})});
     else {
     for (const n of [12,60,120]) {
       const phase=`read-${n}`; await Promise.all(students.slice(0,n).map(s=>call(phase,endpoint,s))); summary(phase);

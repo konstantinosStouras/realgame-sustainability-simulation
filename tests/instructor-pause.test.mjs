@@ -47,7 +47,7 @@ test('one pause catches up multiple bounded transactions and reauthorizes each b
   let authorizations = 0; const actor = f.store.actor.bind(f.store);
   f.store.actor = (...args) => { authorizations++; return actor(...args); };
   const response = await f.store.command(teacher, f.id, { key: 'backlog-one-pause', revision: 0, command: pause });
-  assert.equal(authorizations, 3); assert.equal(response.revision, 63);
+  assert.equal(authorizations, 4, 'one read-only preflight and three authoritative catch-up transactions'); assert.equal(response.revision, 63);
   const current = await f.store.view(teacher, f.id);
   assert.equal(current.state.hour, 61); assert.equal(current.state.status, 'paused');
   assert.equal((await verifyReplay(f)).filter(r => r.command.type === 'tick').length, 61);
@@ -102,7 +102,7 @@ test('pause exception rejects future or malformed revisions and all additional o
 test('fresh authorization failure between catch-up batches prevents the pause', async () => {
   const f = await fixture(); f.now(60000);
   let calls = 0; const actor = f.store.actor.bind(f.store);
-  f.store.actor = (...args) => { if (++calls > 1) throw Object.assign(new Error('Access revoked'), { status: 403 }); return actor(...args); };
+  f.store.actor = (...args) => { if (++calls > 2) throw Object.assign(new Error('Access revoked'), { status: 403 }); return actor(...args); };
   await assert.rejects(f.store.command(teacher, f.id, { key: 'revoked-mid-catchup', revision: 0, command: pause }), { status: 403 });
   const metadata = (await f.store.sessionRef(f.id).get()).data();
   assert.equal(metadata.hour, 24); assert.equal(metadata.status, 'running');

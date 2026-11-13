@@ -5,7 +5,8 @@ import { assertEconomicState } from './economic-checks.mjs';
 
 // All decisions and clock advances use the public authenticated API. Admin reads
 // below inspect only this synthetic session to independently reconcile its books.
-export async function runEconomicScenario({run,students,teacher,endpoint,call,requireOk,checks,db,summary,session,samples}) {
+export async function runEconomicScenario(ctx) {
+  const {run,students,teacher,endpoint,call,requireOk,checks,db,summary,session,samples,recoveryFactory,captureReplay}=ctx;
   let sequence=0,previousSnapshots=[];
   const records=[];checks.daily=records;
   async function persisted(){
@@ -23,6 +24,7 @@ export async function runEconomicScenario({run,students,teacher,endpoint,call,re
     if(duplicate)assert.deepEqual(requireOk(await call('duplicate-decision',endpoint+'/command',who,request)),response);
     return response;
   }
+  const recovery=recoveryFactory?.({...ctx,persisted,initial,act});
   // Scale supplier capacity for this 12-team teaching setup; prices, recipes and
   // accepted contracts remain the ordinary model. A shortage is introduced later.
   for(const supplier of initial.catalog.suppliers)await act(teacher,{type:'catalog',collection:'suppliers',id:supplier.id,patch:{stock:supplier.stock*12,replenish:supplier.replenish*12}},'instructor-setup');
@@ -55,6 +57,7 @@ export async function runEconomicScenario({run,students,teacher,endpoint,call,re
     }
     // Exercise an explicit three-day shared-material shortage and recovery.
     if(day===20||day===23){const supplier=initial.catalog.suppliers.find(s=>s.id==='cell-circular');await act(teacher,{type:'catalog',collection:'suppliers',id:supplier.id,patch:day===20?{stock:0,replenish:0}:{stock:supplier.stock*12,replenish:supplier.replenish*12}},'supply-shock');}
+    if(recovery)await recovery.afterDay({day,persisted});
     await act(teacher,{type:'step',hours:24},'day-advance');
     last=await persisted();assertEconomicState(last.state,{initial,day});
     assert.deepEqual(last.state.snapshots.slice(0,-1),previousSnapshots,'Closed daily reports changed');previousSnapshots=structuredClone(last.state.snapshots);
@@ -92,15 +95,18 @@ export async function runEconomicScenario({run,students,teacher,endpoint,call,re
   }
   assert.equal((await call('completed-student-access',endpoint,students[0])).status,403);
   const replay=requireOk(await call('full-economic-replay',endpoint+'/replay',teacher));
+  if(captureReplay)await captureReplay({initial:replay.initial,commands:replay.commands,finalState:last.state});
   const reconstructed=structuredClone(replay.initial);
   for(const record of replay.commands)applyCommand(reconstructed,record.actor,record.command,record.realAt,{replay:true});
   // JSON persistence normalizes negative zero; compare the persisted contract.
   assert.deepEqual(JSON.parse(JSON.stringify(reconstructed)),last.state,'Production replay must exactly reproduce every account, event and report');
   const receipts=await db.collection('studioRequests').where('sessionId','==',session.id).get();
-  assert.equal(receipts.docs.length,sequence,'Duplicate submissions must never create extra receipts');
-  checks.economy={days:60,students:120,teams:12,acceptedDecisions:sequence,replayExact:true,allDailyReportsReconciled:true,allLoansRepaid:true,pendingDeposits:last.state.companies.reduce((n,c)=>n+c.deposits.filter(d=>d.maturedAt===null).length,0),final:records.at(-1)};
-  checks.unexpectedFailures=samples.filter(s=>s.status===0||(s.status>=400&&!(s.phase==='completed-student-access'&&s.status===403))).length;
+  const acceptedDecisions=sequence+(recovery?.acceptedDecisions||0);
+  assert.equal(receipts.docs.length,acceptedDecisions,'Duplicate submissions must never create extra receipts');
+  if(recovery?.finish)await recovery.finish();
+  checks.economy={days:60,students:120,teams:12,acceptedDecisions,replayExact:true,allDailyReportsReconciled:true,allLoansRepaid:true,pendingDeposits:last.state.companies.reduce((n,c)=>n+c.deposits.filter(d=>d.maturedAt===null).length,0),final:records.at(-1)};
+  checks.unexpectedFailures=samples.filter(s=>(s.status===0||(s.status>=400&&!(s.phase==='completed-student-access'&&s.status===403)))&&!recovery?.expectedSample(s)).length;
   assert.equal(checks.unexpectedFailures,0);
-  checks.browserDeadlineOverruns=samples.filter(s=>s.ms>=15000).length;
+  checks.browserDeadlineOverruns=samples.filter(s=>s.ms>=15000&&!(s.injectedFault==='abort-after-send'&&recovery?.expectedSample(s))).length;
   assert.equal(checks.browserDeadlineOverruns,0,'Every ordinary API request must finish within the browser deadline');
 }

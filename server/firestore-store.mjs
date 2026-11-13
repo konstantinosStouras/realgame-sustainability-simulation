@@ -12,6 +12,7 @@ export class FirestoreStore {
     if (!Number.isSafeInteger(viewCacheMaxBytes) || viewCacheMaxBytes < 0 || !Number.isSafeInteger(viewCacheTtlMs) || viewCacheTtlMs < 0) throw new Error('Invalid view cache limits');
     this.db = db; this.prefix = prefix; this.now = now;
     this.viewClockTasks = new Map();
+    this.commandWrites = new Map();
     this.viewSnapshots = new Map(); this.viewSnapshotTasks = new Map();
     this.viewCacheBytes = 0; this.viewCacheMaxBytes = viewCacheMaxBytes; this.viewCacheTtlMs = viewCacheTtlMs;
     for (const name of ['Users', 'Sessions', 'Members', 'Invites', 'Requests']) this[name.toLowerCase()] = db.collection(prefix + name);
@@ -214,70 +215,103 @@ export class FirestoreStore {
     }, { readOnly: true });
   }
   async command(user, id, request) {
+    this.commandWrites ||= new Map();
     const { key, revision, command } = request;
     if (command?.type === 'assignment') fail('Use the instructor assignment endpoint to change membership.', 403);
     if (typeof key !== 'string' || key.length < 8 || key.length > 100) fail('A unique request key is required.');
     const requestRef = this.requests.doc(digest(JSON.stringify([user.id, key]))), payload = digest(JSON.stringify({ id, command }));
-    const execute = () => this.db.runTransaction(async tx => {
-      const actor = await this.actor(tx, user, id), previous = await tx.get(requestRef);
-      if (previous.exists) { if (previous.data().payload !== payload) fail('Request key already used for a different decision.', 409); return { response: previous.data().response }; }
-      const ref = this.sessionRef(id), doc = await tx.get(ref);
-      if (!doc.exists || doc.data().status === 'deleted') fail('Session not found.', 404);
-      const metadata = doc.data();
-      const state = await this.readState(tx, ref, metadata);
-      const plainPause = actor.role === 'instructor' && command?.type === 'clock' && command.status === 'paused'
-        && !Array.isArray(command) && Object.keys(command).length === 2 && Object.hasOwn(command, 'type') && Object.hasOwn(command, 'status')
-        && Number.isSafeInteger(revision) && revision >= 0 && revision <= metadata.revision;
-      const previousHour = state.hour;
-      const clockNow = this.now(), clock = advanceCloudClock(state, metadata.nextTickAt, clockNow);
-      // A plain instructor stop has no economic options to review. Other
-      // readers' ticks must not make a one-second clock impossible to pause.
-      // Lifecycle changes still require the exact reviewed metadata revision.
-      const pauseAfterCatchup = (plainPause && (state.status !== 'running' || clock.nextTickAt > clockNow))
-        || (actor.role === 'instructor' && ['closeSession', 'deleteSession'].includes(command?.type) && revision === metadata.revision && state.status === 'running' && clock.nextTickAt > clockNow);
-      if (clock.records.length && !pauseAfterCatchup) {
-        this.writeState(tx, ref, state, metadata, clock.nextTickAt);
-        for (const record of clock.records) this.log(tx, ref, record.actor, record.command, record.realAt, record.revision);
-        // Commit elapsed time before reporting a stale decision; throwing here
-        // would roll back the ticks and allow a pause to discard elapsed time.
-        return { clockAdvanced: true, retryPause: plainPause, advancedHours: state.hour - previousHour, remainingHours: state.endHour - state.hour };
-      }
-      if (revision !== state.revision && !pauseAfterCatchup) fail('The session changed. Refreshed state is available; review and submit again.', 409);
-      if (plainPause && ['paused', 'completed'].includes(state.status)) {
-        // Completion may occur during catch-up. A stop must never reopen it,
-        // and an already stopped clock needs no extra simulation revision.
-        if (clock.records.length) {
+    const isPlainPause = (actor, metadata) => actor.role === 'instructor' && command?.type === 'clock' && command.status === 'paused'
+      && !Array.isArray(command) && Object.keys(command).length === 2 && Object.hasOwn(command, 'type') && Object.hasOwn(command, 'status')
+      && Number.isSafeInteger(revision) && revision >= 0 && revision <= metadata.revision;
+    const run = async () => {
+      const execute = () => this.db.runTransaction(async tx => {
+        const actor = await this.actor(tx, user, id), previous = await tx.get(requestRef);
+        if (previous.exists) { if (previous.data().payload !== payload) fail('Request key already used for a different decision.', 409); return { response: previous.data().response }; }
+        const ref = this.sessionRef(id), doc = await tx.get(ref);
+        if (!doc.exists || doc.data().status === 'deleted') fail('Session not found.', 404);
+        const metadata = doc.data();
+        const plainPause = isPlainPause(actor, metadata);
+        // A paused classroom cannot accrue ticks. Reject obsolete decisions from
+        // current metadata before copying and decoding its growing history. Keep
+        // fresh authorization and exact-retry receipts ahead of this shortcut.
+        if (metadata.status !== 'running' && revision !== metadata.revision && !plainPause) fail('The session changed. Refreshed state is available; review and submit again.', 409);
+        const state = await this.readState(tx, ref, metadata);
+        const previousHour = state.hour;
+        const clockNow = this.now(), clock = advanceCloudClock(state, metadata.nextTickAt, clockNow);
+        // A plain instructor stop has no economic options to review. Other
+        // readers' ticks must not make a one-second clock impossible to pause.
+        // Lifecycle changes still require the exact reviewed metadata revision.
+        const pauseAfterCatchup = (plainPause && (state.status !== 'running' || clock.nextTickAt > clockNow))
+          || (actor.role === 'instructor' && ['closeSession', 'deleteSession'].includes(command?.type) && revision === metadata.revision && state.status === 'running' && clock.nextTickAt > clockNow);
+        if (clock.records.length && !pauseAfterCatchup) {
           this.writeState(tx, ref, state, metadata, clock.nextTickAt);
           for (const record of clock.records) this.log(tx, ref, record.actor, record.command, record.realAt, record.revision);
+          // Commit elapsed time before reporting a stale decision; throwing here
+          // would roll back the ticks and allow a pause to discard elapsed time.
+          return { clockAdvanced: true, retryPause: plainPause, advancedHours: state.hour - previousHour, remainingHours: state.endHour - state.hour };
         }
-        const response = { message: state.status === 'completed' ? 'Session already completed.' : 'Clock already paused.', revision: state.revision };
+        if (revision !== state.revision && !pauseAfterCatchup) fail('The session changed. Refreshed state is available; review and submit again.', 409);
+        if (plainPause && ['paused', 'completed'].includes(state.status)) {
+          // Completion may occur during catch-up. A stop must never reopen it,
+          // and an already stopped clock needs no extra simulation revision.
+          if (clock.records.length) {
+            this.writeState(tx, ref, state, metadata, clock.nextTickAt);
+            for (const record of clock.records) this.log(tx, ref, record.actor, record.command, record.realAt, record.revision);
+          }
+          const response = { message: state.status === 'completed' ? 'Session already completed.' : 'Clock already paused.', revision: state.revision };
+          tx.create(requestRef, { userId: user.id, sessionId: id, payload, response, createdAt: this.now() });
+          return { response };
+        }
+        const realAt = new Date(this.now()).toISOString();
+        const previousSpeed = state.secondsPerHour;
+        const message = applyCommand(state, actor, command, realAt); assertInvariants(state);
+        const speedChanged = state.secondsPerHour !== previousSpeed;
+        const nextTickAt = state.status !== 'running' ? null : command.type === 'clock' || speedChanged ? this.now() + state.secondsPerHour * 1000 : metadata.nextTickAt;
+        this.writeState(tx, ref, state, metadata, nextTickAt);
+        for (const record of clock.records) this.log(tx, ref, record.actor, record.command, record.realAt, record.revision);
+        this.log(tx, ref, actor, command, realAt, state.revision);
+        const response = { message, revision: state.revision };
         tx.create(requestRef, { userId: user.id, sessionId: id, payload, response, createdAt: this.now() });
         return { response };
+      });
+      let remainingPauseBatches;
+      for (;;) {
+        const outcome = await execute();
+        // Keep each transaction bounded, reauthorize every batch, and account for
+        // all elapsed hours before stopping. Only the option-free stop retries.
+        if (outcome.retryPause) {
+          remainingPauseBatches ??= Math.ceil(outcome.remainingHours / 24);
+          if (outcome.advancedHours <= 0 || remainingPauseBatches-- <= 0) fail('The shared clock is still catching up. Retry the pause.', 409);
+          continue;
+        }
+        if (outcome.clockAdvanced) fail('The shared clock advanced. Refreshed state is available; review and submit again.', 409);
+        return outcome.response;
       }
-      const realAt = new Date(this.now()).toISOString();
-      const previousSpeed = state.secondsPerHour;
-      const message = applyCommand(state, actor, command, realAt); assertInvariants(state);
-      const speedChanged = state.secondsPerHour !== previousSpeed;
-      const nextTickAt = state.status !== 'running' ? null : command.type === 'clock' || speedChanged ? this.now() + state.secondsPerHour * 1000 : metadata.nextTickAt;
-      this.writeState(tx, ref, state, metadata, nextTickAt);
-      for (const record of clock.records) this.log(tx, ref, record.actor, record.command, record.realAt, record.revision);
-      this.log(tx, ref, actor, command, realAt, state.revision);
-      const response = { message, revision: state.revision };
-      tx.create(requestRef, { userId: user.id, sessionId: id, payload, response, createdAt: this.now() });
-      return { response };
-    });
-    let remainingPauseBatches;
+    };
     for (;;) {
-      const outcome = await execute();
-      // Keep each transaction bounded, reauthorize every batch, and account for
-      // all elapsed hours before stopping. Only the option-free stop retries.
-      if (outcome.retryPause) {
-        remainingPauseBatches ??= Math.ceil(outcome.remainingHours / 24);
-        if (outcome.advancedHours <= 0 || remainingPauseBatches-- <= 0) fail('The shared clock is still catching up. Retry the pause.', 409);
-        continue;
-      }
-      if (outcome.clockAdvanced) fail('The shared clock advanced. Refreshed state is available; review and submit again.', 409);
-      return outcome.response;
+      // Share only admission to an active writer, never authorization/results.
+      // After it settles, waiters fan out fresh read-only preflights. They do
+      // not queue119 stale requests behind119 serial network transactions.
+      const active = this.commandWrites.get(id);
+      if (active) { await active.catch(() => {}); continue; }
+      const previous = await this.db.runTransaction(async tx => {
+        const actor = await this.actor(tx, user, id), receipt = await tx.get(requestRef);
+        if (receipt.exists) {
+          if (receipt.data().payload !== payload) fail('Request key already used for a different decision.', 409);
+          return { response: receipt.data().response };
+        }
+        const doc = await tx.get(this.sessionRef(id));
+        if (!doc.exists || doc.data().status === 'deleted') fail('Session not found.', 404);
+        const metadata = doc.data();
+        if (metadata.status !== 'running' && revision !== metadata.revision && !isPlainPause(actor, metadata)) fail('The session changed. Refreshed state is available; review and submit again.', 409);
+        return null;
+      }, { readOnly: true });
+      if (previous) return previous.response;
+      // Another matching preflight may have admitted a writer while we read.
+      if (this.commandWrites.has(id)) continue;
+      const task = run(); this.commandWrites.set(id, task);
+      try { return await task; }
+      finally { if (this.commandWrites.get(id) === task) this.commandWrites.delete(id); }
     }
   }
   async assign(user, id, userId, companyId) {
