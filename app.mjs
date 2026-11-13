@@ -1,5 +1,5 @@
-import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=39ab30b1db61';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=39ab30b1db61';
+import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=1d8eb3a2e625';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=1d8eb3a2e625';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -195,7 +195,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=39ab30b1db61')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=1d8eb3a2e625')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -244,7 +244,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=39ab30b1db61')).testClient();
+      const client = (await import('./src/test-client.mjs?v=1d8eb3a2e625')).testClient();
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -528,7 +528,24 @@ function modal(title, content, onSubmit, submitLabel = 'Confirm') {
   if (form) form.onsubmit = async event => { event.preventDefault(); const b = form.querySelector('[data-action="submit"]'); b.disabled = true; try { await onSubmit(new FormData(form)); dialog.close(); render(); } catch (e) { reportFormError(form, e); b.disabled = false; } };
   if (!dialog.open) dialog.showModal();
 }
-function download(name, data, type = 'application/json') { const blob = new Blob([typeof data === 'string' ? data : JSON.stringify(data, null, 2)], { type }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 5000); }
+// Keep download sources alive for the page lifetime: browser save prompts and
+// security checks can outlast an arbitrary cleanup timer.
+const downloadSources = new Set();
+globalThis.addEventListener?.('pagehide', event => {
+  if (event.persisted) return;
+  for (const url of downloadSources) URL.revokeObjectURL(url);
+  downloadSources.clear();
+});
+function download(name, data, type = 'application/json') {
+  const blob = new Blob([typeof data === 'string' ? data : JSON.stringify(data, null, 2)], { type });
+  const url = URL.createObjectURL(blob), link = document.createElement('a');
+  link.href = url; link.download = name; link.hidden = true;
+  downloadSources.add(url);
+  document.body.append(link);
+  try { link.click(); }
+  catch (error) { URL.revokeObjectURL(url); downloadSources.delete(url); throw error; }
+  finally { link.remove(); }
+}
 function csv(name, rows) { download(name, rows.map(r => r.map(v => `"${String(v).replace(/^[=+@-]/, "'$&").replace(/"/g, '""')}"`).join(',')).join('\r\n'), 'text/csv'); }
 const value = (data, key) => Number(data.get(key));
 function openDispatch(id) {
@@ -583,15 +600,9 @@ async function action(name, id) {
     }, deleting ? 'Delete sessions' : 'Close session'); return;
   }
   if (name === 'session-export') {
-    if (!health?.attachmentExport) throw new Error('Refresh the page to load the updated export service.');
-    // Preflight authorization/errors through the normal API before native navigation.
-    await api('/sessions/' + encodeURIComponent(id) + '/replay');
-    const frame = document.createElement('iframe'); frame.name = 'export-' + crypto.randomUUID(); frame.hidden = true; frame.title = 'Session export download';
-    const form = document.createElement('form'); form.method = 'POST'; form.action = backend + '/api/export-download'; form.target = frame.name; form.hidden = true;
-    for (const [name, value] of Object.entries({session:id, token})) { const input = document.createElement('input'); input.type = 'hidden'; input.name = name; input.value = value; form.append(input); }
-    document.body.append(frame, form);
-    try { form.submit(); toast('Download requested: session-' + id + '.json. Check your browser downloads.'); }
-    finally { form.remove(); setTimeout(() => frame.remove(), 120000); }
+    const data = await api('/sessions/' + encodeURIComponent(id) + '/replay');
+    download('session-' + id + '.json', data);
+    toast('JSON download requested.');
     return;
   }
   if (name === 'open-session' || name === 'session-codes') { selectSession(id); page = 'admin'; await enter(); if (name === 'session-codes') await action('roster'); return; }
@@ -612,7 +623,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=39ab30b1db61')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=1d8eb3a2e625')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -747,7 +758,7 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=39ab30b1db61')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    try { const client = (await import('./src/test-client.mjs?v=1d8eb3a2e625')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p>' + button('test-leave','Return to classroom') + '</main>'; }
     return;
   }
