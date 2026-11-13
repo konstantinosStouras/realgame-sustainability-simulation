@@ -61,6 +61,23 @@ test('negative financial exports stay numeric while untrusted formula-like text 
   assert.ok(data.endsWith('"A ""quoted"" team"'));
 });
 
+test('carbon report tables suppress binary floating-point tails without changing exported values', async () => {
+  const h = harness();
+  h.run("report='emissions'; reportRange=7; selectedCompanies.add('company-1'); state.snapshots.at(-2).companies[0].emissions=184.32000000000002; state.snapshots.at(-1).companies[0].emissions=2925.7999999999997;");
+  const html = h.run('reportsPage()');
+  const exactTable = html.slice(html.indexOf('Exact daily values'));
+  assert.match(exactTable, /<td>184\.32<\/td>/);
+  assert.match(exactTable, /<td>2,925\.8<\/td>/);
+  assert.doesNotMatch(exactTable, /184\.32000000000002|2,925\.7999999999997/);
+  assert.equal(h.run("reportValue(100.01, 'EUR')"), '100.01');
+  assert.equal(h.run("reportValue(192, 'modules')"), '192');
+  assert.equal(h.run("reportValue(100/12, '%')"), '8.3333');
+  await h.run("action('report-csv')");
+  const rows = h.context.captured.at(-1).data.split('\r\n');
+  assert.ok(rows.at(-2).endsWith(',"184.32000000000002"'));
+  assert.ok(rows.at(-1).endsWith(',"2925.7999999999997"'));
+});
+
 test('completed instructor preview exports the complete balanced ledger with numeric credits', async () => {
   const h = harness();
   // Simulate a long journal with balanced transactions beyond the 100 visible rows.
