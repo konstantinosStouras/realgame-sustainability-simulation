@@ -311,3 +311,23 @@ td { line-height: 1.5; }
 @media (max-width: 480px) {
   .metrics { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Keep navigation beside the plots, including on compact screens. */
+.layout { display: grid; grid-template-columns: 176px minmax(0, 1fr); max-width: 1676px; margin-inline: auto; }
+.workspace-nav { position: sticky; top: 0; align-self: start; height: 100dvh; overflow-y: auto; display: block; padding: 12px 8px; border-top: 0; }
+.workspace-tools { display: flex; flex-direction: column; width: 100%; gap: 4px; }
+.workspace-tools > :is(button, a) { flex: 0 0 auto; flex-direction: row; justify-content: flex-start; gap: 10px; width: 100%; min-height: 56px; padding: 8px; }
+.workspace-tools .icon { width: 28px; height: 28px; }
+.workspace-tool-desktop { display: block; min-height: 0; font-size: 13px; line-height: 1.3; text-align: left; overflow-wrap: anywhere; }
+.workspace-tool-short { display: none; }
+.workspace-tools > :is(button, a) .workspace-tool-label { display: none; }
+.workspace .content { margin: 0; padding-inline: 24px; }
+@media (max-width: 700px) {
+  .layout { grid-template-columns: 72px minmax(0, 1fr); }
+  .workspace-nav { padding: 6px 3px; }
+  .workspace-tools > :is(button, a) { flex-direction: column; justify-content: center; gap: 4px; min-height: 56px; padding: 6px 2px; }
+  .workspace-tools .icon { width: 24px; height: 24px; }
+  .workspace-tool-desktop { display: none; }
+  .workspace-tool-short { display: block; font-size: 10px; line-height: 1.2; white-space: normal; overflow-wrap: anywhere; }
+  .workspace .content { padding-inline: 12px; }
+}
