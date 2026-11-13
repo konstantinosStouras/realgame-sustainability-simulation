@@ -161,7 +161,7 @@ test('student workspace exposes nine categories and shows filtered live stock wi
         controller:{qty:8,capacity:16,value:800,carbon:8},
         panel:{qty:2,capacity:4,value:25000,carbon:120}
       },
-      purchases:[{item:'cell',qty:240,receivedAt:null}]
+      purchases:[{item:'cell',qty:240,receivedAt:null},{item:'controller',qty:100,receivedAt:70}]
     };
     openPanels.add('inventory');`);
   const navigation = h.run('workspaceNavigation(false, () => true)');
@@ -173,6 +173,8 @@ test('student workspace exposes nine categories and shows filtered live stock wi
   assert.match(workspace, /Needed \/ solar panel/);
   assert.match(workspace, /Solar panel<\/td><td>[^]*?\/ 4<\/span><\/td><td>—<\/td>/);
   assert.match(workspace, /2 solar panels from stock on hand/);
+  assert.match(workspace, /After incoming orders: 4 solar panels \(2 more\)/);
+  assert.match(workspace, /Limiting after receipt: Junction box<\/span>/);
   assert.match(workspace, /Limiting: Photo cell<\/span>/);
   assert.match(workspace, /Photo cell<\/td><td>[^]*?\/ 128<\/span><\/td><td>32 <span class="badge amber">Limiting<\/span><\/td>/);
   assert.match(workspace, /Recycled frame<\/td><td>[^]*?\/ 12<\/span><\/td><td>1<\/td>/);
@@ -181,11 +183,15 @@ test('student workspace exposes nine categories and shows filtered live stock wi
   const legacy = h.run('studentWorkspace(() => true)');
   assert.match(legacy, /Needed \/ solar module/);
   assert.match(legacy, /2 solar modules from stock on hand/);
+  assert.match(legacy, /After incoming orders: 6 solar modules \(4 more\)/);
+  assert.match(legacy, /Limiting after receipt: Recycled frame<\/span>/);
   assert.match(legacy, /PV cell<\/td><td>[^]*?\/ 128<\/span><\/td><td>24 <span class="badge amber">Limiting<\/span><\/td>/);
   assert.match(legacy, /Controller<\/td><td>[^]*?\/ 16<\/span><\/td><td>1<\/td>/);
   h.run('state.recipe = {cell:32,frame:1,controller:2}');
   h.run('state.company.inventory.controller.qty = 4');
-  assert.match(h.run('studentWorkspace(() => true)'), /Limiting: Photo cell, Junction box<\/span>/);
+  const tied = h.run('studentWorkspace(() => true)');
+  assert.match(tied, /Limiting: Photo cell, Junction box<\/span>/);
+  assert.match(tied, /After incoming orders: 2 solar panels \(0 more\)/);
   h.run('state.company.inventory.cell.qty = 0');
   assert.match(h.run('studentWorkspace(() => true)'), /0 solar panels from stock on hand/);
   h.run("inventoryCategories.delete('component')");
