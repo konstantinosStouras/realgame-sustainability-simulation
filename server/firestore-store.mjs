@@ -3,14 +3,17 @@ import { waitForSessionUpdate } from './session-updates.mjs';
 import { testTemplate } from './test-template.mjs';
 import { sessionId } from '../src/session-id.mjs';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { createSession, applyCommand, assertInvariants, publicView, canMessage, fail } from '../src/engine.mjs';
-import { encodeState, decodeState, digest, advanceCloudClock } from './cloud-state.mjs';
+import { createSession, applyCommand, assertInvariants, publicView, publicViewJSON, canMessage, fail } from '../src/engine.mjs';
+import { encodeState, decodeStateWithSize, digest, advanceCloudClock } from './cloud-state.mjs';
 
 export class FirestoreStore {
-  constructor(db, { prefix = 'studio', now = Date.now } = {}) {
+  constructor(db, { prefix = 'studio', now = Date.now, viewCacheMaxBytes = 32 * 1024 * 1024, viewCacheTtlMs = 30000 } = {}) {
     if (!/^[a-zA-Z][a-zA-Z0-9_]{0,60}$/.test(prefix)) throw new Error('Invalid Firestore namespace');
+    if (!Number.isSafeInteger(viewCacheMaxBytes) || viewCacheMaxBytes < 0 || !Number.isSafeInteger(viewCacheTtlMs) || viewCacheTtlMs < 0) throw new Error('Invalid view cache limits');
     this.db = db; this.prefix = prefix; this.now = now;
     this.viewClockTasks = new Map();
+    this.viewSnapshots = new Map(); this.viewSnapshotTasks = new Map();
+    this.viewCacheBytes = 0; this.viewCacheMaxBytes = viewCacheMaxBytes; this.viewCacheTtlMs = viewCacheTtlMs;
     for (const name of ['Users', 'Sessions', 'Members', 'Invites', 'Requests']) this[name.toLowerCase()] = db.collection(prefix + name);
   }
   userRef(id) { return this.users.doc(digest(id)); }
@@ -33,11 +36,47 @@ export class FirestoreStore {
     return { ...user, companyId: member.data().companyId };
   }
   async readState(tx, ref, metadata, initial = false) {
+    // Mutating transactions and exports always read their own snapshot.
+    return (await this.readSnapshot(tx, ref, metadata, initial)).state;
+  }
+  async readSnapshot(tx, ref, metadata, initial = false) {
     const info = initial ? metadata.initial : metadata;
     const refs = Array.from({ length: info.chunkCount }, (_, i) => ref.collection(initial ? 'initialChunks' : 'stateChunks').doc(String(i)));
     const docs = await tx.getAll(...refs);
     if (docs.some(d => !d.exists)) throw new Error('Classroom snapshot is incomplete.');
-    return decodeState(docs.map(d => Buffer.from(d.data().data)), info);
+    return decodeStateWithSize(docs.map(d => Buffer.from(d.data().data)), info);
+  }
+  dropViewSnapshot(key) {
+    const entry = this.viewSnapshots.get(key);
+    if (entry) { this.viewCacheBytes -= entry.rawBytes; this.viewSnapshots.delete(key); }
+  }
+  async readViewState(tx, ref, metadata) {
+    // Membership/access and metadata were just read in this caller's transaction.
+    // A verified content digest identifies the same immutable snapshot across
+    // transactions; never cache an actor, preview or authorization decision.
+    const key = JSON.stringify([ref.id, metadata.digest, metadata.codec, metadata.bytes, metadata.chunkCount]);
+    for (const [cachedKey, entry] of this.viewSnapshots) if (entry.expiresAt <= this.now()) this.dropViewSnapshot(cachedKey);
+    const cached = this.viewSnapshots.get(key);
+    if (cached) {
+      this.viewSnapshots.delete(key); this.viewSnapshots.set(key, cached);
+      return cached.state;
+    }
+    if (this.viewSnapshotTasks.has(key)) return this.viewSnapshotTasks.get(key);
+    const task = (async () => {
+      const snapshot = await this.readSnapshot(tx, ref, metadata);
+      // Charge uncompressed JSON bytes, not gzip size. Large but valid snapshots
+      // still work; they simply bypass the completed cache. At most four
+      // snapshots survive a request, within the shared raw-byte budget.
+      if (this.viewCacheTtlMs && snapshot.rawBytes <= this.viewCacheMaxBytes) {
+        while (this.viewSnapshots.size && (this.viewSnapshots.size >= 4 || this.viewCacheBytes + snapshot.rawBytes > this.viewCacheMaxBytes)) this.dropViewSnapshot(this.viewSnapshots.keys().next().value);
+        this.viewSnapshots.set(key, { ...snapshot, expiresAt: this.now() + this.viewCacheTtlMs });
+        this.viewCacheBytes += snapshot.rawBytes;
+      }
+      return snapshot.state;
+    })();
+    this.viewSnapshotTasks.set(key, task);
+    try { return await task; }
+    finally { if (this.viewSnapshotTasks.get(key) === task) this.viewSnapshotTasks.delete(key); }
   }
   writeState(tx, ref, state, metadata, nextTickAt) {
     const encoded = encodeState(state), { chunks, ...info } = encoded;
@@ -112,7 +151,7 @@ export class FirestoreStore {
     return this.db.runTransaction(async tx => {
       const actor = await this.actor(tx, user, id), ref = this.sessionRef(id), doc = await tx.get(ref);
       if (!doc.exists || doc.data().status === 'deleted') fail('Session not found.', 404);
-      const metadata = doc.data(), state = await this.readState(tx, ref, metadata);
+      const metadata = doc.data(), state = await this.readViewState(tx, ref, metadata);
       return { actor, state, nextTickAt: metadata.nextTickAt };
     }, { readOnly: true });
   }
@@ -136,7 +175,7 @@ export class FirestoreStore {
     try { await task; }
     finally { if (this.viewClockTasks.get(id) === task) this.viewClockTasks.delete(id); }
   }
-  async view(user, id, preview) {
+  async currentViewSnapshot(user, id) {
     let snapshot = await this.readViewSnapshot(user, id);
     const isDue = value => value.state.status === 'running' && value.nextTickAt != null && value.nextTickAt <= this.now();
     if (isDue(snapshot)) {
@@ -145,7 +184,17 @@ export class FirestoreStore {
       // Reauthorize and read metadata/chunks together at a new consistent time.
       snapshot = await this.readViewSnapshot(user, id);
     }
-    return { actor: snapshot.actor, state: publicView(snapshot.state, snapshot.actor, preview), catchingUp: isDue(snapshot) };
+    return { ...snapshot, catchingUp: isDue(snapshot) };
+  }
+  async view(user, id, preview) {
+    const { actor, state, catchingUp } = await this.currentViewSnapshot(user, id);
+    return { actor, state: publicView(state, actor, preview), catchingUp };
+  }
+  async viewJSON(user, id, preview) {
+    const { actor, state, catchingUp } = await this.currentViewSnapshot(user, id);
+    // Each component is JSON encoded; the state is never exposed as mutable
+    // references. Authorization and clock catch-up are shared with view().
+    return `{"actor":${JSON.stringify(actor)},"state":${publicViewJSON(state, actor, preview)},"catchingUp":${JSON.stringify(catchingUp)}}`;
   }
   async updates(user, id, revision, signal) {
     if (!Number.isSafeInteger(revision) || revision < 0) fail('Invalid session revision.');

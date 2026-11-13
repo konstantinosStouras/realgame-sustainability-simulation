@@ -545,7 +545,7 @@ export function assertInvariants(s) {
   }
   return true;
 }
-export function publicView(s, actor, previewId) {
+function projectPublicView(s, actor, previewId) {
   // Select authorized data before cloning: every classroom poll should copy only
   // its response, not every company's growing private ledger and order history.
   const view = { ...s }, isTeacher = actor.role === 'instructor';
@@ -557,5 +557,13 @@ export function publicView(s, actor, previewId) {
   view.messages = view.messages.filter(m => canMessage(s, actor, m.channel));
   view.audit = view.audit.filter(a => isTeacher || a.companyId === companyId).map(a => ({ ...a, command: a.command.type === 'message' ? { type: 'message' } : a.command }));
   delete view.rng; delete view.sequence;
-  return structuredClone(view);
+  return view;
+}
+export function publicView(s, actor, previewId) {
+  return structuredClone(projectPublicView(s, actor, previewId));
+}
+export function publicViewJSON(s, actor, previewId) {
+  // Serialize synchronously while the projection's references remain private.
+  // HTTP responses need immutable text, not a second copy of every ledger row.
+  return JSON.stringify(projectPublicView(s, actor, previewId));
 }

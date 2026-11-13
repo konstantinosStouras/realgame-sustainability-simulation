@@ -4,10 +4,11 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 import https from 'node:https';
+import { gunzipSync } from 'node:zlib';
 import { digest, decodeState } from '../server/cloud-state.mjs';
 import { assertInvariants } from '../src/engine.mjs';
 
-export async function runLiveLoad({ admin, db, apiKey, base, output, manifest }) {
+export async function runLiveLoad({ admin, db, apiKey, base, output, manifest, scenario, sessionOptions = {} }) {
   assert.match(base, /^https:\/\/[a-z0-9.-]+\/api$/);
   const run = `load-${Date.now()}-${randomBytes(4).toString('hex')}`;
   const identities = [], sessions = [], samples = [], checks = {};
@@ -37,16 +38,16 @@ export async function runLiveLoad({ admin, db, apiKey, base, output, manifest })
     return { uid, token: data.idToken };
   }
   async function call(phase, path, who, body, timeout = 45000) {
-    const start = performance.now(); let status = 0, value;
+    const start = performance.now(); let status = 0, value, wireBytes, decodedBytes, encoding;
     try {
       const response = await new Promise((resolve,reject)=>{
-        const request=https.request(base+path,{agent,method:body===undefined?'GET':'POST',headers:{Origin:'https://www.stouras.com','Content-Type':'application/json',...(who?{Authorization:`Bearer ${who.token}`}:{})},signal:AbortSignal.timeout(timeout)},res=>{
-          const chunks=[];res.on('data',chunk=>chunks.push(chunk));res.on('error',reject);res.on('end',()=>resolve({status:res.statusCode,text:Buffer.concat(chunks).toString('utf8')}));
+        const request=https.request(base+path,{agent,method:body===undefined?'GET':'POST',headers:{Origin:'https://www.stouras.com','Content-Type':'application/json','Accept-Encoding':'gzip',...(who?{Authorization:`Bearer ${who.token}`}:{})},signal:AbortSignal.timeout(timeout)},res=>{
+          const chunks=[];res.on('data',chunk=>chunks.push(chunk));res.on('error',reject);res.on('end',()=>{try{const bytes=Buffer.concat(chunks),decoded=res.headers['content-encoding']==='gzip'?gunzipSync(bytes):bytes;resolve({status:res.statusCode,text:decoded.toString('utf8'),bytes:bytes.length,encoding:res.headers['content-encoding']||'identity'});}catch(e){reject(e);}});
         });request.on('error',reject);request.end(body===undefined?undefined:JSON.stringify(body));
       });
-      status = response.status; value = JSON.parse(response.text);
+      status = response.status; wireBytes=response.bytes;decodedBytes=Buffer.byteLength(response.text);encoding=response.encoding;value = JSON.parse(response.text);
     } catch (e) { value = { error: `${e.name}: ${e.code || e.cause?.code || e.message}` }; }
-    samples.push({ phase, status, ms: Math.round(performance.now() - start), ...(status >= 500 || !status ? { error: value.error } : {}) });
+    samples.push({ phase, status, ms: Math.round(performance.now() - start),wireBytes,decodedBytes,encoding, ...(status >= 500 || !status ? { error: value.error } : {}) });
     return { status, value };
   }
   const requireOk = r => { assert.ok(r.status >= 200 && r.status < 300, `Unexpected status ${r.status}: ${JSON.stringify(r.value)}`); return r.value; };
@@ -66,7 +67,7 @@ export async function runLiveLoad({ admin, db, apiKey, base, output, manifest })
     // Manifest the chosen ID before the POST: a lost create response must not
     // leave an untracked classroom behind after a successful server commit.
     sessions.push(run); await saveManifest();
-    const session = requireOk(await call('create','/sessions',teacher,{id:run,name:`Disposable capacity test ${run}`,companyNames:Array.from({length:12},(_,i)=>`Synthetic team ${i+1}`),days:14}));
+    const session = requireOk(await call('create','/sessions',teacher,{name:`Disposable live test ${run}`,companyNames:Array.from({length:12},(_,i)=>`Synthetic team ${i+1}`),days:14,...sessionOptions,id:run}));
     assert.equal(session.id,run);const endpoint=`/sessions/${session.id}`;
     const roster = requireOk(await call('roster',endpoint+'/roster',teacher));
     const joins = await limit(students,12,(student,i)=>call('join','/join',student,{code:roster.invites.find(x=>x.companyId===`company-${i%12+1}`).code}));
@@ -74,6 +75,8 @@ export async function runLiveLoad({ admin, db, apiKey, base, output, manifest })
     const members=requireOk(await call('roster',endpoint+'/roster',teacher)).members;
     assert.equal(members.length,121);for(let i=1;i<=12;i++)assert.equal(members.filter(m=>m.companyId===`company-${i}`).length,10);
     checks.membership=true;
+    if(scenario) await scenario({run,students,teacher,endpoint,call,requireOk,checks,db,summary,session,samples});
+    else {
     for (const n of [12,60,120]) {
       const phase=`read-${n}`; await Promise.all(students.slice(0,n).map(s=>call(phase,endpoint,s))); summary(phase);
     }
@@ -132,6 +135,7 @@ export async function runLiveLoad({ admin, db, apiKey, base, output, manifest })
     assert.equal(checks.duplicateResponses,true);assert.equal(checks.uniqueTicks,true);
     assert.equal(checks.notificationFanout,120);assert.equal(checks.privateCompanyViews,true);
     assert.ok(checks.marketOrders>0,'Competing offers must produce market orders');
+    }
   } catch(e){failure=e.message;console.log(`Probe failed: ${failure}`);}
   finally {
     const phases=[...new Set(samples.map(s=>s.phase))].map(summary);

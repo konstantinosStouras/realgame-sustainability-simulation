@@ -15,9 +15,13 @@ export function encodeState(state) {
   return { chunks, bytes: compressed.length, digest: digest(compressed), codec: 'gzip-json-v1' };
 }
 export function decodeState(chunks, metadata) {
+  return decodeStateWithSize(chunks, metadata).state;
+}
+export function decodeStateWithSize(chunks, metadata) {
   const compressed = Buffer.concat(chunks);
   if (metadata.codec !== 'gzip-json-v1' || compressed.length !== metadata.bytes || digest(compressed) !== metadata.digest) throw new Error('Stored classroom snapshot failed its integrity check.');
-  return JSON.parse(gunzipSync(compressed, { maxOutputLength: MAX_RAW }).toString());
+  const json = gunzipSync(compressed, { maxOutputLength: MAX_RAW });
+  return { state: JSON.parse(json.toString()), rawBytes: json.length };
 }
 // A durable due time, updated in the same transaction as the state, prevents two
 // function instances or the scheduled worker from advancing the same hour twice.

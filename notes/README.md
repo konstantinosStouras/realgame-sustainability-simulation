@@ -19,3 +19,4 @@ Only add notes suitable for a public repository. Keep login details and private 
 - [Our simulation: multiplayer playtest and fixes, 12 November 2026](multi-agent-qa.md)
 - [Classroom stress tests, bugs and fixes, 13 November 2026](stress-test-2026-11-13.md)
 - [Live Firebase capacity: 120 students and 12 teams, 13 November 2026](live-capacity-2026-11-13.md)
+- [Full 60-day live simulation: results and fixes, 13 November 2026](full-live-simulation-2026-11-13.md)

@@ -1,0 +1,1195 @@
+{
+  "date": "2026-11-13",
+  "method": {
+    "students": 120,
+    "teams": 12,
+    "instructors": 1,
+    "simulatedDays": 60,
+    "renderedBrowserLoadTest": false,
+    "description": "120 real synthetic Firebase student identities exercised the authenticated production API; Chrome UI checked separately. The run crossed a deployment between the day-45 and day-59 waves."
+  },
+  "baseline": {
+    "day15": {
+      "phase": "day-15-120-views",
+      "requests": 120,
+      "statuses": {
+        "200": 120
+      },
+      "p50": 14565,
+      "p95": 22774,
+      "p99": 23535,
+      "max": 23597
+    },
+    "failure": "day-15-120-views exceeds browser's15s request timeout: 23597ms",
+    "cleaned": true
+  },
+  "final": {
+    "requestCount": 3014,
+    "statuses": {
+      "200": 3012,
+      "201": 1,
+      "403": 1
+    },
+    "days": 60,
+    "students": 120,
+    "teams": 12,
+    "acceptedDecisions": 1090,
+    "replayExact": true,
+    "allDailyReportsReconciled": true,
+    "allLoansRepaid": true,
+    "pendingDeposits": 12,
+    "final": {
+      "day": 60,
+      "hour": 1440,
+      "revision": 1090,
+      "compressedBytes": 2004323,
+      "chunks": 4,
+      "production": 58566,
+      "orders": 5760,
+      "shipments": 5606,
+      "receivedUnits": 48576,
+      "paidShipments": 5229,
+      "cashCents": 441386536,
+      "profitCents": 400270744
+    },
+    "unexpectedFailures": 0,
+    "cleaned": true,
+    "audit": {
+      "dailyCloses": 60,
+      "reportRows": 720,
+      "strictDailyReconciliation": true,
+      "fullStateReplayExact": true,
+      "browserDeadlineOverruns": 0,
+      "requests": 3014,
+      "maxRequestMs": 13396
+    },
+    "phases": [
+      {
+        "phase": "health",
+        "requests": 1,
+        "statuses": {
+          "200": 1
+        },
+        "p50": 500,
+        "p95": 500,
+        "p99": 500,
+        "max": 500
+      },
+      {
+        "phase": "create",
+        "requests": 1,
+        "statuses": {
+          "201": 1
+        },
+        "p50": 1086,
+        "p95": 1086,
+        "p99": 1086,
+        "max": 1086
+      },
+      {
+        "phase": "roster",
+        "requests": 2,
+        "statuses": {
+          "200": 2
+        },
+        "p50": 432,
+        "p95": 444,
+        "p99": 444,
+        "max": 444
+      },
+      {
+        "phase": "join",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 523,
+        "p95": 1553,
+        "p99": 1742,
+        "max": 1858
+      },
+      {
+        "phase": "decision-review",
+        "requests": 1090,
+        "statuses": {
+          "200": 1090
+        },
+        "p50": 817,
+        "p95": 1566,
+        "p99": 1957,
+        "max": 2898
+      },
+      {
+        "phase": "instructor-setup",
+        "requests": 9,
+        "statuses": {
+          "200": 9
+        },
+        "p50": 323,
+        "p95": 578,
+        "p99": 578,
+        "max": 578
+      },
+      {
+        "phase": "student-setup",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 351,
+        "p95": 478,
+        "p99": 597,
+        "max": 601
+      },
+      {
+        "phase": "duplicate-decision",
+        "requests": 12,
+        "statuses": {
+          "200": 12
+        },
+        "p50": 311,
+        "p95": 485,
+        "p99": 485,
+        "max": 485
+      },
+      {
+        "phase": "market-offer",
+        "requests": 720,
+        "statuses": {
+          "200": 720
+        },
+        "p50": 1040,
+        "p95": 1595,
+        "p99": 1851,
+        "max": 3626
+      },
+      {
+        "phase": "day-advance",
+        "requests": 60,
+        "statuses": {
+          "200": 60
+        },
+        "p50": 1103,
+        "p95": 1729,
+        "p99": 1858,
+        "max": 1858
+      },
+      {
+        "phase": "day-1-120-views",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 1808,
+        "p95": 2606,
+        "p99": 2647,
+        "max": 2664,
+        "deployment": "decoded-cache-only"
+      },
+      {
+        "phase": "dispatch-review",
+        "requests": 84,
+        "statuses": {
+          "200": 84
+        },
+        "p50": 1039,
+        "p95": 1569,
+        "p99": 2506,
+        "max": 2506
+      },
+      {
+        "phase": "manual-delivery",
+        "requests": 83,
+        "statuses": {
+          "200": 83
+        },
+        "p50": 1014,
+        "p95": 1688,
+        "p99": 1782,
+        "max": 1782
+      },
+      {
+        "phase": "weekly-finance",
+        "requests": 96,
+        "statuses": {
+          "200": 96
+        },
+        "p50": 1055,
+        "p95": 1550,
+        "p99": 1896,
+        "max": 1896
+      },
+      {
+        "phase": "day-15-120-views",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 3680,
+        "p95": 5404,
+        "p99": 5489,
+        "max": 5509,
+        "deployment": "decoded-cache-only"
+      },
+      {
+        "phase": "supply-shock",
+        "requests": 2,
+        "statuses": {
+          "200": 2
+        },
+        "p50": 761,
+        "p95": 779,
+        "p99": 779,
+        "max": 779
+      },
+      {
+        "phase": "day-30-120-views",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 5043,
+        "p95": 9114,
+        "p99": 9251,
+        "max": 9317,
+        "deployment": "decoded-cache-only"
+      },
+      {
+        "phase": "day-45-120-views",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 11073,
+        "p95": 13142,
+        "p99": 13371,
+        "max": 13396,
+        "deployment": "decoded-cache-only"
+      },
+      {
+        "phase": "day-59-120-views",
+        "requests": 120,
+        "statuses": {
+          "200": 120
+        },
+        "p50": 10684,
+        "p95": 12105,
+        "p99": 12326,
+        "max": 12410,
+        "deployment": "decoded-cache-and-direct-json"
+      },
+      {
+        "phase": "final-financial-report",
+        "requests": 12,
+        "statuses": {
+          "200": 12
+        },
+        "p50": 1269,
+        "p95": 2359,
+        "p99": 2359,
+        "max": 2359
+      },
+      {
+        "phase": "completed-student-access",
+        "requests": 1,
+        "statuses": {
+          "403": 1
+        },
+        "p50": 286,
+        "p95": 286,
+        "p99": 286,
+        "max": 286
+      },
+      {
+        "phase": "full-economic-replay",
+        "requests": 1,
+        "statuses": {
+          "200": 1
+        },
+        "p50": 1685,
+        "p95": 1685,
+        "p99": 1685,
+        "max": 1685
+      }
+    ],
+    "responseEncodingCounts": {
+      "identity": 3014
+    },
+    "economicTotals": {
+      "orders": 5760,
+      "producedUnits": 58566,
+      "shipments": 5606,
+      "receivedUnits": 48576,
+      "customerPayments": 5229,
+      "supplierPurchases": 580,
+      "supplierPayments": 520,
+      "freightPayments": 5419,
+      "loans": 12,
+      "repaidLoans": 12,
+      "deposits": 60,
+      "maturedDeposits": 48,
+      "pendingDeposits": 12
+    },
+    "daily": [
+      {
+        "day": 1,
+        "hour": 24,
+        "revision": 142,
+        "compressedBytes": 16292,
+        "chunks": 1,
+        "production": 1152,
+        "orders": 96,
+        "shipments": 0,
+        "receivedUnits": 0,
+        "paidShipments": 0,
+        "cashCents": 179029248,
+        "profitCents": -2206752
+      },
+      {
+        "day": 2,
+        "hour": 48,
+        "revision": 167,
+        "compressedBytes": 35124,
+        "chunks": 1,
+        "production": 2304,
+        "orders": 192,
+        "shipments": 24,
+        "receivedUnits": 30,
+        "paidShipments": 0,
+        "cashCents": 183308736,
+        "profitCents": -3841596
+      },
+      {
+        "day": 3,
+        "hour": 72,
+        "revision": 180,
+        "compressedBytes": 60308,
+        "chunks": 1,
+        "production": 3456,
+        "orders": 288,
+        "shipments": 144,
+        "receivedUnits": 268,
+        "paidShipments": 0,
+        "cashCents": 181488768,
+        "profitCents": -3701178
+      },
+      {
+        "day": 4,
+        "hour": 96,
+        "revision": 193,
+        "compressedBytes": 106889,
+        "chunks": 1,
+        "production": 3600,
+        "orders": 384,
+        "shipments": 240,
+        "receivedUnits": 988,
+        "paidShipments": 0,
+        "cashCents": 179613072,
+        "profitCents": 3451213
+      },
+      {
+        "day": 5,
+        "hour": 120,
+        "revision": 206,
+        "compressedBytes": 139477,
+        "chunks": 1,
+        "production": 4728,
+        "orders": 480,
+        "shipments": 336,
+        "receivedUnits": 1806,
+        "paidShipments": 6,
+        "cashCents": 177658912,
+        "profitCents": 11278241
+      },
+      {
+        "day": 6,
+        "hour": 144,
+        "revision": 219,
+        "compressedBytes": 173484,
+        "chunks": 1,
+        "production": 5880,
+        "orders": 576,
+        "shipments": 432,
+        "receivedUnits": 2634,
+        "paidShipments": 43,
+        "cashCents": 181597184,
+        "profitCents": 18885498
+      },
+      {
+        "day": 7,
+        "hour": 168,
+        "revision": 244,
+        "compressedBytes": 207622,
+        "chunks": 1,
+        "production": 7032,
+        "orders": 672,
+        "shipments": 528,
+        "receivedUnits": 3529,
+        "paidShipments": 92,
+        "cashCents": 189795382,
+        "profitCents": 27245493
+      },
+      {
+        "day": 8,
+        "hour": 192,
+        "revision": 257,
+        "compressedBytes": 243367,
+        "chunks": 1,
+        "production": 8184,
+        "orders": 768,
+        "shipments": 624,
+        "receivedUnits": 4369,
+        "paidShipments": 211,
+        "cashCents": 216704574,
+        "profitCents": 34787688
+      },
+      {
+        "day": 9,
+        "hour": 216,
+        "revision": 270,
+        "compressedBytes": 277721,
+        "chunks": 1,
+        "production": 9336,
+        "orders": 864,
+        "shipments": 720,
+        "receivedUnits": 5142,
+        "paidShipments": 318,
+        "cashCents": 188932976,
+        "profitCents": 41389077
+      },
+      {
+        "day": 10,
+        "hour": 240,
+        "revision": 295,
+        "compressedBytes": 315553,
+        "chunks": 1,
+        "production": 10488,
+        "orders": 960,
+        "shipments": 828,
+        "receivedUnits": 5986,
+        "paidShipments": 416,
+        "cashCents": 209940258,
+        "profitCents": 48527506
+      },
+      {
+        "day": 11,
+        "hour": 264,
+        "revision": 308,
+        "compressedBytes": 352403,
+        "chunks": 1,
+        "production": 11640,
+        "orders": 1056,
+        "shipments": 924,
+        "receivedUnits": 6865,
+        "paidShipments": 513,
+        "cashCents": 206950230,
+        "profitCents": 56081114
+      },
+      {
+        "day": 12,
+        "hour": 288,
+        "revision": 321,
+        "compressedBytes": 384272,
+        "chunks": 1,
+        "production": 12792,
+        "orders": 1152,
+        "shipments": 1020,
+        "receivedUnits": 7747,
+        "paidShipments": 608,
+        "cashCents": 225968482,
+        "profitCents": 63518660
+      },
+      {
+        "day": 13,
+        "hour": 312,
+        "revision": 334,
+        "compressedBytes": 418823,
+        "chunks": 1,
+        "production": 13944,
+        "orders": 1248,
+        "shipments": 1116,
+        "receivedUnits": 8631,
+        "paidShipments": 708,
+        "cashCents": 211100274,
+        "profitCents": 71074703
+      },
+      {
+        "day": 14,
+        "hour": 336,
+        "revision": 359,
+        "compressedBytes": 457224,
+        "chunks": 1,
+        "production": 15096,
+        "orders": 1344,
+        "shipments": 1212,
+        "receivedUnits": 9500,
+        "paidShipments": 814,
+        "cashCents": 230726988,
+        "profitCents": 78489038
+      },
+      {
+        "day": 15,
+        "hour": 360,
+        "revision": 372,
+        "compressedBytes": 491334,
+        "chunks": 1,
+        "production": 16248,
+        "orders": 1440,
+        "shipments": 1308,
+        "receivedUnits": 10374,
+        "paidShipments": 908,
+        "cashCents": 222697508,
+        "profitCents": 86019270
+      },
+      {
+        "day": 16,
+        "hour": 384,
+        "revision": 385,
+        "compressedBytes": 525602,
+        "chunks": 2,
+        "production": 17400,
+        "orders": 1536,
+        "shipments": 1404,
+        "receivedUnits": 11277,
+        "paidShipments": 1007,
+        "cashCents": 208977900,
+        "profitCents": 94013432
+      },
+      {
+        "day": 17,
+        "hour": 408,
+        "revision": 398,
+        "compressedBytes": 559394,
+        "chunks": 2,
+        "production": 18552,
+        "orders": 1632,
+        "shipments": 1500,
+        "receivedUnits": 12162,
+        "paidShipments": 1099,
+        "cashCents": 230642132,
+        "profitCents": 101330331
+      },
+      {
+        "day": 18,
+        "hour": 432,
+        "revision": 411,
+        "compressedBytes": 591702,
+        "chunks": 2,
+        "production": 19704,
+        "orders": 1728,
+        "shipments": 1596,
+        "receivedUnits": 12981,
+        "paidShipments": 1194,
+        "cashCents": 228729584,
+        "profitCents": 107939165
+      },
+      {
+        "day": 19,
+        "hour": 456,
+        "revision": 424,
+        "compressedBytes": 626597,
+        "chunks": 2,
+        "production": 20856,
+        "orders": 1824,
+        "shipments": 1692,
+        "receivedUnits": 13846,
+        "paidShipments": 1292,
+        "cashCents": 218800226,
+        "profitCents": 114991214
+      },
+      {
+        "day": 20,
+        "hour": 480,
+        "revision": 450,
+        "compressedBytes": 666026,
+        "chunks": 2,
+        "production": 21972,
+        "orders": 1920,
+        "shipments": 1800,
+        "receivedUnits": 14750,
+        "paidShipments": 1388,
+        "cashCents": 238926084,
+        "profitCents": 122616054
+      },
+      {
+        "day": 21,
+        "hour": 504,
+        "revision": 475,
+        "compressedBytes": 702705,
+        "chunks": 2,
+        "production": 23124,
+        "orders": 2016,
+        "shipments": 1896,
+        "receivedUnits": 15608,
+        "paidShipments": 1481,
+        "cashCents": 235554748,
+        "profitCents": 129740116
+      },
+      {
+        "day": 22,
+        "hour": 528,
+        "revision": 488,
+        "compressedBytes": 736621,
+        "chunks": 2,
+        "production": 24276,
+        "orders": 2112,
+        "shipments": 1992,
+        "receivedUnits": 16486,
+        "paidShipments": 1577,
+        "cashCents": 222672720,
+        "profitCents": 137281883
+      },
+      {
+        "day": 23,
+        "hour": 552,
+        "revision": 502,
+        "compressedBytes": 770434,
+        "chunks": 2,
+        "production": 25380,
+        "orders": 2208,
+        "shipments": 2088,
+        "receivedUnits": 17337,
+        "paidShipments": 1681,
+        "cashCents": 242330550,
+        "profitCents": 144415136
+      },
+      {
+        "day": 24,
+        "hour": 576,
+        "revision": 515,
+        "compressedBytes": 803029,
+        "chunks": 2,
+        "production": 26388,
+        "orders": 2304,
+        "shipments": 2184,
+        "receivedUnits": 18205,
+        "paidShipments": 1784,
+        "cashCents": 245584450,
+        "profitCents": 151642894
+      },
+      {
+        "day": 25,
+        "hour": 600,
+        "revision": 528,
+        "compressedBytes": 837557,
+        "chunks": 2,
+        "production": 27498,
+        "orders": 2400,
+        "shipments": 2280,
+        "receivedUnits": 19073,
+        "paidShipments": 1882,
+        "cashCents": 263326206,
+        "profitCents": 158812415
+      },
+      {
+        "day": 26,
+        "hour": 624,
+        "revision": 541,
+        "compressedBytes": 870336,
+        "chunks": 2,
+        "production": 28626,
+        "orders": 2496,
+        "shipments": 2376,
+        "receivedUnits": 19908,
+        "paidShipments": 1977,
+        "cashCents": 247333604,
+        "profitCents": 165548985
+      },
+      {
+        "day": 27,
+        "hour": 648,
+        "revision": 554,
+        "compressedBytes": 903901,
+        "chunks": 2,
+        "production": 29562,
+        "orders": 2592,
+        "shipments": 2472,
+        "receivedUnits": 20755,
+        "paidShipments": 2072,
+        "cashCents": 255209290,
+        "profitCents": 172496081
+      },
+      {
+        "day": 28,
+        "hour": 672,
+        "revision": 579,
+        "compressedBytes": 939271,
+        "chunks": 2,
+        "production": 30630,
+        "orders": 2688,
+        "shipments": 2568,
+        "receivedUnits": 21520,
+        "paidShipments": 2169,
+        "cashCents": 270205222,
+        "profitCents": 178574297
+      },
+      {
+        "day": 29,
+        "hour": 696,
+        "revision": 592,
+        "compressedBytes": 971857,
+        "chunks": 2,
+        "production": 31686,
+        "orders": 2784,
+        "shipments": 2664,
+        "receivedUnits": 22407,
+        "paidShipments": 2262,
+        "cashCents": 286435396,
+        "profitCents": 186270122
+      },
+      {
+        "day": 30,
+        "hour": 720,
+        "revision": 617,
+        "compressedBytes": 1010611,
+        "chunks": 2,
+        "production": 32598,
+        "orders": 2880,
+        "shipments": 2772,
+        "receivedUnits": 23243,
+        "paidShipments": 2361,
+        "cashCents": 261379424,
+        "profitCents": 193243659
+      },
+      {
+        "day": 31,
+        "hour": 744,
+        "revision": 630,
+        "compressedBytes": 1045218,
+        "chunks": 3,
+        "production": 33486,
+        "orders": 2976,
+        "shipments": 2868,
+        "receivedUnits": 24100,
+        "paidShipments": 2452,
+        "cashCents": 275184400,
+        "profitCents": 200229764
+      },
+      {
+        "day": 32,
+        "hour": 768,
+        "revision": 643,
+        "compressedBytes": 1077844,
+        "chunks": 3,
+        "production": 34350,
+        "orders": 3072,
+        "shipments": 2964,
+        "receivedUnits": 24979,
+        "paidShipments": 2551,
+        "cashCents": 263437942,
+        "profitCents": 207355538
+      },
+      {
+        "day": 33,
+        "hour": 792,
+        "revision": 656,
+        "compressedBytes": 1110438,
+        "chunks": 3,
+        "production": 35214,
+        "orders": 3168,
+        "shipments": 3060,
+        "receivedUnits": 25804,
+        "paidShipments": 2651,
+        "cashCents": 270280834,
+        "profitCents": 213980724
+      },
+      {
+        "day": 34,
+        "hour": 816,
+        "revision": 669,
+        "compressedBytes": 1145091,
+        "chunks": 3,
+        "production": 36078,
+        "orders": 3264,
+        "shipments": 3156,
+        "receivedUnits": 26671,
+        "paidShipments": 2753,
+        "cashCents": 286161460,
+        "profitCents": 221199779
+      },
+      {
+        "day": 35,
+        "hour": 840,
+        "revision": 694,
+        "compressedBytes": 1179706,
+        "chunks": 3,
+        "production": 36925,
+        "orders": 3360,
+        "shipments": 3252,
+        "receivedUnits": 27658,
+        "paidShipments": 2852,
+        "cashCents": 278131466,
+        "profitCents": 229775741
+      },
+      {
+        "day": 36,
+        "hour": 864,
+        "revision": 707,
+        "compressedBytes": 1211875,
+        "chunks": 3,
+        "production": 37760,
+        "orders": 3456,
+        "shipments": 3348,
+        "receivedUnits": 28467,
+        "paidShipments": 2947,
+        "cashCents": 282448572,
+        "profitCents": 236462460
+      },
+      {
+        "day": 37,
+        "hour": 888,
+        "revision": 720,
+        "compressedBytes": 1244127,
+        "chunks": 3,
+        "production": 38577,
+        "orders": 3552,
+        "shipments": 3444,
+        "receivedUnits": 29350,
+        "paidShipments": 3040,
+        "cashCents": 298081688,
+        "profitCents": 243930369
+      },
+      {
+        "day": 38,
+        "hour": 912,
+        "revision": 733,
+        "compressedBytes": 1277313,
+        "chunks": 3,
+        "production": 39673,
+        "orders": 3648,
+        "shipments": 3540,
+        "receivedUnits": 30224,
+        "paidShipments": 3143,
+        "cashCents": 299178983,
+        "profitCents": 251226373
+      },
+      {
+        "day": 39,
+        "hour": 936,
+        "revision": 746,
+        "compressedBytes": 1309899,
+        "chunks": 3,
+        "production": 40631,
+        "orders": 3744,
+        "shipments": 3636,
+        "receivedUnits": 31049,
+        "paidShipments": 3232,
+        "cashCents": 305995124,
+        "profitCents": 257854455
+      },
+      {
+        "day": 40,
+        "hour": 960,
+        "revision": 771,
+        "compressedBytes": 1345841,
+        "chunks": 3,
+        "production": 41660,
+        "orders": 3840,
+        "shipments": 3744,
+        "receivedUnits": 31949,
+        "paidShipments": 3332,
+        "cashCents": 320498765,
+        "profitCents": 265244339
+      },
+      {
+        "day": 41,
+        "hour": 984,
+        "revision": 784,
+        "compressedBytes": 1383716,
+        "chunks": 3,
+        "production": 42508,
+        "orders": 3936,
+        "shipments": 3840,
+        "receivedUnits": 32737,
+        "paidShipments": 3431,
+        "cashCents": 321345424,
+        "profitCents": 271516794
+      },
+      {
+        "day": 42,
+        "hour": 1008,
+        "revision": 809,
+        "compressedBytes": 1419867,
+        "chunks": 3,
+        "production": 43301,
+        "orders": 4032,
+        "shipments": 3936,
+        "receivedUnits": 33660,
+        "paidShipments": 3523,
+        "cashCents": 323227586,
+        "profitCents": 279432572
+      },
+      {
+        "day": 43,
+        "hour": 1032,
+        "revision": 822,
+        "compressedBytes": 1451669,
+        "chunks": 3,
+        "production": 44044,
+        "orders": 4128,
+        "shipments": 4032,
+        "receivedUnits": 34431,
+        "paidShipments": 3627,
+        "cashCents": 338033983,
+        "profitCents": 285672420
+      },
+      {
+        "day": 44,
+        "hour": 1056,
+        "revision": 835,
+        "compressedBytes": 1483932,
+        "chunks": 3,
+        "production": 44899,
+        "orders": 4224,
+        "shipments": 4128,
+        "receivedUnits": 35320,
+        "paidShipments": 3727,
+        "cashCents": 337085654,
+        "profitCents": 293364491
+      },
+      {
+        "day": 45,
+        "hour": 1080,
+        "revision": 848,
+        "compressedBytes": 1516285,
+        "chunks": 3,
+        "production": 45730,
+        "orders": 4320,
+        "shipments": 4224,
+        "receivedUnits": 36145,
+        "paidShipments": 3825,
+        "cashCents": 349443181,
+        "profitCents": 300042103
+      },
+      {
+        "day": 46,
+        "hour": 1104,
+        "revision": 861,
+        "compressedBytes": 1549697,
+        "chunks": 4,
+        "production": 46594,
+        "orders": 4416,
+        "shipments": 4320,
+        "receivedUnits": 37049,
+        "paidShipments": 3915,
+        "cashCents": 349000232,
+        "profitCents": 307387849
+      },
+      {
+        "day": 47,
+        "hour": 1128,
+        "revision": 874,
+        "compressedBytes": 1583520,
+        "chunks": 4,
+        "production": 47437,
+        "orders": 4512,
+        "shipments": 4416,
+        "receivedUnits": 37920,
+        "paidShipments": 4016,
+        "cashCents": 354610951,
+        "profitCents": 314504814
+      },
+      {
+        "day": 48,
+        "hour": 1152,
+        "revision": 887,
+        "compressedBytes": 1617911,
+        "chunks": 4,
+        "production": 48271,
+        "orders": 4608,
+        "shipments": 4512,
+        "receivedUnits": 38808,
+        "paidShipments": 4109,
+        "cashCents": 360727762,
+        "profitCents": 321938337
+      },
+      {
+        "day": 49,
+        "hour": 1176,
+        "revision": 912,
+        "compressedBytes": 1650821,
+        "chunks": 4,
+        "production": 49087,
+        "orders": 4704,
+        "shipments": 4608,
+        "receivedUnits": 39651,
+        "paidShipments": 4210,
+        "cashCents": 373588304,
+        "profitCents": 328949402
+      },
+      {
+        "day": 50,
+        "hour": 1200,
+        "revision": 937,
+        "compressedBytes": 1687589,
+        "chunks": 4,
+        "production": 49899,
+        "orders": 4800,
+        "shipments": 4715,
+        "receivedUnits": 40449,
+        "paidShipments": 4303,
+        "cashCents": 386215301,
+        "profitCents": 335407343
+      },
+      {
+        "day": 51,
+        "hour": 1224,
+        "revision": 950,
+        "compressedBytes": 1720133,
+        "chunks": 4,
+        "production": 50718,
+        "orders": 4896,
+        "shipments": 4803,
+        "receivedUnits": 41274,
+        "paidShipments": 4401,
+        "cashCents": 388525584,
+        "profitCents": 342232015
+      },
+      {
+        "day": 52,
+        "hour": 1248,
+        "revision": 963,
+        "compressedBytes": 1749610,
+        "chunks": 4,
+        "production": 51546,
+        "orders": 4992,
+        "shipments": 4891,
+        "receivedUnits": 42061,
+        "paidShipments": 4498,
+        "cashCents": 394632980,
+        "profitCents": 348552515
+      },
+      {
+        "day": 53,
+        "hour": 1272,
+        "revision": 976,
+        "compressedBytes": 1779891,
+        "chunks": 4,
+        "production": 52466,
+        "orders": 5088,
+        "shipments": 4979,
+        "receivedUnits": 42905,
+        "paidShipments": 4593,
+        "cashCents": 405521354,
+        "profitCents": 355254621
+      },
+      {
+        "day": 54,
+        "hour": 1296,
+        "revision": 989,
+        "compressedBytes": 1812516,
+        "chunks": 4,
+        "production": 53383,
+        "orders": 5184,
+        "shipments": 5067,
+        "receivedUnits": 43698,
+        "paidShipments": 4698,
+        "cashCents": 408149049,
+        "profitCents": 361418746
+      },
+      {
+        "day": 55,
+        "hour": 1320,
+        "revision": 1002,
+        "compressedBytes": 1845487,
+        "chunks": 4,
+        "production": 54279,
+        "orders": 5280,
+        "shipments": 5155,
+        "receivedUnits": 44513,
+        "paidShipments": 4785,
+        "cashCents": 412088286,
+        "profitCents": 367903922
+      },
+      {
+        "day": 56,
+        "hour": 1344,
+        "revision": 1027,
+        "compressedBytes": 1878864,
+        "chunks": 4,
+        "production": 55110,
+        "orders": 5376,
+        "shipments": 5243,
+        "receivedUnits": 45343,
+        "paidShipments": 4876,
+        "cashCents": 420761688,
+        "profitCents": 374571908
+      },
+      {
+        "day": 57,
+        "hour": 1368,
+        "revision": 1040,
+        "compressedBytes": 1905920,
+        "chunks": 4,
+        "production": 55922,
+        "orders": 5472,
+        "shipments": 5331,
+        "receivedUnits": 46146,
+        "paidShipments": 4964,
+        "cashCents": 422213300,
+        "profitCents": 381134595
+      },
+      {
+        "day": 58,
+        "hour": 1392,
+        "revision": 1053,
+        "compressedBytes": 1937179,
+        "chunks": 4,
+        "production": 56798,
+        "orders": 5568,
+        "shipments": 5419,
+        "receivedUnits": 46957,
+        "paidShipments": 5055,
+        "cashCents": 429761657,
+        "profitCents": 387748096
+      },
+      {
+        "day": 59,
+        "hour": 1416,
+        "revision": 1066,
+        "compressedBytes": 1969737,
+        "chunks": 4,
+        "production": 57651,
+        "orders": 5664,
+        "shipments": 5507,
+        "receivedUnits": 47763,
+        "paidShipments": 5142,
+        "cashCents": 438825665,
+        "profitCents": 394070562
+      },
+      {
+        "day": 60,
+        "hour": 1440,
+        "revision": 1090,
+        "compressedBytes": 2004323,
+        "chunks": 4,
+        "production": 58566,
+        "orders": 5760,
+        "shipments": 5606,
+        "receivedUnits": 48576,
+        "paidShipments": 5229,
+        "cashCents": 441386536,
+        "profitCents": 400270744
+      }
+    ]
+  },
+  "automatedTests": {
+    "passed": 179,
+    "failed": 0,
+    "testConcurrency": 2
+  },
+  "browserRelease": "141ab44de424",
+  "finalRevision": "classroom-00029-von",
+  "productionResources": {
+    "cpuPerInstance": 1,
+    "memoryMiBPerInstance": 512,
+    "concurrencyPerInstance": 160,
+    "maxInstances": 2,
+    "observedPeakInstances": 2,
+    "maxRecordedMinuteMeanCpuPct": 53.2,
+    "maxRecordedMinuteMeanMemoryPct": 71.4,
+    "metric5xxCount": 0,
+    "day59ErrorLogCount": 0,
+    "limitation": "Minute means are not instantaneous peaks. Final post-cleanup log retrieval was rate limited (429); post-cleanup metrics remained available. The final wave used two instances versus one in earlier waves."
+  }
+}

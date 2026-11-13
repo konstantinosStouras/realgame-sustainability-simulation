@@ -1,6 +1,6 @@
-import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=2d390f77e037';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=2d390f77e037';
-import { watchSession } from './src/session-updates.mjs?v=2d390f77e037';
+import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=141ab44de424';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=141ab44de424';
+import { watchSession } from './src/session-updates.mjs?v=141ab44de424';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -268,7 +268,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=2d390f77e037')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=141ab44de424')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -339,7 +339,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=2d390f77e037')).testClient();
+      const client = (await import('./src/test-client.mjs?v=141ab44de424')).testClient();
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -519,7 +519,7 @@ function pageBody() {
   return ({ overview: overviewPage, orders: ordersPage, supply: supplyPage, production: productionPage, finance: financePage, energy: energyPage })[page]();
 }
 function chart(metricName, unit, { selected = false, range = 30 } = {}) {
-  const snaps = state.snapshots.filter(x => x.hour >= state.hour - range * 24);
+  const snaps = reportSnapshots(range);
   if (!snaps.length) return '<p class="empty">The first chart point appears at the next daily close. Live operations are already available.</p>';
   const companies = state.companies.filter(c => !selected || !selectedCompanies.size || selectedCompanies.has(c.id));
   const series = companies.map(c => ({ ...c, color: state.companies.findIndex(x => x.id === c.id) % 12, values: snaps.map((snap, index) => {
@@ -711,10 +711,19 @@ function energyPage() {
   return `${pendingEnergy ? `<div class="advice"><strong>Switch to ${esc(pendingProvider?.name || pendingEnergy.data.energyId)} pending.</strong>Effective ${simDate(pendingEnergy.at)}. Your current contract remains active until then; another switch cannot be placed while this one is pending.</div>` : ''}<div class="advice"><strong>Carbon information and demand effects are separate.</strong>Carbon is always measured. Customer preference for lower carbon is currently <b>${state.effects.carbonDemand ? 'enabled' : 'disabled'}</b>. A new energy contract changes future production; existing inventory keeps its embodied footprint.</div>${panel('Choose your electricity', 'Tariffs are EUR/kWh by 8-hour shift. Standing charge is EUR/day.', table(['Provider', '00–08 / 08–16 / 16–24', 'Standing charge', 'Switch fee / delay', 'kg CO₂e/kWh', ''], energyOptions.map(e => [esc(e.name), e.rates.map(r => exactMoney(r)).join(' / '), exactMoney(e.daily), `${money(e.fee)} / ${e.delay} h`, precise(e.carbon), e.id === c.energy ? '<span class="badge">Current contract</span>' : e.id === pendingEnergy?.data.energyId ? '<span class="badge amber">Switch pending</span>' : button('energy-switch', 'Switch', e.id, 'small', !permitted('energy') || !!pendingEnergy)])))}<div class="grid3">${Object.entries(INVESTMENTS).map(([key, inv]) => { const contract = c.investments.filter(x => x.kind === key).at(-1), active = contract?.activeAt !== null && contract?.activeAt !== undefined; return `<section class="panel investment"><div class="invest-icon">${icon(key === 'efficiency' ? 'energy' : 'production')}</div><h2>${esc(inv.name)}</h2><p>${({ delivery: 'Dispatch oldest orders using the cheapest route that can meet the promise, with a delay buffer.', purchasing: 'Reorder components hourly when stock plus incoming supply reaches your policy threshold.', machine: 'Add six modules per hour of machine capacity. Materials and staff still limit output.', warehouse: 'Expand every stock location by 50%. Reduce pressure on storage space.', efficiency: 'Reduce production electricity per module by 25% after commissioning.' })[key]}</p><div class="price">${money(inv.cost)}</div><p>${inv.delay} h to activate · prepaid<br>${contract ? (active ? `Active since ${simDate(contract.activeAt)}` : 'Installation pending') : 'Not installed'}</p>${button('invest', contract && !active ? 'Pending' : active && !['machine', 'warehouse'].includes(key) ? 'Active' : 'Invest', key, 'small', !permitted('investments') || (contract && (!active || !['machine', 'warehouse'].includes(key))))}</section>`; }).join('')}</div>${panel('Research & market presence', 'Daily recurring budgets · diminishing quality and marketing effects.', `<div class="value-list"><div><span>Quality multiplier</span><strong>${c.quality.toFixed(3)}</strong></div><div><span>Daily research</span><strong>${money(c.research)}</strong></div><div><span>Daily marketing</span><strong>${money(c.marketing)}</strong></div></div>${button('budget', 'Edit daily budgets', '', '', !permitted('investments'))}`)}`;
 }
 const reportTypes = { profit: ['Cumulative profit', 'EUR'], dailySales: ['Daily revenue earned', 'EUR'], dailyProduction: ['Daily production', 'modules'], cash: ['Cash balance', 'EUR'], inventory: ['Finished inventory', 'modules'], energyCost: ['Cumulative energy cost', 'EUR'], energyKwh: ['Cumulative electricity', 'kWh'], emissions: ['Cumulative carbon', 'kg CO₂e'], marketShare: ['Cumulative delivered market share', '%'], dispatched: ['Cumulative dispatches', 'modules'], received: ['Cumulative customer receipts', 'modules'] };
+function reportSnapshots(range) {
+  const lastClose = state.snapshots.at(-1)?.hour ?? 0;
+  return state.snapshots.filter(s => s.hour > lastClose - range * 24);
+}
+function reportValue(value, unit) {
+  return new Intl.NumberFormat('en-GB', unit === 'EUR'
+    ? {minimumFractionDigits:2,maximumFractionDigits:2}
+    : {maximumFractionDigits:20}).format(value);
+}
 function reportsPage() {
   const [title, unit] = reportTypes[report];
-  const snaps = state.snapshots.filter(s => s.hour >= state.hour - reportRange * 24);
-  return `<div class="advice"><strong>Daily reports are frozen at each midnight close.</strong>Last close: ${state.snapshots.length ? simDate(state.snapshots.at(-1).hour) : 'none yet'}. Live operations: ${simDate(state.hour)}. Each close includes that hour’s arrivals, production, demand, automation, costs, and depreciation.</div><div class="toolbar">${select('report', 'Measure', Object.entries(reportTypes).map(([k, [n]]) => [k, n]), report)}${select('range', 'Time window', [['7', 'Last 7 days'], ['30', 'Last 30 days'], ['180', 'Full session']], String(reportRange))}${button('report-csv', 'Export CSV', '', 'small')}</div>${panel(title, `${unit} · daily snapshots`, `<div class="toolbar">${state.companies.map(c => check(`series-${c.id}`, c.name, !selectedCompanies.size || selectedCompanies.has(c.id))).join('')}</div>${chart(report, unit, { selected: true, range: reportRange })}`)}${panel('Exact daily values', 'Accessible data table · one row per company per completed day', `<details><summary>Show report values</summary>${table(['As of (simulation)', 'Company', `${esc(title)} (${unit})`], reportRows(snaps).map(row => [row[0], esc(row[1]), number(row[2])]))}</details>`)}`;
+  const snaps = reportSnapshots(reportRange);
+  return `<div class="advice"><strong>Daily reports are frozen at each midnight close.</strong>Last close: ${state.snapshots.length ? simDate(state.snapshots.at(-1).hour) : 'none yet'}. Live operations: ${simDate(state.hour)}. Each close includes that hour’s arrivals, production, demand, automation, costs, and depreciation.</div><div class="toolbar">${select('report', 'Measure', Object.entries(reportTypes).map(([k, [n]]) => [k, n]), report)}${select('range', 'Time window', [['7', 'Last 7 days'], ['30', 'Last 30 days'], ['180', 'Full session']], String(reportRange))}${button('report-csv', 'Export CSV', '', 'small')}</div>${panel(title, `${unit} · daily snapshots`, `<div class="toolbar">${state.companies.map(c => check(`series-${c.id}`, c.name, !selectedCompanies.size || selectedCompanies.has(c.id))).join('')}</div>${chart(report, unit, { selected: true, range: reportRange })}`)}${panel('Exact daily values', 'Accessible data table · one row per company per completed day', `<details><summary>Show report values</summary>${table(['As of (simulation)', 'Company', `${esc(title)} (${unit})`], reportRows(snaps).map(row => [row[0], esc(row[1]), reportValue(row[2], unit)]))}</details>`)}`;
 }
 function reportRows(snaps = state.snapshots) { return snaps.flatMap(s => s.companies.filter(c => !selectedCompanies.size || selectedCompanies.has(c.id)).map(c => { const prev = state.snapshots.find(x => x.hour === s.hour - 24)?.companies.find(x => x.id === c.id); let n = report === 'dailySales' ? c.revenue - (prev?.revenue || 0) : report === 'dailyProduction' ? c.production - (prev?.production || 0) : c[report]; if (reportTypes[report][1] === 'EUR') n /= 100; return [simDate(s.hour), c.name, n]; })); }
 function channelOptions() { return [['announcements', 'Instructor announcements'], ...(isTeacher() ? state.companies.map(c => [`teacher:${c.id}`, `Teacher ↔ ${c.name}`]) : [[`team:${actor.companyId}`, 'My team · internal'], [`teacher:${actor.companyId}`, 'Ask the instructor']])]; }
@@ -753,7 +762,15 @@ function download(name, data, type = 'application/json') {
   catch (error) { URL.revokeObjectURL(url); downloadSources.delete(url); throw error; }
   finally { link.remove(); }
 }
-function csv(name, rows) { download(name, rows.map(r => r.map(v => `"${String(v).replace(/^[=+@-]/, "'$&").replace(/"/g, '""')}"`).join(',')).join('\r\n'), 'text/csv'); }
+function csv(name, rows) {
+  const cell = value => {
+    // Engine amounts are numbers, including negative credits and losses. Escape
+    // formula-like user text without changing those amounts into spreadsheet text.
+    const text = typeof value === 'number' && Number.isFinite(value) ? String(value) : String(value).replace(/^[=+@-]/, "'$&");
+    return `"${text.replace(/"/g, '""')}"`;
+  };
+  download(name, rows.map(row => row.map(cell).join(',')).join('\r\n'), 'text/csv');
+}
 const value = (data, key) => Number(data.get(key));
 function openDispatch(id) {
   const o = company().orders.find(x => x.id === id), routes = state.catalog.routes.filter(r => r.enabled);
@@ -867,7 +884,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=2d390f77e037')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=141ab44de424')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -906,7 +923,7 @@ async function action(name, id) {
   if (name === 'catalog-list') modal(`${id.charAt(0).toUpperCase() + id.slice(1)} catalogue`, table(['Name', 'State', ''], state.catalog[id].map(x => [esc(x.name), x.enabled ? 'Enabled' : 'Disabled', button('catalog-edit', 'Edit', `${id}:${x.id}`, 'small')])));
   if (name === 'catalog-edit') { const [collection, rowId] = id.split(':'), row = state.catalog[collection].find(x => x.id === rowId), fields = { suppliers: ['price', 'stock', 'replenish', 'lead', 'term', 'reliability'], routes: ['hours', 'fixed', 'unit', 'term', 'reliability'], markets: ['volume', 'referencePrice', 'greenWeight'], energy: ['fee', 'daily', 'delay'] }[collection]; modal(row.name, `<p class="form-note">Money fields are integer cents; time fields are hours; reliability and green weight are percent; stock and volume are units. Changes affect future contracts.</p><div class="form-grid">${fields.map(k => field(k, ({ price: 'Unit price (cents)', fixed: 'Fixed freight (cents)', unit: 'Freight / unit (cents)', referencePrice: 'Reference price (cents)', fee: 'Switch fee (cents)', daily: 'Standing charge (cents/day)', volume: 'Demand / 6-hour cycle', greenWeight: 'Carbon preference (%)', stock: 'Available stock', replenish: 'Daily replenishment', lead: 'Lead time (hours)', term: 'Payment term (hours)', hours: 'Transit (hours)', delay: 'Switch delay (hours)', reliability: 'On-time probability (%)' })[k], (row[k] ?? 0), 'number', 'min="0"')).join('')}${check('enabled', 'Enabled', row.enabled)}</div>`, f => command({ type: 'catalog', collection, id: rowId, patch: { ...Object.fromEntries(fields.map(k => [k, value(f, k)])), enabled: f.has('enabled') } })); }
   if (name === 'replay') download('simulation-replay.json', await api(`/sessions/${sessionId}/replay`));
-  if (name === 'report-csv') csv('daily-report.csv', [['Simulation time (UTC)', 'Company', `${reportTypes[report][0]} (${reportTypes[report][1]})`], ...reportRows(state.snapshots.filter(s => s.hour >= state.hour - reportRange * 24))]);
+  if (name === 'report-csv') csv('daily-report.csv', [['Simulation time (UTC)', 'Company', `${reportTypes[report][0]} (${reportTypes[report][1]})`], ...reportRows(reportSnapshots(reportRange))]);
   if (name === 'ledger-csv') csv('transaction-journal.csv', [['Hour', 'Simulation time (UTC)', 'Transaction', 'Account', 'Debit positive / credit negative (EUR)'], ...c.ledger.flatMap(l => Object.entries(l.lines).map(([a, n]) => [l.hour, simDate(l.hour), l.description, a, n / 100]))]);
 }
 // Native disclosure supports Enter/Space and Tab; arrows add a quick shortcut.
@@ -1002,7 +1019,7 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=2d390f77e037')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    try { const client = (await import('./src/test-client.mjs?v=141ab44de424')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p>' + (e.status === 403 ? button('retry-start', 'Try again', '', 'primary') : '') + button('test-leave','Return to classroom') + '</main>'; }
     return;
   }

@@ -5,7 +5,8 @@ import { fail } from '../src/engine.mjs';
 export function createCloudHandler({ store, verifyFirebase, projectId, allowedOrigins }) {
   const origins = new Set(allowedOrigins);
   return async (req, res) => {
-    const send = (status, value) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }); res.end(JSON.stringify(value)); };
+    const sendJSON = (status, json) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }); res.end(json); };
+    const send = (status, value) => sendJSON(status, JSON.stringify(value));
     try {
       const origin = req.headers.origin;
       if (origin && !origins.has(origin)) fail('This origin is not allowed.', 403);
@@ -46,7 +47,11 @@ export function createCloudHandler({ store, verifyFirebase, projectId, allowedOr
         } finally { res.off('close', close); }
         return;
       }
-      if (!action && req.method === 'GET') return send(200, await store.view(user, id, url.searchParams.get('company')));
+      if (!action && req.method === 'GET') {
+        const preview = url.searchParams.get('company');
+        if (store.viewJSON) return sendJSON(200, await store.viewJSON(user, id, preview));
+        return send(200, await store.view(user, id, preview));
+      }
       if (action === 'command' && req.method === 'POST') return send(200, await store.command(user, id, body));
       if (action === 'roster' && req.method === 'GET') return send(200, await store.roster(user, id));
       if (action === 'assign' && req.method === 'POST') return send(200, await store.assign(user, id, body.userId, body.companyId));
