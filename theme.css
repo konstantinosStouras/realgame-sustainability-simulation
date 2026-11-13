@@ -144,3 +144,11 @@
 [data-theme="dark"] .account-dropdown button:hover:not(:disabled), [data-theme="dark"] .account-dropdown button:focus-visible { background:var(--soft); }
 @media (max-width:480px) { .account-menu > summary { font-size:13px; } .account-name { max-width:140px; } }
 @media (prefers-reduced-motion:reduce) { .account-chevron,.account-menu > summary { transition:none; } }
+
+/* Align session setup and actions after removing the unused Options panel. */
+.admin-columns { align-items: start; }
+.session-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.session-actions .session-action-hint { min-width: 0; }
+.session-actions .session-action-hint > button { width: 100%; height: 100%; }
+@media (max-width: 480px) { .session-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 360px) { .session-actions { grid-template-columns: minmax(0, 1fr); } }

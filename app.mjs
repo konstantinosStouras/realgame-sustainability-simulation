@@ -1,5 +1,5 @@
-import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=da83fc15f13b';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=da83fc15f13b';
+import { itemName, productionRecipe, INVESTMENTS, FEATURES } from './src/engine.mjs?v=39ab30b1db61';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=39ab30b1db61';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -195,7 +195,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=da83fc15f13b')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=39ab30b1db61')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -244,7 +244,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=da83fc15f13b')).testClient();
+      const client = (await import('./src/test-client.mjs?v=39ab30b1db61')).testClient();
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -282,7 +282,7 @@ function sessionButton(action, label, id = '', cls = '') {
 function renderAdminHome() {
   const active = sessions.filter(s => s.status !== 'completed'), past = sessions.filter(s => s.status === 'completed');
   const cards = list => list.map(s => `<article class="session-card"><div class="session-card-heading"><h3>${esc(s.name)}</h3><span class="badge session-status">${esc(s.status === 'completed' ? 'Closed' : s.status)}</span></div><p class="session-meta">Simulation hour ${number(s.hour)}</p><div class="session-actions" role="group" aria-label="Actions for ${esc(s.name)}">${sessionButton('open-session', 'Open', s.id, 'session-open')}${sessionButton('copy-session', 'Copy link', s.id)}${sessionButton('session-export', '↓ Export data', s.id, 'session-export')}${sessionButton('session-test', 'Test', s.id)}${s.status !== 'completed' ? sessionButton('session-close', 'Close', s.id) : ''}${sessionButton('session-delete', 'Delete', s.id, 'session-danger')}</div><div class="session-access">${sessionButton('session-codes', 'Company join codes ↗', s.id, 'session-access-button')}<small>Session ${esc(s.id)}</small></div></article>`).join('') || '<p class="empty">No sessions here yet.</p>';
-  root.innerHTML = `<div class="admin-home"><header class="admin-header">${brand}${accountControls(user)}</header><main id="content"><div class="page-heading"><div><p class="eyebrow">Instructor workspace</p><h1>Sustainability Studio admin</h1><p>Manage your sessions and set up each learning task.</p></div></div><div class="admin-columns"><aside><details class="panel"><summary>Options</summary><p class="form-note">Open a session to set its clock, teaching capabilities, suppliers, markets and energy options.</p>${button('solo', 'Try a test simulation')}</details><details class="panel"><summary>Create session</summary><form id="create-session-form">${createSessionFields()}${button('submit', 'Create session', '', 'primary')}<div class="error" role="alert"></div></form></details></aside><div><details class="panel" open><summary>Active sessions <span>${active.length} sessions</span></summary><p class="form-note">Open a session to manage your classroom. Paused sessions appear here too.</p>${active.length ? sessionButton('sessions-delete', 'Delete all active sessions', '', 'session-danger session-bulk') : ''}${cards(active)}</details><details class="panel"><summary>Past sessions <span>${past.length} sessions</span></summary>${cards(past)}</details></div></div></main></div>`;
+  root.innerHTML = `<div class="admin-home"><header class="admin-header">${brand}${accountControls(user)}</header><main id="content"><div class="page-heading"><div><p class="eyebrow">Instructor workspace</p><h1>Sustainability Studio admin</h1><p>Manage your sessions and set up each learning task.</p></div></div><div class="admin-columns"><aside><details class="panel"><summary>Create session</summary><form id="create-session-form">${createSessionFields()}${button('submit', 'Create session', '', 'primary')}<div class="error" role="alert"></div></form></details></aside><div><details class="panel" open><summary>Active sessions <span>${active.length} sessions</span></summary><p class="form-note">Open a session to manage your classroom. Paused sessions appear here too.</p>${active.length ? sessionButton('sessions-delete', 'Delete all active sessions', '', 'session-danger session-bulk') : ''}${cards(active)}</details><details class="panel"><summary>Past sessions <span>${past.length} sessions</span></summary>${cards(past)}</details></div></div></main></div>`;
 }
 
 function renderLobby(error = '', requested = '', needsCompany = false) {
@@ -612,7 +612,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=da83fc15f13b')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=39ab30b1db61')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -747,7 +747,7 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=da83fc15f13b')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    try { const client = (await import('./src/test-client.mjs?v=39ab30b1db61')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p>' + button('test-leave','Return to classroom') + '</main>'; }
     return;
   }
