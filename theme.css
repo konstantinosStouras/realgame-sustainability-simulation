@@ -161,3 +161,56 @@ dialog .dialog-toolbar .close{position:static;min-width:44px;flex-shrink:0}
 .session-actions .session-action-hint > button { width: 100%; height: 100%; }
 @media (max-width: 480px) { .session-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 360px) { .session-actions { grid-template-columns: minmax(0, 1fr); } }
+
+/* Shared action buttons. Navigation, menu rows and branded sign-in retain their layout. */
+:root {
+  --action-bg:#f0f5eb; --action-border:#bccfba; --action-text:#28513c;
+  --action-hover:#e3edd8; --action-hover-border:#86a278; --action-hover-text:#173a31;
+  --action-primary:#28513c; --action-primary-text:#fff; --action-primary-hover:#1d4030;
+  --action-danger:#fff1ec; --action-danger-border:#e6b7ab; --action-danger-text:#a52c15; --action-danger-hover:#fbe1d8;
+  --action-shadow:0 1px 2px #173a3108;
+}
+:root[data-theme="dark"] {
+  --action-bg:#23382b; --action-border:#4d6951; --action-text:#d8ebc4;
+  --action-hover:#304a36; --action-hover-border:#92b37b; --action-hover-text:#eff8e4;
+  --action-primary:#c4dda0; --action-primary-text:#17291e; --action-primary-hover:#d5edb0;
+  --action-danger:#3b2422; --action-danger-border:#855046; --action-danger-text:#ffb7a6; --action-danger-hover:#50302b;
+  --action-shadow:0 1px 2px #0002;
+}
+/* Specificity matches legacy theme rules so all action surfaces use these tokens. */
+:is(:root[data-theme],:root:not([data-theme])) body :is(button,.button):not(:where(.workspace-tools *, .nav *, .pane-title *, .account-dropdown *, .studio-google, .studio-reset, .theme-toggle, .close)) {
+  min-height:44px; max-width:100%; padding:11px 16px;
+  border:1px solid var(--action-border); border-radius:10px;
+  background:var(--action-bg); color:var(--action-text);
+  font-family:Inter,"Segoe UI",Arial,sans-serif; font-size:14px; font-weight:600;
+  line-height:1.4; letter-spacing:.01em; white-space:normal; overflow-wrap:anywhere;
+  gap:8px; box-shadow:var(--action-shadow); text-decoration:none; filter:none;
+}
+:is(:root[data-theme],:root:not([data-theme])) body :is(button,.button):not(:where(.workspace-tools *, .nav *, .pane-title *, .account-dropdown *, .studio-google, .studio-reset, .theme-toggle, .close)):hover:not(:disabled):not([aria-disabled="true"]) {
+  background:var(--action-hover); border-color:var(--action-hover-border); color:var(--action-hover-text);
+}
+:is(:root[data-theme],:root:not([data-theme])) body :is(button.primary,.button.primary,.session-open) {
+  background:var(--action-primary); border-color:var(--action-primary); color:var(--action-primary-text);
+}
+:is(:root[data-theme],:root:not([data-theme])) body :is(button.primary,.button.primary,.session-open):hover:not(:disabled):not([aria-disabled="true"]) {
+  background:var(--action-primary-hover); border-color:var(--action-primary-hover); color:var(--action-primary-text);
+}
+:is(:root[data-theme],:root:not([data-theme])) body :is(button.danger,.button.danger,.session-danger):not(:where(.account-dropdown *)) {
+  background:var(--action-danger); border-color:var(--action-danger-border); color:var(--action-danger-text);
+}
+:is(:root[data-theme],:root:not([data-theme])) body :is(button.danger,.button.danger,.session-danger):not(:where(.account-dropdown *)):hover:not(:disabled):not([aria-disabled="true"]) {
+  background:var(--action-danger-hover); border-color:var(--action-danger-text); color:var(--action-danger-text);
+}
+:is(:root[data-theme],:root:not([data-theme])) body .theme-toggle {
+  width:44px; height:44px; min-height:44px; border-radius:10px;
+  border:1px solid var(--action-border); background:var(--action-bg); color:var(--action-text); box-shadow:var(--action-shadow);
+}
+:is(:root[data-theme],:root:not([data-theme])) body .theme-toggle:hover { background:var(--action-hover); border-color:var(--action-hover-border); }
+:is(:root[data-theme],:root:not([data-theme])) body :is(button,.button):focus-visible { outline:3px solid var(--green); outline-offset:3px; }
+:is(:root[data-theme],:root:not([data-theme])) body :is(.workspace-tools,.nav,.account-dropdown) :focus-visible { outline-offset:-3px; }
+:is(:root[data-theme],:root:not([data-theme])) body :is(button,.button):disabled,
+:is(:root[data-theme],:root:not([data-theme])) body .button[aria-disabled="true"] { opacity:.5; cursor:not-allowed; filter:none; box-shadow:none; }
+@media (prefers-reduced-motion:no-preference) {
+  button,.button { transition:background .15s,border-color .15s,color .15s,box-shadow .15s; }
+}
+@media (prefers-reduced-motion:reduce) { button,.button { transition:none; } }
