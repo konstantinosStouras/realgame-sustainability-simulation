@@ -8,6 +8,9 @@ export function testTemplate(initial, current) {
     dailyCorporateOverhead: initial.accounting?.dailyCorporateOverhead || 0,
     dailyEnergyOverhead: initial.accounting?.dailyEnergyOverhead ?? 0,
     dailyDepreciation: initial.accounting?.dailyDepreciation ?? null,
+    startingPrices: initial.accounting?.startingPrices ?? {},
+    inventoryStatement: initial.accounting?.inventoryStatement ?? 'cogs',
+    openingUnitCosts: initial.accounting?.openingUnitCosts ?? {},
     features: current.features, effects: current.effects, catalog: current.catalog,
     recipe: initial.recipe, secondsPerHour: current.secondsPerHour
   });
