@@ -46,17 +46,22 @@
     document.body.prepend(bar);
     const root = document.querySelector('#app');
     const toggle = bar.firstChild;
-    if (root) new MutationObserver(() => {
+    const placeToggle = () => {
+      if (!root) return;
       const slot = root.querySelector('[data-theme-slot]') || root.querySelector('.welcome-nav');
       if (slot && toggle.parentNode !== slot) slot.append(toggle);
       else if (!slot && toggle.parentNode !== bar) bar.append(toggle);
       bar.hidden = !!slot;
-    }).observe(root, { childList: true, subtree: true });
+    };
+    if (root) new MutationObserver(placeToggle).observe(root, { childList: true, subtree: true });
+    placeToggle();
     const dialog = document.querySelector('#dialog');
     if (dialog) new MutationObserver(() => {
-      for (const button of buttons) if (!button.isConnected) buttons.delete(button);
+      // The shared control may be temporarily detached during a workspace render.
+      for (const button of buttons) if (button !== toggle && !button.isConnected) buttons.delete(button);
       if (dialog.open && !dialog.querySelector('.theme-toggle')) {
-        dialog.prepend(makeButton());
+        const slot = dialog.querySelector('[data-dialog-theme-slot]') || dialog;
+        slot.prepend(makeButton());
         apply();
       }
     }).observe(dialog, { childList: true, attributes: true, attributeFilter: ['open'] });

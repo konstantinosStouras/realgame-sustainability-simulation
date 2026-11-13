@@ -1,9 +1,14 @@
-/* Appearance stays outside the game root so live renders never reset it. */
+/* Theme state survives workspace renders; the shared control follows its header slot. */
+:root{--dialog-surface:#fff}
 .theme-bar{position:sticky;top:0;z-index:30;min-height:52px;display:flex;justify-content:flex-end;align-items:center;padding:4px clamp(12px,3vw,38px);background:var(--paper);border-bottom:1px solid var(--line)}
 .theme-toggle{min-height:44px;font-size:1rem;white-space:nowrap}
 .workspace-nav{top:53px}
 .sidebar{top:53px;height:calc(100vh - 53px)}
 #dialog>.theme-toggle{position:sticky;top:0;z-index:2;display:flex;margin:0 44px 18px 0;box-shadow:0 0 0 6px var(--paper)}
+.dialog-toolbar{position:sticky;top:-28px;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:12px;margin:-28px -28px 18px;padding:12px 18px;background:var(--dialog-surface);border-bottom:1px solid var(--line)}
+.dialog-toolbar [data-dialog-theme-slot]{display:flex}
+dialog .dialog-toolbar .close{position:static;min-width:44px;flex-shrink:0}
+[data-theme="dark"]{--dialog-surface:#222e27}
 :root[data-theme="dark"]{color-scheme:dark;--paper:#161f1b;--ink:#e1eddc;--text:#d4e0d7;--muted:#a7b9ad;--line:#3d5145;--green:#b5d893;--lime:#d0e6a5;--soft:#2b3c30;--red:#ffa58e}
 [data-theme="dark"] :is(button,.button,.skip,.timebox,.metric,.panel,.student-pane,dialog){background:#222e27;color:var(--text)}
 [data-theme="dark"] :is(button,.button):hover{background:#344b39;border-color:#819d70}
@@ -12,6 +17,10 @@
 [data-theme="dark"] :is(.sidebar,.workspace-nav,.workspace-tool-label){background:#10291f;color:#e1eddc}
 [data-theme="dark"] :is(.brand-mark,.nav button.active,.workspace-tools button[aria-current="page"],.workspace-tools button[aria-pressed="true"]){background:var(--lime);color:#17291e}
 [data-theme="dark"] .workspace-tools button{background:transparent;color:#e4eee7}
+[data-theme="dark"] .workspace-tools > button.active{background:var(--lime);color:#17291e}
+[data-theme="dark"] .workspace-tools > :is(button,a):focus-visible{outline-color:var(--green)}
+[data-theme="dark"] .workspace-tools > button.active:focus-visible{outline-color:#17291e}
+@media(hover:hover){[data-theme="dark"] .workspace-tools > :is(button,a):hover{background:#344b39;color:#e4eee7}[data-theme="dark"] .workspace-tools > button.active:hover{background:#d5edb0;color:#17291e}}
 [data-theme="dark"] .topbar{background:#1c2821}
 [data-theme="dark"] .avatar{background:#3c5034;color:var(--ink)}
 [data-theme="dark"] .badge.amber{background:#493b21;color:#f3d28b}
@@ -41,7 +50,7 @@
 [data-theme="dark"] .danger{color:var(--red)}
 /* One shared appearance control, beside the account on every signed-in screen. */
 .theme-bar[hidden]{display:none}
-.theme-toggle{width:42px;height:42px;border-radius:50%;padding:0;font-size:1.25rem;display:inline-grid;place-items:center}
+.theme-toggle{width:44px;height:44px;flex-shrink:0;border-radius:50%;padding:0;font-size:1.25rem;display:inline-grid;place-items:center}
 .workspace-nav{top:0}
 .admin-home{max-width:1180px;margin:auto;padding:0 28px 64px}
 .admin-header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:22px 0;border-bottom:1px solid var(--line);margin-bottom:42px}
