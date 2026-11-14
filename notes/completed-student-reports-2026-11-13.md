@@ -15,3 +15,5 @@ The change separates read access from admission to active classrooms in both the
 The Chrome functional test used a local classroom; Firestore access behavior was covered by store and HTTP integration tests. No Firebase test accounts or classrooms were created for this check. Test tabs were closed and the memory-only server stopped; private CSV evidence was retained.
 
 This updates the completion-access behavior documented in the earlier [14-day Chrome playtest](chrome-team-play-2026-11-13.md). That report describes the behavior observed before this change.
+
+The subsequent [live Firebase verification](live-final-student-reports-2026-11-14.md) exercised completion, refresh, CSV downloads, and rejected decisions in two actual Chrome student sessions against the deployed backend.
