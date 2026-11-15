@@ -320,3 +320,19 @@ body .deadline-exact { font-weight: 700; }
   .toggle-row > .error { grid-column: 1; }
   .toggle-row > .toolbar { grid-template-columns: 5rem minmax(0, 1fr) auto; gap: 10px; }
 }
+
+/* Keep decision fields aligned even when one label wraps to another line. */
+.form-grid { align-items: end; }
+.form-grid > label { min-width: 0; }
+.form-grid > label.check { align-self: end; min-height: 44px; margin-bottom: 14px; }
+.value-list + button { margin-top: 20px; }
+/* Descriptions can vary in length without shifting investment actions. */
+.grid3 > .investment { display: flex; flex-direction: column; }
+.grid3 > .investment > button { align-self: flex-start; margin-top: auto; }
+.pane-content .grid3 > .investment { margin-bottom: 0; }
+.grid3 > .investment > p:last-of-type { padding-bottom: 12px; }
+/* Keep primary and secondary actions balanced on small decision dialogs. */
+@media (max-width: 480px) {
+  dialog .form-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  dialog .form-actions > button { width: 100%; min-width: 0; overflow-wrap: normal; }
+}
