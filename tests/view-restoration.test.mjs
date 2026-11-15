@@ -1,3 +1,4 @@
+import { createMessageSounds } from '../src/message-sounds.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
@@ -11,7 +12,7 @@ function setup(values = new Map(), { id = 'teacher', sessionId = 'class-one', un
   const storage = { getItem: k => values.get(k) ?? null, setItem: (k,v) => { if(unavailable) throw new Error('Storage blocked'); values.set(k,v); } };
   const root = { innerHTML: '' }, requests = [];
   const location = { hostname: 'localhost', href: 'https://example.test/simulation/?session=' + sessionId };
-  const context = vm.createContext({ ...engine, URL, URLSearchParams, location, history: { replaceState: (_,__,href) => { location.href=href; } },
+  const context = vm.createContext({ createMessageSounds, ...engine, URL, URLSearchParams, location, history: { replaceState: (_,__,href) => { location.href=href; } },
     localStorage: storage, sessionStorage: storage, classroomBackend: '', firebaseConfig: {},
     document: { querySelector: s => s === '#app' ? root : { open: false }, addEventListener() {}, activeElement: { closest: () => null } },
     testView: {actor:teacher,state:engine.publicView(session,teacher)},

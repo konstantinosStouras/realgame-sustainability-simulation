@@ -1,3 +1,4 @@
+import { createMessageSounds } from '../src/message-sounds.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
@@ -9,7 +10,7 @@ function harness() {
   const notice = { hidden: true, textContent: '' }, root = { innerHTML: 'Existing workspace' }, dialog = { open: false }, browser = {}, values = new Map();
   const storage = { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) };
   const body = { closest: () => null }, document = { activeElement: body, hidden: false, querySelector: key => ({ '#app': root, '#dialog': dialog, '#connection': notice })[key], addEventListener() {} };
-  const context = vm.createContext({ document, localStorage: storage, sessionStorage: storage, URL, AbortSignal,
+  const context = vm.createContext({ createMessageSounds, document, localStorage: storage, sessionStorage: storage, URL, AbortSignal,
     location: { hostname: 'localhost' }, firebaseConfig: {}, classroomBackend: '', setTimeout: () => 1, clearTimeout() {}, setInterval() {},
     window: { addEventListener: (event, callback) => { browser[event] = callback; } } });
   vm.runInContext(app.split('\nawait startWorkspace();')[0], context);

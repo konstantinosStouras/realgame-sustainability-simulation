@@ -1,3 +1,4 @@
+import { createMessageSounds } from '../src/message-sounds.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -10,7 +11,7 @@ function harness() {
   const storage = {getItem:()=>null, setItem(){}, removeItem(){}};
   const dialog = {open:false};
   const document = {hidden:false, activeElement:{closest:()=>null}, querySelector:selector=>selector === '#dialog' ? dialog : {}, addEventListener(){}};
-  const context = vm.createContext({document, localStorage:storage, sessionStorage:storage, location:{hostname:'localhost'}, setTimeout, clearTimeout, URL, AbortSignal, firebaseConfig:{}, classroomBackend:''});
+  const context = vm.createContext({ createMessageSounds,document, localStorage:storage, sessionStorage:storage, location:{hostname:'localhost'}, setTimeout, clearTimeout, URL, AbortSignal, firebaseConfig:{}, classroomBackend:''});
   vm.runInContext(source, context);
   const run = code => vm.runInContext(code, context);
   const requests = [];

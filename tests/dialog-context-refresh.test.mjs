@@ -1,3 +1,4 @@
+import { createMessageSounds } from '../src/message-sounds.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
@@ -11,7 +12,7 @@ function harness(){
  const fields={'[name=qty]':control('30'),'[name=routeId]':control('rail'),'#dispatch-context':control(),'#dispatch-deadline':control(),'#dispatch-route-timing':control(),'#dispatch-terms':control(),'#dispatch-quote':control(),'#purchase-context':control(),'#purchase-quote':control()};
  const listeners={},form={querySelector:s=>fields[s],addEventListener:(type,fn)=>{listeners[type]=fn;}},dialog={open:true,querySelector:()=>form,close(){this.open=false;}};
  const document={activeElement:fields['[name=qty]'],querySelector:s=>s==='#dialog'?dialog:s==='#app'?{}:null,addEventListener(){}};
- const ctx=vm.createContext({document,URL,AbortSignal,location:{hostname:'localhost',href:'http://localhost/'},localStorage:storage(),sessionStorage:storage(),crypto:{randomUUID},setTimeout:()=>1,clearTimeout(){},firebaseConfig:{},classroomBackend:'',FormData:class extends Map{constructor(){super([['qty',fields['[name=qty]'].value],['routeId',fields['[name=routeId]'].value]]);}},itemName:()=> 'frame',renders:0});
+ const ctx=vm.createContext({ createMessageSounds,document,URL,AbortSignal,location:{hostname:'localhost',href:'http://localhost/'},localStorage:storage(),sessionStorage:storage(),crypto:{randomUUID},setTimeout:()=>1,clearTimeout(){},firebaseConfig:{},classroomBackend:'',FormData:class extends Map{constructor(){super([['qty',fields['[name=qty]'].value],['routeId',fields['[name=routeId]'].value]]);}},itemName:()=> 'frame',renders:0});
  vm.runInContext(source,ctx);
  const run=code=>vm.runInContext(code,ctx);
  run(`actor={id:'synthetic-student',role:'student',companyId:'company-1'};user=actor;sessionId='synthetic-session';

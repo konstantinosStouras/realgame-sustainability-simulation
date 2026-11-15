@@ -1,3 +1,4 @@
+import { createMessageSounds } from '../src/message-sounds.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -21,7 +22,7 @@ function harness(hostname = 'localhost') {
     document, localStorage: storage(), sessionStorage: storage(), crypto: { randomUUID },
     setTimeout: () => 1, clearTimeout: () => {}, URL, AbortSignal,
     FormData: class extends Map { constructor(form) { super(form.values); } },
-    applyCommand, createSession, itemName, productionRecipe, INVESTMENTS: {}, FEATURES: [], firebaseConfig: {}, classroomBackend: 'https://classroom.example', location: { hostname, href: 'https://' + hostname + '/' }, renderCount: 0,
+    createMessageSounds, applyCommand, createSession, itemName, productionRecipe, INVESTMENTS: {}, FEATURES: [], firebaseConfig: {}, classroomBackend: 'https://classroom.example', location: { hostname, href: 'https://' + hostname + '/' }, renderCount: 0,
     activeTestForm: null
   });
   context.history = { replaceState: (_, __, href) => { context.location.href = href; } };
@@ -205,6 +206,19 @@ test('message headers retain full names without repeating roles or internal labe
   assert.equal(headers[0],'<span>Instructor announcement</span><span>Taylor Morgan</span>');
   assert.equal(headers[1],'<span>Alex Parker</span>');
   assert.doesNotMatch(html,/internal|· student|· instructor/);
+});
+
+test('fresh authorized messages reach sound detection even while a draft defers rendering', async () => {
+  const h=harness(), observed=[];
+  h.context.soundObserver=(...args)=>observed.push(args);
+  h.context.apiImplementation=async()=>({state:{revision:2,status:'paused',messages:[{id:'new',senderId:'teammate'}]},actor:{id:'test-user',role:'student',companyId:'c1'}});
+  h.document.activeElement={closest:()=>h.form};
+  h.run('messageSounds={observe:soundObserver};api=apiImplementation;');
+  await h.run('load(false)');
+  assert.equal(observed.length,1);
+  assert.equal(observed[0][1][0].id,'new');
+  assert.equal(observed[0][2],'test-user');
+  assert.equal(h.context.renderCount,0,'sound must not replace the active draft');
 });
 
 test('typing sends only a flag, clears on blur and ignores results after leaving a team view', async () => {

@@ -26,6 +26,7 @@ export function createApp({ store = new Store(process.env.DATA_PATH || '.data/si
       if (!url.pathname.startsWith('/api/')) {
         if (req.method !== 'GET' && req.method !== 'HEAD') fail('Method not allowed.', 405);
         const files = { '/': 'index.html', '/index.html': 'index.html', '/styles.css': 'styles.css', '/theme.css': 'theme.css', '/theme.mjs': 'theme.mjs', '/google-g.png': 'google-g.png', '/app.mjs': 'app.mjs', '/src/engine.mjs': 'src/engine.mjs', '/src/solo.mjs': 'src/solo.mjs', '/src/test-client.mjs': 'src/test-client.mjs', '/src/test-worker.mjs': 'src/test-worker.mjs', '/src/test-classroom.mjs': 'src/test-classroom.mjs', '/src/firebase-client.mjs': 'src/firebase-client.mjs', '/firebase-config.mjs': 'firebase-config.mjs', '/notes/model.md': 'notes/model.md' };
+        files['/src/message-sounds.mjs'] = 'src/message-sounds.mjs';
         files['/src/typing-presence.mjs'] = 'src/typing-presence.mjs';
         files['/src/session-updates.mjs'] = 'src/session-updates.mjs';
         const file = files[url.pathname]; if (!file) fail('Not found.', 404);

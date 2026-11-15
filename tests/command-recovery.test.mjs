@@ -1,3 +1,4 @@
+import { createMessageSounds } from '../src/message-sounds.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
@@ -14,7 +15,7 @@ function client({ state, actor, saved = storage(), backend = 'https://classroom.
   const root = { querySelector: () => ({ insertAdjacentHTML: (_, html) => { if (html.includes('id="pending-decision"')) pendingNotice.isConnected = true; } }) }, dialog = { open: false }, notices = {}, handlers = {};
   const document = { activeElement: { closest: () => null }, addEventListener: (event, handler) => { handlers[event] = handler; },
     querySelector: key => ({ '#app': root, '#dialog': dialog, '#toast': notices, '#pending-decision': pendingNotice.isConnected ? pendingNotice : null })[key] || null };
-  const context = vm.createContext({ ...engine, document, sessionStorage: saved, localStorage: storage(), URL, AbortSignal,
+  const context = vm.createContext({ createMessageSounds, ...engine, document, sessionStorage: saved, localStorage: storage(), URL, AbortSignal,
     crypto: { randomUUID }, setTimeout: () => 1, clearTimeout() {}, firebaseConfig: {}, classroomBackend: backend,
     location: { hostname: 'classroom.invalid', href: backend + '/?session=' + state.id }, currentState: state, currentActor: actor });
   vm.runInContext(source, context);

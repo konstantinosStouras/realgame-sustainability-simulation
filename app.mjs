@@ -1,6 +1,7 @@
-import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=2a751d487002';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=2a751d487002';
-import { watchSession } from './src/session-updates.mjs?v=2a751d487002';
+import { createMessageSounds } from './src/message-sounds.mjs?v=291b7568f6f7';
+import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=291b7568f6f7';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=291b7568f6f7';
+import { watchSession } from './src/session-updates.mjs?v=291b7568f6f7';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -46,6 +47,15 @@ function showTestAccessClosed() {
   if (dialog.open) dialog.close();
   root.innerHTML = '<main class="welcome" id="content"><h1>Test classroom access is closed</h1><p>Your instructor has closed access to this test round. Decisions are blocked. You can return when access reopens.</p>' + button('test-retry', 'Try again', '', 'primary') + button('test-leave', 'Leave test') + '</main>';
 }
+let messageSounds;
+function sounds() { return messageSounds ||= createMessageSounds(); }
+function observeMessageSounds(view) {
+  const scope = JSON.stringify([connectionScope(), view.actor?.id, view.actor?.companyId, preview]);
+  sounds().observe(scope, view.state.messages, view.actor?.id);
+}
+function soundControl() { return `<button type="button" class="small" data-action="message-sounds" aria-pressed="${sounds().enabled}" aria-label="Message sounds">Sound: ${sounds().enabled ? 'on' : 'off'}</button>`; }
+document.addEventListener('pointerdown', () => sounds().arm(), { passive: true });
+document.addEventListener('keydown', () => sounds().arm(), { passive: true });
 let liveSession = null;
 function stopSessionUpdates() { liveSession?.watch.stop(); liveSession = null; }
 function clearClosedSession() {
@@ -214,6 +224,7 @@ async function load(force = true, afterCommand = false) {
   try {
     const data = await api(`/sessions/${sessionId}${preview ? `?company=${encodeURIComponent(preview)}` : ''}`);
     if (!current()) return;
+    observeMessageSounds(data);
     const changed = !state || data.state.revision !== state.revision || !online;
     const completedNow = data.state.status === 'completed' && state?.status !== 'completed';
     // Preserve reviewed drafts during play, but completion must retire decision forms.
@@ -272,7 +283,7 @@ async function signIn(result) {
   token = result.token; user = result.user; sessionStorage.setItem('studio-token', token); await enter();
 }
 function sessionLink(id) { const url = new URL(location.href); url.searchParams.delete('session'); if (id) url.searchParams.set('session', id); url.hash = ''; return url.href; }
-function selectSession(id) { history.replaceState(null, '', sessionLink(id)); sessionId = id || null; }
+function selectSession(id) { sounds().reset(); history.replaceState(null, '', sessionLink(id)); sessionId = id || null; }
 // Only navigation preferences are kept, scoped to this tab, account and classroom.
 // Simulation data and authorization always come from the server after refresh.
 function workspaceViewKey() {
@@ -364,6 +375,7 @@ function firebaseForm() {
     </div>`;
 }
 function renderWelcome() {
+  sounds().reset();
   stopSessionUpdates();
   renderLocalWelcome();
   if (!health || health.auth === 'firebase') {
@@ -372,7 +384,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=2a751d487002')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=291b7568f6f7')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -417,6 +429,7 @@ async function enterTest(client) {
   restoreWorkspaceView();
   // Fetch an authorized test instructor preview before the first render.
   if (preview) state = (await client.call('view', { preview })).state;
+  observeMessageSounds({state, actor});
   history.replaceState(null, '', testTabUrl(client.credentials.key));
   render();
   client.subscribe(event => {
@@ -443,7 +456,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=2a751d487002')).testClient();
+      const client = (await import('./src/test-client.mjs?v=291b7568f6f7')).testClient();
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -1004,7 +1017,7 @@ function messagesPage() {
   const recipients = conversations.filter(([id]) => isTeacher() || id !== 'announcements');
   const recipient = recipients.some(([id]) => id === channel) ? channel : recipients[0]?.[0];
   const canSend = (state.status !== 'completed' || isTeacher()) && state.features.messaging.allowed && !!recipient;
-  return `<div class="toolbar">${select('channel', 'Show messages', options, channel)}<span class="form-note">Announcements and conversations appear together. Only messages available to your account are shown.</span></div>${panel(esc(options.find(x => x[0] === channel)?.[1]), 'Real and simulation times are shown separately.', `<div class="messages" data-view-key="messages">${messages.map(m => `<article class="message ${messageStyle(m)}"><div class="message-header">${m.channel === 'announcements' ? '<span>Instructor announcement</span>' : m.channel.startsWith('teacher:') ? `<span>${esc(labels.get(m.channel))}</span>` : ''}<span>${esc(m.senderName)}</span></div><p>${esc(m.text)}</p><small>Real time: ${new Date(m.realAt).toLocaleString('en-GB')} · Simulation: ${simDate(m.hour)}</small></article>`).join('') || '<p class="empty">No messages in this view yet.</p>'}</div>${actor.role === 'student' && (channel === 'all' || channel === `team:${actor.companyId}`) ? '<p class="team-typing" data-team-typing role="status" aria-live="polite" aria-label="Team typing status"></p>' : ''}${canSend ? `<form id="message-form">${select('recipient', 'Send to', recipients, recipient)}<p class="form-note">Your message goes only to the selected conversation. Only instructors can post announcements.</p><label>Your message<textarea name="text" maxlength="2000" placeholder="Share a decision, ask a question, or coordinate a next step…" required></textarea></label>${button('submit', 'Send message', '', 'primary')}<div class="error" role="alert"></div></form>` : '<p class="form-note">Messaging is read-only for your role or disabled.</p>'}`)}`;
+  return `<div class="toolbar">${select('channel', 'Show messages', options, channel)}${soundControl()}<span class="form-note">Announcements and conversations appear together. Only messages available to your account are shown.</span></div>${panel(esc(options.find(x => x[0] === channel)?.[1]), 'Real and simulation times are shown separately.', `<div class="messages" data-view-key="messages">${messages.map(m => `<article class="message ${messageStyle(m)}"><div class="message-header">${m.channel === 'announcements' ? '<span>Instructor announcement</span>' : m.channel.startsWith('teacher:') ? `<span>${esc(labels.get(m.channel))}</span>` : ''}<span>${esc(m.senderName)}</span></div><p>${esc(m.text)}</p><small>Real time: ${new Date(m.realAt).toLocaleString('en-GB')} · Simulation: ${simDate(m.hour)}</small></article>`).join('') || '<p class="empty">No messages in this view yet.</p>'}</div>${actor.role === 'student' && (channel === 'all' || channel === `team:${actor.companyId}`) ? '<p class="team-typing" data-team-typing role="status" aria-live="polite" aria-label="Team typing status"></p>' : ''}${canSend ? `<form id="message-form">${select('recipient', 'Send to', recipients, recipient)}<p class="form-note">Your message goes only to the selected conversation. Only instructors can post announcements.</p><label>Your message<textarea name="text" maxlength="2000" placeholder="Share a decision, ask a question, or coordinate a next step…" required></textarea></label>${button('submit', 'Send message', '', 'primary')}<div class="error" role="alert"></div></form>` : '<p class="form-note">Messaging is read-only for your role or disabled.</p>'}`)}`;
 }
 const studentDecisionTypes = new Set(['offer', 'purchase', 'dispatch', 'shifts', 'staff', 'loan', 'deposit', 'energy', 'invest', 'reorder', 'budget']);
 function decisionTiming(audit = state?.audit || []) {
@@ -1205,6 +1218,12 @@ document.addEventListener('keydown', event => {
 });
 
 async function action(name, id) {
+  if (name === 'message-sounds') {
+    sounds().setEnabled(!sounds().enabled);
+    const control = root.querySelector('[data-action=message-sounds]');
+    if (control) { control.textContent = `Sound: ${sounds().enabled ? 'on' : 'off'}`; control.setAttribute('aria-pressed', String(sounds().enabled)); }
+    return;
+  }
   if (name === 'toggle-mobile-menu') {
     const toggle = root.querySelector('.mobile-menu-toggle');
     const open = toggle.getAttribute('aria-expanded') !== 'true';
@@ -1290,7 +1309,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=2a751d487002')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=291b7568f6f7')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -1398,7 +1417,7 @@ document.addEventListener('submit', async event => {
     if (form.id === 'shifts-form') { await command({ type: 'shifts', shifts: [0, 1, 2].map(i => f.has(`shift${i}`)) }); render(); }
     if (form.id === 'effects-form') { await command({ type: 'configure', carbonDemand: f.has('carbonDemand') }); render(); }
     if (form.dataset.feature) { await command({ type: 'configure', feature: form.dataset.feature, visible: f.has('visible'), allowed: f.has('allowed') }); render(); }
-    if (form.id === 'message-form') { typingInputAt = 0; void syncTyping(true); await command({ type: 'message', channel: f.get('recipient') || channel, text: f.get('text') }); render(); }
+    if (form.id === 'message-form') { typingInputAt = 0; void syncTyping(true); await command({ type: 'message', channel: f.get('recipient') || channel, text: f.get('text') }); sounds().play('sent'); render(); }
   } catch (e) { reportFormError(form, e); }
   finally { submittingForms.delete(form); if (submit) submit.disabled = false; }
 });
@@ -1439,7 +1458,7 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=2a751d487002')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    try { const client = (await import('./src/test-client.mjs?v=291b7568f6f7')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p><div class="toolbar">' + (e.status === 403 ? button('retry-start', 'Try again', '', 'primary') : '') + button('test-leave','Return to classroom') + '</div></main>'; }
     return;
   }

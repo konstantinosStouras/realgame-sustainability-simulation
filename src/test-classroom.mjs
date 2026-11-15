@@ -1,5 +1,5 @@
-import { createSession, applyCommand, tick, publicView, assertInvariants, fail } from './engine.mjs?v=2a751d487002';
-import { typingPresence } from './typing-presence.mjs?v=2a751d487002';
+import { createSession, applyCommand, tick, publicView, assertInvariants, fail } from './engine.mjs?v=291b7568f6f7';
+import { typingPresence } from './typing-presence.mjs?v=291b7568f6f7';
 
 // This model is held only by a SharedWorker. No storage, network or Firebase APIs.
 export class TestClassroom {
