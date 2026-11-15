@@ -264,6 +264,33 @@ body th.sortable-heading { padding: 0; }
 }
 /* Retain clear separation when action groups wrap onto another line. */
 .form-actions, .clock-controls, .session-actions { gap: 12px; }
+.message-header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.control-toolbar, .toolbar:has(> label > select) { align-items: flex-end; }
+.control-toolbar > button { flex-shrink: 0; }
+.help-guide { max-width: 1120px; }
+.help-start { padding: clamp(20px, 3vw, 32px); }
+.help-start > p:not(.eyebrow) { max-width: 76ch; }
+.help-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; padding: 0; margin: 24px 0; list-style: none; counter-reset: help-step; }
+.help-steps li { counter-increment: help-step; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); }
+.help-steps li::before { content: counter(help-step); display: grid; place-items: center; width: 30px; height: 30px; margin-bottom: 14px; border-radius: 50%; background: var(--green); color: var(--paper); font-weight: 700; }
+.help-steps strong, .help-steps span { display: block; }
+.help-steps strong { margin-bottom: 8px; }
+.help-steps span { line-height: 1.6; }
+.help-shortcuts { margin-bottom: 0; }
+.help-data p { margin-bottom: 0; max-width: 90ch; }
+.help-topics-heading { margin: 30px 0 16px; }
+.help-topics { display: grid; gap: 12px; }
+.help-section { background: var(--dialog-surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.help-section > summary { padding: 18px 22px; font-size: 1.05rem; font-weight: 650; color: var(--ink); }
+.help-section > summary:focus-visible { outline-offset: -4px; }
+.help-section[open] > summary { border-bottom: 1px solid var(--line); background: var(--soft); }
+.help-section-body { padding: 20px 22px 4px; max-width: 95ch; }
+.help-section-body li { line-height: 1.65; margin-bottom: 12px; }
+@media (max-width: 1000px) { .help-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .help-steps { grid-template-columns: 1fr; } .help-shortcuts > button { width: 100%; } }
+@media (min-width: 701px) {
+  .workspace-tools:has(> :focus-visible) > :hover:not(:focus-visible) .workspace-tool-label { display: none; }
+}
 
 .dispatch-deadline { font-weight: 700; }
 .dispatch-comparison { margin-block: 1rem; }
@@ -275,3 +302,7 @@ body .deadline-late { color: #b42318; font-weight: 700; }
 body .deadline-exact { font-weight: 700; }
 :root[data-theme="dark"] body .deadline-early { color: #8de3a6; }
 :root[data-theme="dark"] body .deadline-late { color: #ffaaa3; }
+
+/* Keep quantities and their status labels distinct; separate actions from facts. */
+.quantity-status { display: inline-flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
+.value-list + .toolbar { margin-top: 20px; }

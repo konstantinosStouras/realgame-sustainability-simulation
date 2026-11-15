@@ -153,7 +153,67 @@ test('truck badge counts each order with units left to dispatch', () => {
   assert.doesNotMatch(h.run('workspaceNavigation(false, () => true)'), /dispatch-count/);
 });
 
-test('student workspace exposes nine categories and shows filtered live stock with one Inventory heading', () => {
+test('sidebar selects only the current panel and gives orders a single category owner', () => {
+  const h = harness();
+  h.run("actor.role='student';page='workspace';state.company={orders:[]};['offers','production','finance','messages','inventory'].forEach(id=>openPanels.add(id));selectedPanel='offers';");
+  let html = h.run('workspaceNavigation(false, () => true)');
+  assert.equal((html.match(/class="active"/g)||[]).length,1);
+  assert.match(html, /data-id="sales"[^>]*aria-current="true"[^>]*class="active"/);
+  assert.doesNotMatch(html, /data-id="(?:inbox|chat)"/);
+  h.run("selectedPanel='orders';openPanels.add('orders');");
+  assert.equal(h.run('selectedWorkspaceTool(false, () => true)'), 'sales');
+  h.run("openPanels.delete('orders');selectedPanel='messages';");
+  assert.equal(h.run('selectedWorkspaceTool(false, () => true)'), 'messages');
+  h.run("openPanels.delete('messages');");
+  assert.equal(h.run('selectedWorkspaceTool(false, () => true)'), 'logistics');
+  h.run("page='reports';");
+  html=h.run('workspaceNavigation(false, () => true)');
+  assert.equal((html.match(/class="active"/g)||[]).length,1);
+  assert.match(html,/data-id="reports"[^>]*aria-current="page"/);
+  h.run("page='workspace';selectedPanel='finance';");
+  assert.equal(h.run("selectedWorkspaceTool(false, key => key !== 'finance')"),'logistics');
+});
+
+test('unified messages show all authorized conversations and label recipients separately', () => {
+  const h=harness();h.run(`actor={id:'s',role:'student',companyId:'c1'};state.status='paused';state.features={messaging:{allowed:true}};state.companies=[{id:'c1',name:'One'},{id:'c2',name:'Two'}];channel='all';
+    state.messages=[['announcements','Class notice'],['team:c1','Team discussion'],['teacher:c1','Instructor reply'],['team:c2','Private other team']].map(([channel,text],i)=>({channel,text,senderName:'Sender',role:'student',hour:24,realAt:'2026-01-02T00:00:00.123Z'}));`);
+  const html=h.run('messagesPage()');
+  for(const text of ['Class notice','Team discussion','Instructor reply','All messages','Send to'])assert.ok(html.includes(text));
+  assert.doesNotMatch(html,/Private other team/);
+  const recipient=html.match(/<select name="recipient">([\s\S]*?)<\/select>/)[1];
+  assert.match(recipient,/team:c1/);assert.match(recipient,/teacher:c1/);assert.doesNotMatch(recipient,/announcements|team:c2|value="all"/);
+  h.run("channel='announcements'");
+  assert.doesNotMatch(h.run('messagesPage()'),/<p>Team discussion<\/p>/);
+  h.run("actor.role='instructor';channel='all'");
+  const teacher=h.run('messagesPage()');
+  assert.match(teacher,/value="announcements" selected/);assert.match(teacher,/value="teacher:c2"/);
+  assert.doesNotMatch(teacher,/<p>Team discussion<\/p>|Private other team/);
+});
+
+test('message submission uses the selected recipient rather than the all-messages filter', async () => {
+  const h=harness();h.form.values.push(['recipient','teacher:c1']);h.run("channel='all';command=async c=>{globalThis.sent=c;}");
+  await h.handlers.submit({target:h.form,preventDefault(){}});
+  assert.equal(h.context.sent.channel,'teacher:c1');assert.equal(h.context.sent.text,'Preserve this draft');
+});
+
+test('decision timing separates students, excludes non-decisions and preserves millisecond timestamps', () => {
+  const h=harness();h.context.audit=[0,500,1000,1500].map((ms,i)=>({id:'a'+i,role:'student',actorId:'s1',actorName:'Student',companyId:'c1',realAt:new Date(Date.UTC(2026,0,1)+ms).toISOString(),hour:0,command:{type:'offer'},result:'Saved'}));
+  h.context.audit.push({role:'student',actorId:'s2',realAt:'2026-01-01T00:00:00.250Z',command:{type:'purchase'}},{role:'student',actorId:'s1',realAt:'bad',command:{type:'staff'}},{role:'student',actorId:'s1',realAt:'2026-01-01T00:00:00.100Z',command:{type:'message'}},{role:'instructor',actorId:'teacher',realAt:'2026-01-01T00:00:00.000Z',command:{type:'offer'}});
+  const before=JSON.stringify(h.context.audit),rows=h.run('decisionTiming(audit)');
+  assert.equal(rows.length,2);assert.equal(rows[0].review,true);assert.equal(rows[0].peak2,4);assert.equal(rows[0].minimumGap,500);assert.equal(rows[0].rapidPairs,3);assert.equal(rows[0].missing,1);
+  assert.equal(rows[1].review,false);assert.equal(rows[1].minimumGap,null);assert.equal(JSON.stringify(h.context.audit),before);
+  h.context.player=rows[0];assert.equal(h.run('decisionTimingRows(player)[1][0]'),'2026-01-01T00:00:00.500Z');
+});
+
+test('timing thresholds require a burst, handle boundary cases, and remain instructor-only', () => {
+  const h=harness();const audit=times=>times.map(ms=>({role:'student',actorId:'s',actorName:'Student',companyId:'c1',realAt:new Date(ms).toISOString(),hour:0,command:{type:'dispatch'}}));
+  for(const [times,expected] of [[[0,500],false],[[0,700,1400,2000],true],[[0,700,1400,2001],false],[[0,2000,4000,6000,8000,10000],true],[[0,2000,4000,6000,8000,10001],false]]){h.context.audit=audit(times);assert.equal(h.run('decisionTiming(audit)[0].review'),expected);}
+  h.context.audit=audit([0,100,200,300]);h.run("state.audit=audit;state.companies=[{id:'c1',name:'One'}]");
+  assert.match(h.run('decisionTimingPanel()'),/review signal, not proof of AI use/);
+  h.run("actor.role='student'");assert.equal(h.run('decisionTimingPanel()'),'');
+});
+
+test('student workspace exposes seven categories and shows filtered live stock with one Inventory heading', () => {
   const h = harness();
   h.run(`actor.role = 'student'; page = 'workspace';
     state.recipe = {cell:32,frame:1,controller:2};
@@ -172,8 +232,8 @@ test('student workspace exposes nine categories and shows filtered live stock wi
     };
     openPanels.add('inventory');`);
   const navigation = h.run('workspaceNavigation(false, () => true)');
-  assert.equal((navigation.match(/data-action="workspace-tool"/g) || []).length, 8);
-  assert.match(navigation, /data-id="operations"[\s\S]*data-id="logistics"[\s\S]*href="notes\/model.md"[\s\S]*data-id="help"/);
+  assert.equal((navigation.match(/data-action="workspace-tool"/g) || []).length, 7);
+  assert.match(navigation, /data-id="operations"[\s\S]*data-id="logistics"[\s\S]*data-id="help"/);
   const workspace = h.run('studentWorkspace(() => true)');
   assert.equal((workspace.match(/<h2[^>]*>Inventory<\/h2>/g) || []).length, 1);
   assert.match(workspace, /Solar panel[\s\S]*Photo cell[\s\S]*240/);
@@ -186,9 +246,9 @@ test('student workspace exposes nine categories and shows filtered live stock wi
   assert.match(workspace, /first<small><\/small><\/td><td[^>]*>16 × Photo cell<\/td><td[^>]*>4 Jan, 01:00<\/td><td[^>]*>0<\/td><td[^>]*>2<\/td><td[^>]*>Photo cell<\/td>.*later<small><\/small><\/td><td[^>]*>224 × Photo cell<\/td><td[^>]*>4 Jan, 03:00<\/td><td[^>]*>\+2<\/td><td[^>]*>4<\/td><td[^>]*>Junction box<\/td>/);
   assert.doesNotMatch(workspace, /received<small>/);
   assert.match(workspace, /Limiting: Photo cell<\/span>/);
-  assert.match(workspace, /Photo cell<\/td><td[^>]*>[^]*?\/ 128<\/span><\/td><td[^>]*>32 <span class="badge amber">Limiting<\/span><\/td>/);
-  assert.match(workspace, /Recycled frame<\/td><td[^>]*>[^]*?\/ 12<\/span><\/td><td[^>]*>1<\/td>/);
-  assert.match(workspace, /Junction box<\/td><td[^>]*>[^]*?\/ 16<\/span><\/td><td[^>]*>2<\/td>/);
+  assert.match(workspace, /Photo cell<\/td><td[^>]*>[^]*?\/ 128<\/span><\/td><td[^>]*><span class="quantity-status"><span>32<\/span><span class="badge amber">Limiting<\/span><\/span><\/td>/);
+  assert.match(workspace, /Recycled frame<\/td><td[^>]*>[^]*?\/ 12<\/span><\/td><td[^>]*><span class="quantity-status"><span>1<\/span><\/span><\/td>/);
+  assert.match(workspace, /Junction box<\/td><td[^>]*>[^]*?\/ 16<\/span><\/td><td[^>]*><span class="quantity-status"><span>2<\/span><\/span><\/td>/);
   h.run('delete state.recipe');
   const legacy = h.run('studentWorkspace(() => true)');
   assert.match(legacy, /Needed \/ solar module/);
@@ -197,8 +257,8 @@ test('student workspace exposes nine categories and shows filtered live stock wi
   assert.match(legacy, /Limiting after receipt: Recycled frame<\/span>/);
   assert.match(legacy, /16 × PV cell<\/td><td[^>]*>4 Jan, 01:00<\/td><td[^>]*>\+1<\/td><td[^>]*>3<\/td><td[^>]*>PV cell<\/td>/);
   assert.match(legacy, /224 × PV cell<\/td><td[^>]*>4 Jan, 03:00<\/td><td[^>]*>\+3<\/td><td[^>]*>6<\/td><td[^>]*>Recycled frame<\/td>/);
-  assert.match(legacy, /PV cell<\/td><td[^>]*>[^]*?\/ 128<\/span><\/td><td[^>]*>24 <span class="badge amber">Limiting<\/span><\/td>/);
-  assert.match(legacy, /Controller<\/td><td[^>]*>[^]*?\/ 16<\/span><\/td><td[^>]*>1<\/td>/);
+  assert.match(legacy, /PV cell<\/td><td[^>]*>[^]*?\/ 128<\/span><\/td><td[^>]*><span class="quantity-status"><span>24<\/span><span class="badge amber">Limiting<\/span><\/span><\/td>/);
+  assert.match(legacy, /Controller<\/td><td[^>]*>[^]*?\/ 16<\/span><\/td><td[^>]*><span class="quantity-status"><span>1<\/span><\/span><\/td>/);
   h.run('state.recipe = {cell:32,frame:1,controller:2}');
   h.run('state.company.inventory.controller.qty = 4');
   const tied = h.run('studentWorkspace(() => true)');
@@ -402,4 +462,37 @@ test('twelve competing companies have distinct stable chart and legend colors', 
     assert.ok(css.includes(`.chart circle.c${i}{fill:var(--chart-${i})}`));
     assert.match(dark, new RegExp(`--chart-${i}:#[a-f0-9]{6}`));
   }
+});
+
+
+test('help uses current recipe and accounting and keeps guidance inside the app', () => {
+  const h=harness();
+  h.run("actor.role='student';state.recipe={cell:32,frame:1,controller:2};state.accounting={revenueAt:'dispatch'};");
+  const help=h.run('helpPage()');
+  assert.match(help,/32 × Photo cell/);
+  assert.match(help,/recognizes sales at dispatch/);
+  assert.match(help,/Team responsibilities and planning/);
+  assert.match(help,/real data collected from several suppliers/);
+  assert.match(help,/data-action="nav" data-id="orders"/);
+  assert.doesNotMatch(help,/independently authored|notes\/model\.md|Instructor controls and decision timing/);
+  h.run("actor.role='instructor';state.accounting.revenueAt='receipt'");
+  assert.match(h.run('helpPage()'),/recognizes sales at customer receipt/);
+  assert.match(h.run('helpPage()'),/Instructor controls and decision timing/);
+});
+
+test('instructor timing CSV exports each accepted decision and protects student access', async () => {
+  const h=harness();
+  h.run("state.companies=[{id:'c1',name:'One'}];state.audit=[{role:'student',actorId:'s1',actorName:'Student',companyId:'c1',realAt:'2026-01-01T00:00:00.125Z',hour:2,command:{type:'offer'},result:'Saved'}];");
+  h.context.exports=[];h.run('csv=(name,rows)=>exports.push({name,rows})');
+  await h.run("action('decision-timing-csv','')");
+  assert.equal(h.context.exports.length,1);
+  const output=h.context.exports[0];
+  assert.equal(output.rows.length,2);
+  assert.equal(output.rows[1][0],'s1');
+  assert.equal(output.rows[1][3],'2026-01-01T00:00:00.125Z');
+  assert.equal(output.rows[1][5],'offer');
+  assert.equal(output.rows[1][7],'Saved');
+  h.run("actor.role='student'");
+  await h.run("action('decision-timing-csv','')");
+  assert.equal(h.context.exports.length,1);
 });

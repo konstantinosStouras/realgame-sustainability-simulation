@@ -1,6 +1,6 @@
-# Sustainability Studio: original model and teaching guide
+# Sustainability Studio: model and teaching guide
 
-This is an independently authored business simulation. All catalogues, formulas, text, code, and interface assets here are original. Private research remains excluded from the repository and deployment.
+The supplier data used in this simulation corresponds to real data collected from several suppliers. The guide below explains how the simulation uses that data and how its operating rules work.
 
 ## Start a class
 
@@ -125,3 +125,21 @@ Combined headings sort by a defined primary value; hover or keyboard-focus the h
 ### Dispatch deadline guidance
 
 The dispatch form shows the current simulation time and hours remaining until the accepted order deadline (or hours overdue). Every enabled transport route shows its estimated arrival margin in parentheses: green for hours before the deadline, red for hours after it, and neutral when exactly on the deadline. The comparison also shows the margin with the full listed carrier delay. These are estimates, not guarantees. Arrivals more than 24 hours early can still incur the model's early-delivery satisfaction penalty; the selected-route quote retains that warning. Guidance is calculated as of the simulation time displayed in the form and refreshes when the form is opened or a stale decision is reviewed. If the clock is running, reopen the form for the latest estimate; existing draft-preservation safeguards remain in effect.
+
+## Sidebar selection and unified messages
+
+Only the currently selected section is highlighted. Opening several workspace panels does not mark every sidebar button as selected. Clicking or focusing a panel selects its section; closing it selects a remaining panel. Orders belong to Sales even though Logistics offers an orders shortcut.
+
+The Messages button opens **All messages**, combining instructor announcements, internal team messages and conversations with the instructor that the signed-in account is authorized to read. Each message identifies its conversation and sender. The **Show messages** filter narrows the feed; **Send to** independently selects the destination for a new message. Students cannot post announcements or read another company's internal messages. Instructor access to private team conversations is unchanged.
+
+## Instructor decision timing review
+
+Session control includes **Student decision timing**, with a summary for every student who has made an accepted business decision, a full per-student history and a CSV export. It uses the existing authoritative audit records, including historical decisions: student ID/name, company, command, result, real UTC acceptance timestamp with milliseconds, and simulation time. Shared classroom timestamps are recorded by the backend; temporary tests and solo rounds use browser time and are identified as test/demo data. Menu clicks, rejected attempts, chat messages and automatic simulation outcomes are not counted as student business decisions. A student with no accepted decisions has no row yet.
+
+The potential-automation indicator flags a **rapid pattern for review** when one student has at least four accepted decisions within two seconds, or six within ten seconds. It also shows the shortest gap, number of gaps below one second and largest ten-second burst. Thresholds are transparent heuristics, not a validated AI detector. Fast human input, accessibility tools, shared accounts, network timing and generated test data can produce similar patterns; slower agents may not trigger the indicator. No grade, access restriction or automatic misconduct conclusion follows from the flag. Missing/invalid historical timestamps are excluded from timing calculations but retained in the decision list. Equal timestamps are retained as zero-second gaps. Exports contain student identities and are private classroom records; never commit them to the public repository.
+
+## Team responsibilities and planning
+
+Coordinate procurement, inventory, production, deliveries and sales around a shared demand plan. Plan purchases from projected orders and lead times; monitor safety stock; match shifts and capacity to materials; prioritize customer deadlines; and make market offers that operations can fulfil. Review competitor results, cash, profit and funding needs together, and communicate changes before advancing time.
+
+The in-app Help & guide presents these responsibilities, a four-step decision cycle and expandable explanations of each decision area.

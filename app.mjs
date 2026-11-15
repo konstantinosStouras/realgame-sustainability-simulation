@@ -1,6 +1,6 @@
-import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=6d9f06df8dd2';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=6d9f06df8dd2';
-import { watchSession } from './src/session-updates.mjs?v=6d9f06df8dd2';
+import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=0d6599abb79c';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=0d6599abb79c';
+import { watchSession } from './src/session-updates.mjs?v=0d6599abb79c';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -14,7 +14,7 @@ const localWorkspace = ['localhost', '127.0.0.1', '[::1]'].includes(location.hos
 const savedBackend = localStorage.getItem('studio-backend') || '';
 // Old loopback testing preferences must not strand returning public-site users.
 let backend = localWorkspace ? savedBackend : (/^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(savedBackend) ? classroomBackend : savedBackend || classroomBackend), token = sessionStorage.getItem('studio-token') || '';
-let state, actor, user, sessions = [], sessionId, preview, page = 'overview', channel = 'announcements', report = 'profit', reportRange = 30, selectedCompanies = new Set(), solo = null, health = null, roster = null, busy = false, online = true, firebaseClient = null;
+let state, actor, user, sessions = [], sessionId, preview, page = 'overview', channel = 'all', report = 'profit', reportRange = 30, selectedCompanies = new Set(), solo = null, health = null, roster = null, busy = false, online = true, firebaseClient = null;
 let testRoom = null, testPending = null;
 let testAccessClosed = false;
 const connectionMessage = 'Connection interrupted. Displayed classroom data may be out of date. Reconnecting… Pending decisions are never submitted automatically.';
@@ -292,6 +292,7 @@ function restoreWorkspaceView() {
       openPanels.clear();
       for (const id of saved.openPanels) if (Object.hasOwn(studentPanels, id)) openPanels.add(id);
     }
+    selectedPanel = openPanels.has(saved.selectedPanel) ? saved.selectedPanel : null;
     if (Array.isArray(saved.inventoryCategories)) {
       inventoryCategories.clear();
       for (const id of saved.inventoryCategories) if (['finished', 'component'].includes(id)) inventoryCategories.add(id);
@@ -309,7 +310,7 @@ function rememberWorkspaceView() {
   try {
     sessionStorage.setItem(key, JSON.stringify({ version: 1, page, preview: preview || null,
       channel, report, reportRange, selectedCompanies: [...selectedCompanies],
-      openPanels: [...openPanels], inventoryCategories: [...inventoryCategories] }));
+      openPanels: [...openPanels], selectedPanel, inventoryCategories: [...inventoryCategories] }));
   } catch { /* Navigation still works when browser storage is unavailable. */ }
 }
 async function enter() {
@@ -326,7 +327,7 @@ async function enter() {
   }
   try {
     page = user.role === 'instructor' ? 'admin' : 'overview';
-    channel = 'announcements'; report = 'profit'; reportRange = 30; selectedCompanies.clear();
+    channel = 'all'; selectedPanel = null; report = 'profit'; reportRange = 30; selectedCompanies.clear();
     openPanels.clear(); inventoryCategories.clear(); inventoryCategories.add('finished'); inventoryCategories.add('component');
     restoreWorkspaceView();
     await load();
@@ -371,7 +372,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=6d9f06df8dd2')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=0d6599abb79c')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -411,7 +412,7 @@ async function enterTest(client) {
   testRoom = client; solo = null; testAccessClosed = false;
   state = view.state; actor = view.actor; user = actor; sessionId = state.id; preview = undefined;
   sessions = []; page = actor.role === 'instructor' ? 'admin' : 'overview';
-  channel = 'announcements'; report = 'profit'; reportRange = 30; selectedCompanies.clear();
+  channel = 'all'; selectedPanel = null; report = 'profit'; reportRange = 30; selectedCompanies.clear();
   openPanels.clear(); inventoryCategories.clear(); inventoryCategories.add('finished'); inventoryCategories.add('component');
   restoreWorkspaceView();
   // Fetch an authorized test instructor preview before the first render.
@@ -442,7 +443,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=6d9f06df8dd2')).testClient();
+      const client = (await import('./src/test-client.mjs?v=0d6599abb79c')).testClient();
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -509,7 +510,7 @@ function renderLobby(error = '', requested = '', needsCompany = false) {
   state = null; actor = null;
   root.innerHTML = '<main class="welcome" id="content">' + brand + '<h1>Enter your session ID</h1><p>Enter the ID provided by your instructor. Only sessions open to students can be entered.</p><section class="panel"><form id="session-entry-form">' + field('sessionId', 'Session ID', requested, 'text', 'maxlength="100" autocomplete="off"') + (needsCompany ? field('code', 'Company join code', '', 'text', 'autocomplete="off"') + '<p>Your instructor’s company code assigns you to the correct team.</p>' : '') + button('submit', 'Enter session', '', 'primary') + '<div class="error" role="alert">' + esc(error) + '</div></form></section>' + (user?.role === 'instructor' ? button('sessions', 'All sessions') : '') + button('logout', 'Sign out') + '</main>';
 }
-const pages = { overview: 'Overview', orders: 'Sales & dispatch', supply: 'Supply & inventory', production: 'Production', finance: 'Finance', energy: 'Energy & growth', reports: 'Reports', messages: 'Messages', admin: 'Session control' };
+const pages = { overview: 'Overview', orders: 'Sales & dispatch', supply: 'Supply & inventory', production: 'Production', finance: 'Finance', energy: 'Energy & growth', reports: 'Reports', messages: 'Messages', help: 'Help & guide', admin: 'Session control' };
 const studentPanels = {
   inventory: ['Inventory', 'supply', () => inventoryPanel(true)],
   suppliers: ['Suppliers', 'supply', () => suppliersPanel(true)],
@@ -525,17 +526,16 @@ const studentPanels = {
   messages: ['Messages', 'messages', messagesPage]
 };
 const openPanels = new Set();
+let selectedPanel = null;
 const inventoryCategories = new Set(['finished', 'component']);
 const workspaceTools = [
   { id: 'operations', title: 'Operations', label: 'Ops', icon: 'admin', description: 'Manage production, energy and replenishment.', student: ['production', 'energy', 'replenishment'], instructor: ['production', 'energy', 'admin'] },
   { id: 'finance', title: 'Finance', label: 'Cash', icon: 'coins', description: 'Review cash, accounts and financing.', student: ['finance'], instructor: ['finance'] },
   { id: 'sales', title: 'Sales and orders', label: 'Sales', icon: 'edit', description: 'Set sales offers and dispatch orders.', student: ['orders', 'offers'], instructor: ['orders'] },
   { id: 'logistics', title: 'Logistics', label: 'Ship', icon: 'truck', description: 'Check stock, suppliers, purchases and shipments.', student: ['inventory', 'suppliers', 'purchases', 'shipments', 'logistics'], instructor: ['supply'] },
-  { id: 'inbox', title: 'Announcements', label: 'Inbox', icon: 'mail', description: 'Open instructor announcements.', channel: 'announcements' },
-  { id: 'chat', title: 'Chat', label: 'Chat', icon: 'messages', description: 'Open team or instructor conversations.', channel: 'chat' },
+  { id: 'messages', title: 'Messages', label: 'Messages', icon: 'messages', description: 'Read announcements, team messages and instructor conversations together.', channel: 'all' },
   { id: 'reports', title: 'Reports', label: 'Stats', icon: 'reports', description: 'Compare daily results and export data.', page: 'reports' },
-  { id: 'guide', title: 'Guide', label: 'Guide', icon: 'book', description: 'Read the simulation model and teaching guide.', href: 'notes/model.md' },
-  { id: 'help', title: 'Help', label: 'Help', icon: 'help', description: 'Get help finding tools or return to the overview.' }
+  { id: 'help', title: 'Help & guide', label: 'Help', icon: 'book', description: 'Learn how to play, compare decisions and understand your results.', page: 'help' }
 ];
 const workspaceIcons = {
   coins: '<ellipse cx="9" cy="8" rx="6" ry="3"/><path d="M3 8v8c0 4 12 4 12 0V8M3 12c0 4 12 4 12 0m3-9c2 0 3 1 3 3v7c0 2-1 3-3 3"/>',
@@ -554,20 +554,37 @@ function workspaceDestinations(tool, admin, visible) {
   return destinations;
 }
 
-function workspaceChannel(tool) {
-  return tool.channel === 'chat' ? channelOptions().find(([id]) => id !== 'announcements')?.[0] : tool.channel;
+function selectedWorkspaceTool(admin, visible) {
+  const panels = [...openPanels].filter(id => studentPanelVisible(id, visible));
+  const destination = !admin && page === 'workspace' ? (panels.includes(selectedPanel) ? selectedPanel : panels.at(-1)) : page;
+  // Orders have one owner even though Logistics also offers a shortcut to them.
+  return workspaceTools.find(tool => tool.page === destination || (tool.channel && destination === 'messages') || (admin ? tool.instructor : tool.student)?.includes(destination))?.id;
 }
+function selectWorkspacePanel(id) {
+  if (page !== 'workspace' || !openPanels.has(id) || selectedPanel === id) return;
+  selectedPanel = id;
+  const active = selectedWorkspaceTool(false, workspaceFeatureVisible);
+  root.querySelectorAll('.workspace-tools > button').forEach(button => {
+    const selected = button.dataset.id === active;
+    button.classList.toggle('active', selected);
+    if (selected) button.setAttribute('aria-current', 'true'); else button.removeAttribute('aria-current');
+  });
+  rememberWorkspaceView();
+}
+for (const type of ['click', 'focusin']) document.addEventListener(type, event => {
+  const pane = event.target.closest?.('.student-pane');
+  if (pane) selectWorkspacePanel(pane.getAttribute('aria-labelledby')?.replace(/^pane-/, ''));
+});
 
 function workspaceNavigation(admin, visible) {
   const waiting = visible('orders') ? (company()?.orders || []).filter(order => order.remaining > 0).length : 0;
+  const selected = selectedWorkspaceTool(admin, visible);
   const buttons = workspaceTools.map(tool => {
     const { id, title, label, description, href } = tool;
     const destinations = workspaceDestinations(tool, admin, visible);
     const unavailable = (tool.channel && !visible('messages')) || (tool.student && !destinations.length);
-    const current = tool.page === page || (tool.channel &&
-      (page === 'messages' || (page === 'workspace' && openPanels.has('messages'))) &&
-      (tool.channel === 'chat' ? channel !== 'announcements' : channel === 'announcements'));
-    const active = current || destinations.some(destination => admin ? page === destination : page === 'workspace' && openPanels.has(destination));
+    const current = !unavailable && id === selected;
+    const active = current;
     const showBadge = id === 'logistics' && waiting > 0;
     const waitingLabel = showBadge ? `${number(waiting)} ${waiting === 1 ? 'order' : 'orders'} waiting to be dispatched` : '';
     const graphic = icon(tool.icon, workspaceIcons[tool.icon]);
@@ -575,7 +592,7 @@ function workspaceNavigation(admin, visible) {
       <span class="workspace-tool-label"><strong aria-hidden="true">${title}</strong><span id="tool-${id}-hint">${showBadge ? waitingLabel + '. ' : ''}${description}</span></span>`;
     const accessibility = `aria-label="${title}" aria-describedby="tool-${id}-hint"`;
     return href ? `<a href="${href}" target="_blank" rel="noopener" ${accessibility}>${body}</a>` :
-      `<button type="button" data-action="workspace-tool" data-id="${id}" ${accessibility}${current ? ' aria-current="page"' : ''}${active ? ' class="active"' : ''}${unavailable ? ' aria-disabled="true"' : ''}${destinations.length > 1 || id === 'help' ? ' aria-haspopup="dialog"' : ''}>${body}</button>`;
+      `<button type="button" data-action="workspace-tool" data-id="${id}" ${accessibility}${current ? ` aria-current="${page === 'workspace' ? 'true' : 'page'}"` : ''}${active ? ' class="active"' : ''}${unavailable ? ' aria-disabled="true"' : ''}${destinations.length > 1 ? ' aria-haspopup="dialog"' : ''}>${body}</button>`;
   });
   return `<header class="workspace-nav" data-view-key="workspace-nav"><button type="button" class="mobile-menu-toggle" data-action="toggle-mobile-menu" aria-expanded="false" aria-controls="workspace-sections"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg><span>Menu</span></button><nav id="workspace-sections" class="workspace-tools" aria-label="Workspace">${buttons.join('')}</nav></header>`;
 }
@@ -664,9 +681,9 @@ function render() {
   const visible = workspaceFeatureVisible;
   if (!visible(page) || (page === 'workspace' && admin)) page = 'overview';
   const scope = interactionScope(), interaction = captureInteraction(scope);
-  const titles = { workspace: 'Decision workspace', overview: c ? `Let's make progress, ${c.name.split(' ')[0]}.` : 'A classroom in motion.', orders: 'From offer to arrival.', supply: 'Keep your business moving.', production: 'Make capacity count.', finance: 'Follow the money.', energy: 'Build a better footprint.', reports: 'See the whole picture.', messages: 'Better decisions, together.', admin: 'Set the pace of learning.' };
-  const subtitles = { workspace: 'Open the panels you need and compare them side by side.', overview: 'Your business, at a glance. Every decision has a next step.', orders: 'Accepted terms stay with each order, from first dispatch to final payment.', supply: 'Balance availability, working capital, and the footprint of every component.', production: 'Coordinate materials, people, machines, and the hours they work.', finance: 'Cash is available money. Profit is revenue earned less costs incurred.', energy: 'Invest now. Track activation and the results over time.', reports: 'Comparable daily results, with every reporting boundary clearly marked.', messages: 'A shared space for announcements, questions, and team decisions.', admin: 'Control the shared clock, classroom access, and teaching parameters.' };
-  root.innerHTML = `<div class="layout">${!admin || preview ? workspaceNavigation(admin, visible) : ''}<div class="workspace"><header class="topbar"><div class="breadcrumb">Workspace &nbsp; / &nbsp; <strong>${pages[page] || "Decision workspace"}</strong></div><div class="top-actions">${user?.role === 'instructor' ? button('sessions', 'All sessions', '', 'small') : ''}${accountControls(actor)}</div></header>${testRoom ? `<div class="mode-banner"><span><strong>Temporary test round</strong> · ${esc(actor.name)} · Shared only across these browser tabs. No test data is saved.</span>${admin ? button('test-students', 'Open test student tabs') + button('test-end', 'End test round') : ''}${button('test-leave', 'Leave test')}</div>` : solo ? `<div class="mode-banner"><span><strong>Solo sandbox</strong> · ${solo.isTest ? 'Private test round · changes are discarded when you leave.' : 'Saved in this browser. Switch roles to rehearse; no other people are connected.'}</span>${button('switch-solo', admin ? 'Play a company' : 'Instructor view')}</div>` : health?.demo ? '<div class="mode-banner"><span><strong>Local classroom demo</strong> · Synthetic accounts share durable server state. Demo sign-in is enabled on this computer.</span></div>' : ''}<main id="content" class="content">${connectionNotice()}<div class="page-heading"><div><div class="eyebrow">${esc(state.name)}${c ? ` &nbsp; / &nbsp; ${esc(c.name)}` : ''}</div><h1 tabindex="-1">${esc(titles[page])}</h1><p>${subtitles[page]}</p></div><div class="timebox"><span class="badge ${state.status === 'running' ? '' : 'amber'}">● ${esc(state.status)}</span><strong>${simDate(state.hour)} · simulation</strong><small>Day ${Math.floor(state.hour / 24) + 1} · ends ${simDate(state.endHour)}</small></div></div>${state.status === 'completed' ? `<div class="advice warning"><strong>Session complete. ${state.events.filter(e => e.status === 'pending').length} scheduled events remain.</strong>${admin ? 'Pending deliveries, payments, and investments are preserved. The instructor can extend the end date to settle them.' : 'Final reports and CSV downloads remain available. New decisions are disabled.'}</div>` : ''}${admin ? `<div class="toolbar instructor-toolbar" aria-label="Instructor controls">${select('preview', 'Company preview · read-only', [['', 'All companies'], ...state.companies.map(x => [x.id, x.name])], preview || '')}<nav class="instructor-links" aria-label="Instructor pages">${button('nav', 'Session control', 'admin', 'small')}${button('nav', 'Class overview', 'overview', 'small')}${button('nav', 'Reports', 'reports', 'small')}${button('nav', 'Announcements', 'messages', 'small')}</nav></div>` : ''}${!admin && !solo && !testRoom ? `<div class="toolbar" aria-label="Classroom access">${button('join', 'Join another class', '', 'small')}${button('sessions', 'Switch session', '', 'small')}</div>` : ''}${page === "workspace" ? studentWorkspace(visible) : pageBody()}<div class="footer-note"><a href="notes/model.md" target="_blank" rel="noopener">Model & teaching guide ↗</a><br>All amounts are simulated EUR · Emissions in kg CO₂e · Simulation dates use UTC · Live state at ${simDate(state.hour)} · Model v${state.schema}</div></main></div></div>`;
+  const titles = { workspace: 'Decision workspace', overview: c ? `Let's make progress, ${c.name.split(' ')[0]}.` : 'A classroom in motion.', orders: 'From offer to arrival.', supply: 'Keep your business moving.', production: 'Make capacity count.', finance: 'Follow the money.', energy: 'Build a better footprint.', reports: 'See the whole picture.', messages: 'Better decisions, together.', help: 'Your guide to running the business.', admin: 'Set the pace of learning.' };
+  const subtitles = { workspace: 'Open the panels you need and compare them side by side.', overview: 'Your business, at a glance. Every decision has a next step.', orders: 'Accepted terms stay with each order, from first dispatch to final payment.', supply: 'Balance availability, working capital, and the footprint of every component.', production: 'Coordinate materials, people, machines, and the hours they work.', finance: 'Cash is available money. Profit is revenue earned less costs incurred.', energy: 'Invest now. Track activation and the results over time.', reports: 'Comparable daily results, with every reporting boundary clearly marked.', messages: 'A shared space for announcements, questions, and team decisions.', help: 'Know what to check, which decisions to make, and what happens next.', admin: 'Control the shared clock, classroom access, and teaching parameters.' };
+  root.innerHTML = `<div class="layout">${!admin || preview ? workspaceNavigation(admin, visible) : ''}<div class="workspace"><header class="topbar"><div class="breadcrumb">Workspace &nbsp; / &nbsp; <strong>${pages[page] || "Decision workspace"}</strong></div><div class="top-actions">${user?.role === 'instructor' ? button('sessions', 'All sessions', '', 'small') : ''}${accountControls(actor)}</div></header>${testRoom ? `<div class="mode-banner"><span><strong>Temporary test round</strong> · ${esc(actor.name)} · Shared only across these browser tabs. No test data is saved.</span>${admin ? button('test-students', 'Open test student tabs') + button('test-end', 'End test round') : ''}${button('test-leave', 'Leave test')}</div>` : solo ? `<div class="mode-banner"><span><strong>Solo sandbox</strong> · ${solo.isTest ? 'Private test round · changes are discarded when you leave.' : 'Saved in this browser. Switch roles to rehearse; no other people are connected.'}</span>${button('switch-solo', admin ? 'Play a company' : 'Instructor view')}</div>` : health?.demo ? '<div class="mode-banner"><span><strong>Local classroom demo</strong> · Synthetic accounts share durable server state. Demo sign-in is enabled on this computer.</span></div>' : ''}<main id="content" class="content">${connectionNotice()}<div class="page-heading"><div><div class="eyebrow">${esc(state.name)}${c ? ` &nbsp; / &nbsp; ${esc(c.name)}` : ''}</div><h1 tabindex="-1">${esc(titles[page])}</h1><p>${subtitles[page]}</p></div><div class="timebox"><span class="badge ${state.status === 'running' ? '' : 'amber'}">● ${esc(state.status)}</span><strong>${simDate(state.hour)} · simulation</strong><small>Day ${Math.floor(state.hour / 24) + 1} · ends ${simDate(state.endHour)}</small></div></div>${state.status === 'completed' ? `<div class="advice warning"><strong>Session complete. ${state.events.filter(e => e.status === 'pending').length} scheduled events remain.</strong>${admin ? 'Pending deliveries, payments, and investments are preserved. The instructor can extend the end date to settle them.' : 'Final reports and CSV downloads remain available. New decisions are disabled.'}</div>` : ''}${admin ? `<div class="toolbar instructor-toolbar control-toolbar" aria-label="Instructor controls">${select('preview', 'Company preview · read-only', [['', 'All companies'], ...state.companies.map(x => [x.id, x.name])], preview || '')}<nav class="instructor-links" aria-label="Instructor pages">${button('nav', 'Session control', 'admin', 'small')}${button('nav', 'Class overview', 'overview', 'small')}${button('nav', 'Reports', 'reports', 'small')}${button('nav', 'Messages', 'messages', 'small')}</nav></div>` : ''}${!admin && !solo && !testRoom ? `<div class="toolbar" aria-label="Classroom access">${button('join', 'Join another class', '', 'small')}${button('sessions', 'Switch session', '', 'small')}</div>` : ''}${page === "workspace" ? studentWorkspace(visible) : pageBody()}<div class="footer-note">${button('nav', 'Help & guide', 'help', 'small')}<br>All amounts are simulated EUR · Emissions in kg CO₂e · Simulation dates use UTC · Live state at ${simDate(state.hour)} · Model v${state.schema}</div></main></div></div>`;
   rememberWorkspaceView();
   const pending = !solo && !testRoom && sessionStorage.getItem(`studio-pending:${backend}:${actor.id}:${sessionId}`);
   if (pending && !busy) root.querySelector('#content').insertAdjacentHTML('afterbegin', `<div id="pending-decision" class="advice warning"><strong>A decision is awaiting confirmation.</strong>The response was interrupted. Retry with the same request key to confirm the outcome safely. ${button('retry-decision', 'Retry pending decision', '', 'small')}</div>`);
@@ -674,6 +691,7 @@ function render() {
   renderedInteractionScope = scope; renderedInteractionRoot = root.firstElementChild;
 }
 function pageBody() {
+  if (page === 'help') return helpPage();
   if (page === 'admin') return adminPage();
   if (page === 'reports') return reportsPage();
   if (page === 'messages') return messagesPage();
@@ -816,7 +834,7 @@ function inventoryPanel(embedded = false) {
       return [
         sortCell(`<span class="stock-kind ${type}" aria-label="${type === 'finished' ? 'Finished' : 'Component'}">${type === 'finished' ? 'F' : 'C'}</span> ${itemName(state, key)}`, itemName(state, key)),
         sortCell(`<span class="nowrap"><strong>${number(stock.qty)}</strong> / ${number(stock.capacity)}</span>`, stock.qty),
-        sortCell(Object.hasOwn(recipe, key) ? `${number(recipe[key])}${limiting.includes(key) ? ' <span class="badge amber">Limiting</span>' : ''}` : '—', recipe[key] ?? null),
+        sortCell(Object.hasOwn(recipe, key) ? `<span class="quantity-status"><span>${number(recipe[key])}</span>${limiting.includes(key) ? '<span class="badge amber">Limiting</span>' : ''}</span>` : '—', recipe[key] ?? null),
         sortCell(stock.qty ? exactMoney(stock.value / stock.qty) : '—', stock.qty ? stock.value / stock.qty : null),
         sortCell(ordered ? number(ordered) : '—', ordered || 0),
         sortCell(stock.qty ? precise(stock.carbon / stock.qty) : '—', stock.qty ? stock.carbon / stock.qty : null)
@@ -882,22 +900,78 @@ function reportValue(value, unit) {
     ? {minimumFractionDigits:2,maximumFractionDigits:2}
     : {maximumFractionDigits:4}).format(value);
 }
+function helpPage() {
+  const recipe = Object.entries(productionRecipe(state)).map(([key, qty]) => `${number(qty)} × ${esc(itemName(state, key))}`).join(' + ');
+  const section = (id, title, body) => `<details class="help-section" data-view-key="help-${id}"><summary>${title}</summary><div class="help-section-body">${body}</div></details>`;
+  return `<div class="help-guide"><section class="help-start panel"><p class="eyebrow">Start here</p><h2>A clear decision cycle</h2><p>Run a solar-panel company by balancing delivery promises, production, cash and carbon. Work through these four checks whenever the simulation advances.</p><ol class="help-steps"><li><strong>Review commitments</strong><span>Find the earliest customer deadlines and quantities still to dispatch.</span></li><li><strong>Check supply</strong><span>Compare finished stock, component shortages and incoming deliveries.</span></li><li><strong>Plan production</strong><span>Match shifts, workers and machines to the materials you can use.</span></li><li><strong>Deliver and review</strong><span>Choose a feasible route, then check receipts, cash and daily results.</span></li></ol><div class="toolbar help-shortcuts">${button('nav', 'Open orders', 'orders', 'primary')}${button('nav', 'View inventory', 'supply')}${button('nav', 'View reports', 'reports')}</div></section><section class="help-data panel"><h2>About the supplier data</h2><p>The supplier data used in this simulation corresponds to real data collected from several suppliers. The sections below explain how to use the catalogue and how decisions affect the simulation.</p></section><h2 class="help-topics-heading">Explore the decisions</h2><div class="help-topics">
+    ${section('team', 'Team responsibilities and planning', '<p>Coordinate purchasing, inventory, production, deliveries and sales around one shared demand plan. Agree who checks each area, share changes in Messages and review the consequences together.</p><ul><li><strong>Purchasing:</strong> plan component orders from expected sales, current stock and supplier lead times.</li><li><strong>Inventory:</strong> monitor shortages and keep a sensible safety stock without tying up excessive cash.</li><li><strong>Production:</strong> choose shifts and capacity that match available materials and delivery commitments.</li><li><strong>Deliveries:</strong> prioritize customer deadlines and compare feasible transport routes.</li><li><strong>Sales:</strong> offer prices, quantities and promises the company can fulfil in each market.</li><li><strong>Analysis and planning:</strong> compare demand, competitor results, cash and profit; review funding needs and revise the plan before advancing time.</li></ul>')}
+    ${section('clock', 'The clock, decisions and pending outcomes', '<p>The date at the top of the workspace is simulation time (UTC). While paused, you can still submit decisions, but production, deliveries and scheduled changes wait for the clock to advance.</p><p>A confirmation tells you whether a decision takes effect now or creates a future event. Check activation dates before relying on a new shift, worker, machine or energy contract. Accepted contracts retain their terms; there is no cancellation of committed contracts.</p><p>Open several panels to compare information. The highlighted sidebar button follows the selected panel. Use the × in a panel header to close it.</p>')}
+    ${section('orders', 'Sales offers, orders and transport', '<p><strong>Sales offers:</strong> set price, minimum/maximum order quantity, delivery promise, payment terms and whether to accept new orders. Edits affect future orders; they do not rewrite existing promises. Demand is allocated every six simulation hours, influenced by price, delivery, payment, satisfaction, quality, marketing and enabled carbon preferences.</p><p><strong>Dispatch:</strong> choose an order, quantity and transport route. Partial shipments are allowed, and each shipment pays its own fixed freight fee. Dispatch reduces finished stock; customer receipt happens later.</p><p>The form shows hours remaining and each route’s arrival margin. Green means before the deadline; red means after it. Also check the margin with the full carrier delay. Arrival more than 24 hours early can incur a small satisfaction penalty, so green does not always mean ideal. Compare freight cost and carbon after checking feasibility.</p><p>Click a table heading for decreasing ▼, then increasing ▲, then original order. Sort <strong>Order / market</strong> increasing for the oldest order; sort <strong>Promised arrival</strong> increasing for the earliest deadline.</p>')}
+    ${section('supply', 'Inventory, suppliers and replenishment', `<p><strong>This session’s recipe:</strong> ${recipe} per finished module.</p><p>Inventory shows stock, capacity, material requirements and incoming purchases. The limiting component determines how much you can assemble. Buying more of another component does not remove that bottleneck.</p><p>Compare unit price, fixed order fee, lead time, reliability, carbon, minimum quantity, lot size and payment terms. Supplier stock is shared across companies. A purchase commits you to a payable; components become usable on receipt and payment follows the accepted term.</p><p>After installing the replenishment assistant, set a supplier, reorder point and order quantity for each component. It checks stock plus incoming supply hourly. Review its status when credit, stock, capacity or permissions block a purchase.</p>`)}
+    ${section('production', 'Production, staffing and investments', '<p>Each assembly line supports 6 modules/hour; each worker supports 2 modules/hour. Actual output is constrained by machines, workers, materials, warehouse space and available cash.</p><p>Choose the 00–08, 08–16 and 16–24 shifts. Schedule changes take effect at the next eight-hour boundary. Active-shift wages are paid even if materials run out. Staffing changes take 48 hours; a new assembly line takes 72 hours.</p><p>Investments can add capacity, warehouse space, energy efficiency or automation. They cost cash now and become usable after installation. Adding a machine will not help if materials or workers remain the bottleneck.</p><p>The dispatch assistant works on the oldest open order and selects a low-cost route that can meet the promise with a delay buffer. Check its next-action explanation rather than assuming installation means immediate dispatch.</p>')}
+    ${section('energy', 'Energy, carbon, research and marketing', '<p>Compare electricity tariffs by shift, daily standing charges, switching fees, activation delays and carbon intensity. A new energy contract changes future production. Existing stock retains its embodied carbon.</p><p>Operational carbon includes received components and inbound transport, production electricity and outbound freight. Lower-carbon choices can affect customer demand when the instructor enables that preference.</p><p>Daily research gradually improves quality; daily marketing influences demand. Both create recurring costs. Review capacity before increasing demand, and compare the benefit with the cash commitment.</p>')}
+    ${section('finance', 'Cash, profit, payments and financing', `<p><strong>Cash and profit are different.</strong> This session recognizes sales at ${state.accounting?.revenueAt === 'dispatch' ? 'dispatch' : 'customer receipt'}. Customer payment still follows actual receipt plus the accepted payment term. A shipped order can therefore be unpaid.</p><p>Finance separates receivables, supplier payables, debt, stock and locked deposits. Scheduled cash movements include committed events only, not all future wages, overhead or new trading. The transaction journal explains each posting.</p><p>Bullet loans fund after 24 hours; annuity loans after 48 hours. Review repayment dates and interest before borrowing. Term deposits lock cash until maturity with no early withdrawal. Keep enough liquidity for wages, freight, materials and scheduled obligations.</p><p>Daily rent, energy standing charges, budgets and depreciation affect profit. Depreciation is not a cash payment. If a due payment lacks cash, the obligation remains and is retried.</p>`)}
+    ${section('reports', 'Reports and performance', '<p>Operational panels show live state. Reports show frozen snapshots taken at each midnight close, so today’s decisions may not appear in the chart yet.</p><p>Choose a measure and time window, select companies to compare, and open the exact-values table when you need precise numbers. Export CSV uses the selected report and time window. Daily sales and production are changes between closes; cash, inventory and cumulative measures describe each close.</p><p>Judge decisions across profit, cash, delivery service and carbon together. A high cash balance alone does not show whether customer promises are being met.</p>')}
+    ${section('messages', 'Messages, announcements and teamwork', '<p>Open <strong>Messages</strong> for one feed of instructor announcements, your team’s internal messages and conversations with the instructor. Each item names its conversation and sender.</p><p><strong>Show messages</strong> filters what you read. <strong>Send to</strong> chooses who receives your next message. Team messages stay inside your company; instructor conversations include your company and the instructor. Only instructors post class announcements.</p>')}
+    ${section('troubleshooting', 'When an action does not work', '<ul><li><strong>Disabled control:</strong> check stock, feature permissions, pending changes and whether the session has ended.</li><li><strong>Production stopped:</strong> check the active shift, limiting component, staffing, machine capacity, storage and cash.</li><li><strong>State changed:</strong> review the refreshed quote before retrying. A confirmation is required before treating a decision as accepted.</li><li><strong>Connection interrupted:</strong> keep the draft and use the pending-decision retry to avoid duplicating a commitment.</li><li><strong>Temporary test round:</strong> keep a test tab open. Test decisions are not saved as permanent classroom records.</li></ul>')}
+    ${isTeacher() ? section('instructor', 'Instructor controls and decision timing', '<p>Session control manages the clock, feature visibility, decision permissions and future catalogue conditions. Company previews are read-only. Use announcements for class-wide guidance and instructor conversations for company-specific discussion.</p><p><strong>Student decision timing</strong> lists accepted decisions with real UTC timestamps and simulation times. Open a student’s history or export CSV. A rapid pattern is flagged for review at 4 decisions within 2 seconds or 6 within 10 seconds. Timing alone does not prove AI use; the indicator never changes grades or access.</p>') : ''}
+    </div></div>`;
+}
 function reportsPage() {
   const [title, unit] = reportTypes[report];
   const snaps = reportSnapshots(reportRange);
-  return `<div class="advice"><strong>Daily reports are frozen at each midnight close.</strong>Last close: ${state.snapshots.length ? simDate(state.snapshots.at(-1).hour) : 'none yet'}. Live operations: ${simDate(state.hour)}. Each close includes that hour’s arrivals, production, demand, automation, costs, and depreciation.</div><div class="toolbar">${select('report', 'Measure', Object.entries(reportTypes).map(([k, [n]]) => [k, n]), report)}${select('range', 'Time window', [['7', 'Last 7 days'], ['30', 'Last 30 days'], ['180', 'Full session']], String(reportRange))}${button('report-csv', 'Export CSV', '', 'small')}</div>${panel(title, `${unit} · daily snapshots`, `<div class="toolbar">${state.companies.map(c => check(`series-${c.id}`, c.name, !selectedCompanies.size || selectedCompanies.has(c.id))).join('')}</div>${chart(report, unit, { selected: true, range: reportRange })}`)}${panel('Exact daily values', 'Accessible data table · one row per company per completed day', `<details data-view-key="report-values"><summary>Show report values</summary>${table(['As of (simulation)', 'Company', `${esc(title)} (${unit})`], reportRows(snaps, true).map(row => [sortCell(simDate(row[0]), row[0]), esc(row[1]), sortCell(reportValue(row[2], unit), row[2])]))}</details>`)}`;
+  return `<div class="advice"><strong>Daily reports are frozen at each midnight close.</strong>Last close: ${state.snapshots.length ? simDate(state.snapshots.at(-1).hour) : 'none yet'}. Live operations: ${simDate(state.hour)}. Each close includes that hour’s arrivals, production, demand, automation, costs, and depreciation.</div><div class="toolbar control-toolbar">${select('report', 'Measure', Object.entries(reportTypes).map(([k, [n]]) => [k, n]), report)}${select('range', 'Time window', [['7', 'Last 7 days'], ['30', 'Last 30 days'], ['180', 'Full session']], String(reportRange))}${button('report-csv', 'Export CSV', '', 'small')}</div>${panel(title, `${unit} · daily snapshots`, `<div class="toolbar">${state.companies.map(c => check(`series-${c.id}`, c.name, !selectedCompanies.size || selectedCompanies.has(c.id))).join('')}</div>${chart(report, unit, { selected: true, range: reportRange })}`)}${panel('Exact daily values', 'Accessible data table · one row per company per completed day', `<details data-view-key="report-values"><summary>Show report values</summary>${table(['As of (simulation)', 'Company', `${esc(title)} (${unit})`], reportRows(snaps, true).map(row => [sortCell(simDate(row[0]), row[0]), esc(row[1]), sortCell(reportValue(row[2], unit), row[2])]))}</details>`)}`;
 }
 function reportRows(snaps = state.snapshots, rawTime = false) { return snaps.flatMap(s => s.companies.filter(c => !selectedCompanies.size || selectedCompanies.has(c.id)).map(c => { const prev = state.snapshots.find(x => x.hour === s.hour - 24)?.companies.find(x => x.id === c.id); let n = report === 'dailySales' ? c.revenue - (prev?.revenue || 0) : report === 'dailyProduction' ? c.production - (prev?.production || 0) : c[report]; if (reportTypes[report][1] === 'EUR') n /= 100; return [rawTime ? s.hour : simDate(s.hour), c.name, n]; })); }
 function channelOptions() { return [['announcements', 'Instructor announcements'], ...(isTeacher() ? state.companies.map(c => [`teacher:${c.id}`, `Teacher ↔ ${c.name}`]) : [[`team:${actor.companyId}`, 'My team · internal'], [`teacher:${actor.companyId}`, 'Ask the instructor']])]; }
 function messagesPage() {
-  const options = channelOptions(); if (!options.some(x => x[0] === channel)) channel = options[0][0];
-  const messages = state.messages.filter(m => m.channel === channel);
-  const canSend = (state.status !== 'completed' || isTeacher()) && state.features.messaging.allowed && (isTeacher() || channel !== 'announcements');
-  return `<div class="toolbar">${select('channel', 'Conversation', options, channel)}<span class="form-note">Students can message their team or the instructor. Announcements are read-only for students.</span></div>${panel(esc(options.find(x => x[0] === channel)?.[1]), 'Sender identity comes from the signed-in account. Both clocks are labelled.', `<div class="messages" data-view-key="messages">${messages.map(m => `<article class="message ${m.role === 'instructor' ? 'teacher' : ''}"><div class="message-header">${esc(m.senderName)} · ${esc(m.role)}</div><p>${esc(m.text)}</p><small>Real time: ${new Date(m.realAt).toLocaleString('en-GB')} · Simulation: ${simDate(m.hour)}</small></article>`).join('') || '<p class="empty">Start a useful conversation. Messages are saved with this session.</p>'}</div>${canSend ? `<form id="message-form"><label>Your message<textarea name="text" maxlength="2000" placeholder="Share a decision, ask a question, or coordinate a next step…" required></textarea></label>${button('submit', channel === 'announcements' ? 'Post announcement' : 'Send message', '', 'primary')}<div class="error" role="alert"></div></form>` : '<p class="form-note">This conversation is read-only for your role or messaging is disabled.</p>'}`)}`;
+  const conversations = channelOptions(), options = [['all', 'All messages'], ...conversations];
+  if (!options.some(x => x[0] === channel)) channel = 'all';
+  const labels = new Map(conversations);
+  // The server already filters membership; also limit the feed to this role's channels.
+  const messages = state.messages.filter(m => labels.has(m.channel) && (channel === 'all' || m.channel === channel));
+  const recipients = conversations.filter(([id]) => isTeacher() || id !== 'announcements');
+  const recipient = recipients.some(([id]) => id === channel) ? channel : recipients[0]?.[0];
+  const canSend = (state.status !== 'completed' || isTeacher()) && state.features.messaging.allowed && !!recipient;
+  return `<div class="toolbar">${select('channel', 'Show messages', options, channel)}<span class="form-note">Announcements and conversations appear together. Only messages available to your account are shown.</span></div>${panel(esc(options.find(x => x[0] === channel)?.[1]), 'Each message names its conversation and sender. Real and simulation times are shown separately.', `<div class="messages" data-view-key="messages">${messages.map(m => `<article class="message ${m.role === 'instructor' ? 'teacher' : ''}"><div class="message-header"><strong>${esc(labels.get(m.channel))}</strong><span>${esc(m.senderName)} · ${esc(m.role)}</span></div><p>${esc(m.text)}</p><small>Real time: ${new Date(m.realAt).toLocaleString('en-GB')} · Simulation: ${simDate(m.hour)}</small></article>`).join('') || '<p class="empty">No messages in this view yet.</p>'}</div>${canSend ? `<form id="message-form">${select('recipient', 'Send to', recipients, recipient)}<p class="form-note">Your message goes only to the selected conversation. Only instructors can post announcements.</p><label>Your message<textarea name="text" maxlength="2000" placeholder="Share a decision, ask a question, or coordinate a next step…" required></textarea></label>${button('submit', 'Send message', '', 'primary')}<div class="error" role="alert"></div></form>` : '<p class="form-note">Messaging is read-only for your role or disabled.</p>'}`)}`;
+}
+const studentDecisionTypes = new Set(['offer', 'purchase', 'dispatch', 'shifts', 'staff', 'loan', 'deposit', 'energy', 'invest', 'reorder', 'budget']);
+function decisionTiming(audit = state?.audit || []) {
+  const players = new Map();
+  for (const entry of audit) {
+    if (entry.role !== 'student' || !entry.actorId || !studentDecisionTypes.has(entry.command?.type)) continue;
+    if (!players.has(entry.actorId)) players.set(entry.actorId, { id: entry.actorId, name: entry.actorName, companyId: entry.companyId, entries: [] });
+    const player = players.get(entry.actorId);
+    player.name = entry.actorName; player.companyId = entry.companyId;
+    player.entries.push({ ...entry, timestamp: Date.parse(entry.realAt) });
+  }
+  return [...players.values()].map(player => {
+    const timed = player.entries.filter(entry => Number.isFinite(entry.timestamp)).sort((a, b) => a.timestamp - b.timestamp);
+    let previous = null, minimumGap = null, rapidPairs = 0, peak2 = 0, peak10 = 0, start2 = 0, start10 = 0;
+    for (let i = 0; i < timed.length; i++) {
+      const entry = timed[i]; entry.gap = previous === null ? null : entry.timestamp - previous;
+      if (entry.gap !== null) { minimumGap = minimumGap === null ? entry.gap : Math.min(minimumGap, entry.gap); if (entry.gap < 1000) rapidPairs++; }
+      previous = entry.timestamp;
+      while (entry.timestamp - timed[start2].timestamp > 2000) start2++;
+      while (entry.timestamp - timed[start10].timestamp > 10000) start10++;
+      peak2 = Math.max(peak2, i - start2 + 1); peak10 = Math.max(peak10, i - start10 + 1);
+    }
+    return { ...player, timed, minimumGap, rapidPairs, peak2, peak10, review: peak2 >= 4 || peak10 >= 6, missing: player.entries.length - timed.length, latest: timed.at(-1)?.timestamp ?? null };
+  });
+}
+const timingSeconds = ms => ms == null ? '—' : `${new Intl.NumberFormat('en-GB', { maximumFractionDigits: 3 }).format(ms / 1000)} s`;
+function decisionTimingPanel() {
+  if (!isTeacher()) return '';
+  const players = decisionTiming();
+  return panel('Student decision timing', 'Potential automation indicator · instructor review only', `<p class="form-note">Accepted business decisions are recorded with the student identity, real date/time (UTC, including milliseconds), and simulation time. Menu clicks, messages, automatic production and deliveries are excluded.</p><div class="advice"><strong>Rapid timing is a review signal, not proof of AI use.</strong>Flagged when one student submits at least 4 accepted decisions within 2 seconds, or 6 within 10 seconds. Rapid manual entry, accessibility tools, shared accounts and network timing can also explain a burst. No flag does not rule out automation. These thresholds are heuristics, not a validated AI detector; no grades or access change.</div>${health?.demo || solo || testRoom ? '<p class="form-note">This is a demo or test round: timing may reflect generated setup data or agent-assisted testing.</p>' : ''}${table(['Student', 'Company', 'Decisions', 'Fastest gap', 'Gaps under 1 s', 'Most in 10 s', 'Potential automation', 'Latest decision (UTC)', ''], players.map(p => [esc(p.name || p.id), esc(state.companies.find(c => c.id === p.companyId)?.name || '—'), p.entries.length, sortCell(timingSeconds(p.minimumGap), p.minimumGap), p.rapidPairs, p.peak10, p.review ? '<span class="badge amber">Rapid pattern — review</span>' : p.timed.length < 4 ? 'Limited data' : 'No rapid pattern detected', sortCell(p.latest === null ? 'Unknown timestamp' : new Date(p.latest).toISOString(), p.latest), button('decision-timing', 'View decisions', p.id, 'small')]), 'No accepted student decisions yet. Students appear after their first business decision.')}${players.some(p => p.missing) ? '<p class="form-note">Some historical decisions have missing or invalid timestamps; they are listed but excluded from timing calculations.</p>' : ''}`, button('decision-timing-csv', 'Export decision timestamps', '', 'small', !players.length));
+}
+function decisionTimingRows(player) {
+  const entries = [...player.timed, ...player.entries.filter(entry => !Number.isFinite(entry.timestamp))];
+  return entries.map(entry => [entry.timestamp !== undefined && Number.isFinite(entry.timestamp) ? new Date(entry.timestamp).toISOString() : 'Unknown timestamp', simDate(entry.hour), entry.command.type, timingSeconds(entry.gap), entry.result]);
 }
 function adminPage() {
   if (!isTeacher()) return '';
-  return `<div class="grid2">${panel('The shared clock', 'Pause for discussion. Step for a decision round. Run for continuous play.', `<div class="clock-controls">${button('clock', state.status === 'running' ? 'Pause clock' : 'Run clock', state.status === 'running' ? 'paused' : 'running', 'primary', state.status === 'completed' || !!solo)}${button('step', '+ 1 hour', '1', '', state.status !== 'paused')}${button('step', '+ 1 day', '24', '', state.status !== 'paused')}${button('step', 'Custom step', 'custom', '', state.status !== 'paused')}</div><p class="form-note clock-note"><span>${solo ? 'Solo mode advances with manual steps.' : `<strong>Running speed:</strong> ${state.secondsPerHour} real seconds per simulation hour.`}</span><span>No time is skipped during server downtime.</span></p>${button('settings', 'Session settings', '', 'small')}`)}${panel('Classroom access', 'Every student belongs to one company in this session.', `<div class="toolbar">${button('roster', 'Companies & join codes', '', 'primary', !!solo)}${button('create', 'New session', '', '', !!solo || !!testRoom)}${button('sessions', 'Switch session', '', 'small', !!solo)}</div><p class="form-note">Company join codes grant student membership only. Instructor previews are read-only. Team messages are visible only to members of that company.</p>`)}</div>${panel('Teaching capabilities', 'Visibility controls navigation. Permission controls new decisions. Model effects are separate.', `<div class="toggle-row"><span>Feature</span><span>Visibility &nbsp; / &nbsp; Permission</span></div>${FEATURES.map(f => `<form class="toggle-row" data-feature="${f}"><span>${esc(f.charAt(0).toUpperCase() + f.slice(1))}</span><div class="toolbar">${check('visible', 'Show', state.features[f].visible)}${check('allowed', 'Allow decisions', state.features[f].allowed)}${button('submit', 'Apply', '', 'small')}</div><div class="error" role="alert"></div></form>`).join('')}<form id="effects-form" class="toggle-row"><span>Model effect</span><div class="toolbar">${check('carbonDemand', 'Customer preference for lower carbon', state.effects.carbonDemand)}${button('submit', 'Apply', '', 'small')}</div><div class="error" role="alert"></div></form>`)}${panel('Scenario catalogues', 'Change future supply, transport, demand, and energy conditions. Accepted contracts keep their terms.', `<div class="toolbar">${['suppliers', 'routes', 'markets', 'energy'].map(k => button('catalog-list', k.charAt(0).toUpperCase() + k.slice(1), k)).join('')}</div>`)}${panel('Upcoming outcomes across the class', 'Pending obligations remain visible beyond the configured end.', pendingEvents(10), button('events', 'All events', '', 'small'))}${panel('Audit trail', 'Accepted commands identify the actor and both clocks.', table(['Simulation / real time', 'Actor', 'Action', 'Result'], state.audit.slice(-30).reverse().map(a => [sortCell(`${simDate(a.hour)}<small>${new Date(a.realAt).toLocaleString('en-GB')}</small>`, a.hour), `${esc(a.actorName)}<small>${esc(a.role)}</small>`, esc(a.command.type), esc(a.result)])), button('replay', 'Export replay', '', 'small', !!solo || !!testRoom))}`;
+  return `<div class="grid2">${panel('The shared clock', 'Pause for discussion. Step for a decision round. Run for continuous play.', `<div class="clock-controls">${button('clock', state.status === 'running' ? 'Pause clock' : 'Run clock', state.status === 'running' ? 'paused' : 'running', 'primary', state.status === 'completed' || !!solo)}${button('step', '+ 1 hour', '1', '', state.status !== 'paused')}${button('step', '+ 1 day', '24', '', state.status !== 'paused')}${button('step', 'Custom step', 'custom', '', state.status !== 'paused')}</div><p class="form-note clock-note"><span>${solo ? 'Solo mode advances with manual steps.' : `<strong>Running speed:</strong> ${state.secondsPerHour} real seconds per simulation hour.`}</span><span>No time is skipped during server downtime.</span></p>${button('settings', 'Session settings', '', 'small')}`)}${panel('Classroom access', 'Every student belongs to one company in this session.', `<div class="toolbar">${button('roster', 'Companies & join codes', '', 'primary', !!solo)}${button('create', 'New session', '', '', !!solo || !!testRoom)}${button('sessions', 'Switch session', '', 'small', !!solo)}</div><p class="form-note">Company join codes grant student membership only. Instructor previews are read-only. Team messages are visible only to members of that company.</p>`)}</div>${panel('Teaching capabilities', 'Visibility controls navigation. Permission controls new decisions. Model effects are separate.', `<div class="toggle-row"><span>Feature</span><span>Visibility &nbsp; / &nbsp; Permission</span></div>${FEATURES.map(f => `<form class="toggle-row" data-feature="${f}"><span>${esc(f.charAt(0).toUpperCase() + f.slice(1))}</span><div class="toolbar">${check('visible', 'Show', state.features[f].visible)}${check('allowed', 'Allow decisions', state.features[f].allowed)}${button('submit', 'Apply', '', 'small')}</div><div class="error" role="alert"></div></form>`).join('')}<form id="effects-form" class="toggle-row"><span>Model effect</span><div class="toolbar">${check('carbonDemand', 'Customer preference for lower carbon', state.effects.carbonDemand)}${button('submit', 'Apply', '', 'small')}</div><div class="error" role="alert"></div></form>`)}${panel('Scenario catalogues', 'Change future supply, transport, demand, and energy conditions. Accepted contracts keep their terms.', `<div class="toolbar">${['suppliers', 'routes', 'markets', 'energy'].map(k => button('catalog-list', k.charAt(0).toUpperCase() + k.slice(1), k)).join('')}</div>`)}${panel('Upcoming outcomes across the class', 'Pending obligations remain visible beyond the configured end.', pendingEvents(10), button('events', 'All events', '', 'small'))}${decisionTimingPanel()}${panel('Audit trail', 'Accepted commands identify the actor and both clocks.', table(['Simulation / real time', 'Actor', 'Action', 'Result'], state.audit.slice(-30).reverse().map(a => [sortCell(`${simDate(a.hour)}<small>${new Date(a.realAt).toLocaleString('en-GB')}</small>`, a.hour), `${esc(a.actorName)}<small>${esc(a.role)}</small>`, esc(a.command.type), esc(a.result)])), button('replay', 'Export replay', '', 'small', !!solo || !!testRoom))}`;
 }
 function modal(title, content, onSubmit, submitLabel = 'Confirm') {
   dialog.innerHTML = `<div class="dialog-toolbar"><span data-dialog-theme-slot></span><button class="close" data-action="close" aria-label="Close dialog">×</button></div><h2 id="dialog-title">${esc(title)}</h2>${onSubmit ? `<form id="modal-form">${content}<div class="error" role="alert"></div><div class="form-actions">${button('close', 'Cancel')}${button('submit', submitLabel, '', 'primary')}</div></form>` : content}`;
@@ -1036,14 +1110,10 @@ async function action(name, id) {
     const admin = isTeacher();
     const destinationAction = admin ? 'nav' : 'panel';
     if (tool.channel) {
-      channel = workspaceChannel(tool) || 'announcements';
+      channel = 'all';
       return action('nav', 'messages');
     }
     if (tool.page) return action('nav', tool.page);
-    if (id === 'help') {
-      modal('Help', '<p>Hover over an icon or focus it with the keyboard to see what it does. Open a category to choose a tool.</p><div class="workspace-tool-choices">' + button('nav', 'Go to overview', 'overview') + '</div>');
-      return;
-    }
     const destinations = workspaceDestinations(tool, admin, workspaceFeatureVisible);
     if (destinations.length === 1) return action(destinationAction, destinations[0]);
     if (destinations.length > 1) {
@@ -1054,6 +1124,18 @@ async function action(name, id) {
   }
   const c = company();
   if (name === 'submit') return;
+  if (name === 'decision-timing' || name === 'decision-timing-csv') {
+    if (!isTeacher()) return;
+    const players = decisionTiming();
+    if (name === 'decision-timing-csv') {
+      csv('student-decision-timestamps.csv', [['Student ID', 'Student', 'Company', 'Real time (UTC)', 'Simulation time (UTC)', 'Decision', 'Gap since previous decision', 'Result'], ...players.flatMap(p => decisionTimingRows(p).map(row => [p.id, p.name, state.companies.find(c => c.id === p.companyId)?.name || '', ...row]))]);
+    } else {
+      const player = players.find(p => p.id === id); if (!player) return;
+      const entries = [...player.timed, ...player.entries.filter(entry => !Number.isFinite(entry.timestamp))];
+      modal(`Decision history · ${esc(player.name || player.id)}`, `<p class="form-note">Real timestamps are recorded when decisions are accepted. Gaps compare this student's accepted business decisions only. Review the decisions in context before drawing conclusions about automation.</p>${table(['Real time (UTC)', 'Simulation time', 'Decision', 'Gap since previous', 'Result'], decisionTimingRows(player).map((row, i) => [sortCell(esc(row[0]), Number.isFinite(entries[i].timestamp) ? entries[i].timestamp : null), sortCell(esc(row[1]), entries[i].hour), esc(row[2]), sortCell(esc(row[3]), entries[i].gap ?? null), esc(row[4])]), 'No decisions.', `timing-${player.id}`)}`);
+    }
+    return;
+  }
   if (name === 'profile') { modal('My profile & statistics', '<p><strong>' + esc((user || actor).name) + '</strong></p><p>' + esc((user || actor).role) + '</p><p>' + sessions.length + ' classroom sessions · ' + sessions.filter(s => s.status === 'completed').length + ' completed</p>'); return; }
   if (name === 'copy-session') { const link = new URL(location.href); link.search = ''; link.hash = ''; link.searchParams.set('session', id); try { await navigator.clipboard.writeText(link.href); toast('Session link copied. Sign-in and membership are still required.'); } catch { modal('Copy session link', field('link', 'Select and copy this link', link.href, 'url', 'readonly')); } return; }
   if (name === 'test-leave') { leaveTest(); return; }
@@ -1090,15 +1172,17 @@ async function action(name, id) {
   if (shortcut) id = shortcut;
   if (shortcut || name === 'panel' || name === 'close-panel') {
     if (isTeacher() || !Object.hasOwn(studentPanels, id)) return;
-    if (name === 'close-panel' || (name === 'panel' && page === 'workspace' && openPanels.has(id))) openPanels.delete(id);
-    else openPanels.add(id);
+    if (name === 'close-panel' || (name === 'panel' && page === 'workspace' && openPanels.has(id) && selectedPanel === id)) {
+      openPanels.delete(id);
+      if (selectedPanel === id) selectedPanel = [...openPanels].filter(key => studentPanelVisible(key, workspaceFeatureVisible)).at(-1) || null;
+    } else { openPanels.add(id); selectedPanel = id; }
     page = 'workspace';
     render();
     (root.querySelector('#pane-' + id) || root.querySelector('.page-heading h1'))?.focus();
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=6d9f06df8dd2')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=0d6599abb79c')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -1200,7 +1284,7 @@ document.addEventListener('submit', async event => {
     if (form.id === 'shifts-form') { await command({ type: 'shifts', shifts: [0, 1, 2].map(i => f.has(`shift${i}`)) }); render(); }
     if (form.id === 'effects-form') { await command({ type: 'configure', carbonDemand: f.has('carbonDemand') }); render(); }
     if (form.dataset.feature) { await command({ type: 'configure', feature: form.dataset.feature, visible: f.has('visible'), allowed: f.has('allowed') }); render(); }
-    if (form.id === 'message-form') { await command({ type: 'message', channel, text: f.get('text') }); render(); }
+    if (form.id === 'message-form') { await command({ type: 'message', channel: f.get('recipient') || channel, text: f.get('text') }); render(); }
   } catch (e) { reportFormError(form, e); }
   finally { submittingForms.delete(form); if (submit) submit.disabled = false; }
 });
@@ -1224,14 +1308,23 @@ document.addEventListener('change', async event => {
     if (target.name === 'preview') { preview = target.value || undefined; page = 'overview'; await load(); }
     if (target.name === 'report') { report = target.value; render(); }
     if (target.name === 'range') { reportRange = Number(target.value); render(); }
-    if (target.name === 'channel') { channel = target.value; render(); }
+    if (target.name === 'channel') {
+      const draft = root.querySelector('#message-form textarea')?.value, recipient = root.querySelector('#message-form [name=recipient]')?.value;
+      channel = target.value; render();
+      const textarea = root.querySelector('#message-form textarea'), choice = root.querySelector('#message-form [name=recipient]');
+      if (textarea && draft) {
+        textarea.value = draft;
+        if (choice && [...choice.options].some(option => option.value === recipient)) choice.value = recipient;
+      }
+      root.querySelector('[name=channel]')?.focus();
+    }
     if (target.name?.startsWith('series-')) { if (!selectedCompanies.size) selectedCompanies = new Set(state.companies.map(c => c.id)); if (target.checked) selectedCompanies.add(target.name.slice(7)); else selectedCompanies.delete(target.name.slice(7)); if (!selectedCompanies.size) { selectedCompanies.add(target.name.slice(7)); toast('Keep at least one company selected to display the report.'); } render(); }
   } catch (e) { toast(e.message); }
 });
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=6d9f06df8dd2')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    try { const client = (await import('./src/test-client.mjs?v=0d6599abb79c')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p><div class="toolbar">' + (e.status === 403 ? button('retry-start', 'Try again', '', 'primary') : '') + button('test-leave','Return to classroom') + '</div></main>'; }
     return;
   }
