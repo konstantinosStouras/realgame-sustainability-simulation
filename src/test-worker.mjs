@@ -1,4 +1,4 @@
-import { TestClassroom } from './test-classroom.mjs?v=0d6599abb79c';
+import { TestClassroom } from './test-classroom.mjs?v=23a5dc7bcda2';
 
 const rooms = new Map();
 const subscriptions = new Map();

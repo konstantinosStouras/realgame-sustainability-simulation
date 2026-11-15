@@ -306,3 +306,17 @@ body .deadline-exact { font-weight: 700; }
 /* Keep quantities and their status labels distinct; separate actions from facts. */
 .quantity-status { display: inline-flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
 .value-list + .toolbar { margin-top: 20px; }
+
+/* Instructor feature settings share columns, including validation messages. */
+.toggle-row { display: grid; grid-template-columns: minmax(9rem, 1fr) minmax(0, 25rem); gap: 12px 24px; }
+.toggle-row > .toolbar { display: grid; grid-template-columns: 6rem minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%; }
+.toggle-row > .toolbar > label { min-width: 0; }
+.toggle-row > .toolbar > button { min-width: 72px; }
+.toggle-row > .error { grid-column: 2; margin: 0; }
+.toggle-row > .error:empty { display: none; }
+#effects-form > .toolbar > label { grid-column: 1 / 3; }
+@media (max-width: 700px) {
+  .toggle-row { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .toggle-row > .error { grid-column: 1; }
+  .toggle-row > .toolbar { grid-template-columns: 5rem minmax(0, 1fr) auto; gap: 10px; }
+}
