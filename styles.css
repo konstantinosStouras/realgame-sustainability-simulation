@@ -140,7 +140,7 @@
   box-shadow: 0 3px 10px #173a311c;
   background: white;
 }
-.student-pane:has(#pane-production, #pane-finance, #pane-energy) { grid-column: 1 / -1; }
+.student-pane:has(#pane-production, #pane-finance, #pane-energy, #pane-messages) { grid-column: 1 / -1; }
 .pane-title {
   display: flex;
   align-items: center;
