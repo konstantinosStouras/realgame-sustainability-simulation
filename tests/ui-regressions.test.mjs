@@ -191,6 +191,50 @@ test('unified messages show all authorized conversations and label recipients se
   assert.doesNotMatch(teacher,/<p>Team discussion<\/p>|Private other team/);
 });
 
+test('instructor formatting renders for students while student text stays literal', () => {
+  const h = harness();
+  h.run(`actor={id:'s',role:'student',companyId:'c1'};state.status='paused';state.features={messaging:{allowed:true}};state.companies=[{id:'c1',name:'One'}];channel='all';
+    state.messages=[{channel:'announcements',text:'**Review** your *plan*',role:'instructor'},{channel:'team:c1',text:'**literal**',role:'student'}].map(m=>({...m,senderName:'Test',hour:24,realAt:'2026-01-02T00:00:00Z'}));`);
+  const html = h.run('messagesPage()');
+  assert.match(html, /<strong>Review<\/strong> your <em>plan<\/em>/);
+  assert.match(html, /<p>\*\*literal\*\*<\/p>/);
+  assert.doesNotMatch(html, /data-ready-message|data-message-tool/);
+  h.run("actor.role='instructor'");
+  assert.match(h.run('messagesPage()'), /data-ready-message="3"/);
+});
+
+test('message formatting supports blocks, images and links without executing supplied HTML or URLs', () => {
+  const h = harness(), render = text => h.run(`renderMessageText(${JSON.stringify(text)})`);
+  const html = render('# Heading\n## Smaller\n### Smallest\n> Quote\n- One\n- Two\n1. First\n2. Second\n\n| Topic | Next |\n| --- | --- |\n| **Plan** | Review |');
+  for (const tag of ['h3', 'h4', 'h5', 'blockquote', 'ul', 'ol', 'table', 'strong']) assert.ok(html.includes(`<${tag}>`), tag);
+  assert.match(render('***Both*** ~~old~~'), /<strong><em>Both<\/em><\/strong> <s>old<\/s>/);
+  assert.match(render('[Meet](https://example.com/meeting)'), /rel="noopener noreferrer"/);
+  assert.match(render('![Diagram](https://example.com/image.png)'), /<img.*alt="Diagram".*referrerpolicy="no-referrer"/);
+  for (const text of ['<script>alert(1)</script>', '<img src=x onerror=alert(1)>', '[click](javascript:alert)', '![x](data:image/svg+xml,test)', '[x](vbscript:test)', '[x](https://user:pass@example.com/)']) {
+    assert.doesNotMatch(render(text), /<(?:script|img|a)\b/);
+  }
+  assert.match(render('[x](https://example.com/"onclick="test)'), /&quot;onclick=&quot;/);
+});
+
+test('format controls edit selected text, ready messages append, and oversized inserts preserve drafts', () => {
+  const h = harness(); h.context.Event = Event;
+  const input = { value: 'Review plan', selectionStart: 7, selectionEnd: 11, maxLength: 2000,
+    setRangeText(text, start, end) { this.value = this.value.slice(0, start) + text + this.value.slice(end); this.selectionStart = this.selectionEnd = start + text.length; },
+    setSelectionRange(start, end) { this.selectionStart=start; this.selectionEnd=end; }, focus() {}, dispatchEvent() {} };
+  const error = {textContent:''}, preview = {hidden:true,innerHTML:''};
+  const form = { querySelector: s => s === 'textarea' ? input : s === '.error' ? error : preview };
+  h.context.control = {dataset:{messageTool:'bold'},closest:()=>form,setAttribute(){}};
+  h.run('editMessage(control)'); assert.equal(input.value, 'Review **plan**');
+  h.context.control.dataset = {readyMessage:'1'};
+  h.run('editMessage(control)'); assert.equal(input.value, 'Review **plan**\n\nClock will be stopped in 10 minutes');
+  h.context.control.dataset = {messageTool:'preview'};
+  h.run('editMessage(control)'); assert.equal(preview.hidden,false); assert.match(preview.innerHTML, /<strong>plan<\/strong>/);
+  input.value='x'.repeat(1999); h.context.control.dataset={readyMessage:'0'};
+  h.run('editMessage(control)'); assert.equal(input.value.length,1999); assert.match(error.textContent,/2,000/);
+  input.value='Heading';input.selectionStart=0;input.selectionEnd=7;h.context.control.dataset={messageTool:'h1'};
+  h.run('editMessage(control)');assert.equal(input.value,'# Heading');
+});
+
 test('message submission uses the selected recipient rather than the all-messages filter', async () => {
   const h=harness();h.form.values.push(['recipient','teacher:c1']);h.run("channel='all';command=async c=>{globalThis.sent=c;}");
   await h.handlers.submit({target:h.form,preventDefault(){}});
