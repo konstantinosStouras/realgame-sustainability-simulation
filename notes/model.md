@@ -10,6 +10,8 @@ Pause for decisions and discussion, step the simulation, then inspect outcomes. 
 
 ### Clock speed presets
 
+New sessions start paused at **40 s/h**, the introductory **Very slow** preset. Existing sessions keep their saved speed. Test rounds copied from a session retain that session's configured speed.
+
 The six teaching presets cover 6–45 real seconds per simulation hour (s/h). Lower values run the simulation faster. Each button sets the band's midpoint, rounded to the nearest whole second with halves rounded up, without changing whether the clock is running or paused.
 
 | Band | Range (s/h) | Button sets (s/h) |

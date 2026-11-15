@@ -43,7 +43,7 @@ test('simulated students keep message identity and team privacy; instructor sees
 });
 test('shared test clock advances once and closure freezes student decisions', () => {
   const {room}=fixture(),[teacher,student]=room.people;
-  room.command(teacher.key,{key:'start-clock',revision:0,command:{type:'clock',status:'running'}},0);
+  room.command(teacher.key,{key:'start-clock',revision:0,command:{type:'clock',status:'running',secondsPerHour:4}},0);
   room.advance(8000);room.advance(8000);assert.equal(room.state.hour,2);
   room.command(teacher.key,{key:'close-clock',revision:room.state.revision,command:{type:'closeSession'}},8000);
   room.advance(12000);assert.equal(room.state.hour,2);

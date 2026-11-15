@@ -94,7 +94,7 @@ export function createSession({ id = 'session', name = 'The circular economy cha
     }
   }
   if (!Array.isArray(companyNames) || companyNames.length < 1 || companyNames.length > 12) fail('Choose 1–12 companies.');
-  const s = { id, name: cleanText(name, 'Session name'), schema: VERSION, seed, rng: seed >>> 0, sequence: 0, revision: 0, hour: 0, startDate: '2026-01-01T00:00:00.000Z', endHour: days * 24, status: 'paused', secondsPerHour: 4, features: Object.fromEntries(FEATURES.map(f => [f, { visible: true, allowed: true }])), effects: { carbonDemand: true }, catalog: catalog(), companies: [], events: [], snapshots: [], messages: [], audit: [] };
+  const s = { id, name: cleanText(name, 'Session name'), schema: VERSION, seed, rng: seed >>> 0, sequence: 0, revision: 0, hour: 0, startDate: '2026-01-01T00:00:00.000Z', endHour: days * 24, status: 'paused', secondsPerHour: 40, features: Object.fromEntries(FEATURES.map(f => [f, { visible: true, allowed: true }])), effects: { carbonDemand: true }, catalog: catalog(), companies: [], events: [], snapshots: [], messages: [], audit: [] };
   s.recipe = { ...RECIPE };
   s.accounting = { revenueAt, dailyCorporateOverhead };
   if (dailyEnergyOverhead) s.accounting.dailyEnergyOverhead = dailyEnergyOverhead;

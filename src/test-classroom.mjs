@@ -1,5 +1,5 @@
-import { createSession, applyCommand, tick, publicView, assertInvariants, fail } from './engine.mjs?v=291b7568f6f7';
-import { typingPresence } from './typing-presence.mjs?v=291b7568f6f7';
+import { createSession, applyCommand, tick, publicView, assertInvariants, fail } from './engine.mjs?v=f4c8a67c79de';
+import { typingPresence } from './typing-presence.mjs?v=f4c8a67c79de';
 
 // This model is held only by a SharedWorker. No storage, network or Firebase APIs.
 export class TestClassroom {
@@ -8,7 +8,7 @@ export class TestClassroom {
     if (groups.some(g => !Number.isInteger(g.students) || g.students < 1 || g.students > 20) || groups.reduce((n,g) => n + g.students, 0) > 60) fail('Choose 1–20 students per company, up to 60 in total.');
     this.state = createSession({ ...template, id: uuid(), name: ('Test · ' + template.name).slice(0,120), companyNames: groups.map(g => g.name) });
     for (const key of ['features', 'effects', 'catalog', 'recipe']) if (template[key]) this.state[key] = structuredClone(template[key]);
-    this.state.secondsPerHour = template.secondsPerHour || 4;
+    this.state.secondsPerHour = template.secondsPerHour ?? this.state.secondsPerHour;
     this.state.isTest = true;
     this.people = [{ id: uuid(), name: 'Test instructor', role: 'instructor', companyId: null, key: uuid() }];
     this.state.companies.forEach((company, i) => {

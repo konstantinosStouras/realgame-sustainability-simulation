@@ -11,7 +11,8 @@ function fixture() {
 }
 async function start(store) {
   const session = await store.create(teacher);
-  await store.command(teacher, session.id, { key: 'start-clock-key-' + session.id, revision: 0, command: { type: 'clock', status: 'running' } });
+  // These elapsed-time scenarios intentionally run at 4 s/h, independently of the creation default.
+  await store.command(teacher, session.id, { key: 'start-clock-key-' + session.id, revision: 0, command: { type: 'clock', status: 'running', secondsPerHour: 4 } });
   return session.id;
 }
 
