@@ -391,3 +391,43 @@ body .deadline-exact { font-weight: 700; }
   dialog .form-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   dialog .form-actions > button { width: 100%; min-width: 0; overflow-wrap: normal; }
 }
+
+/* Give page actions their own breathing room beneath the introduction. */
+.page-heading { gap: 24px; margin-bottom: 32px; }
+.page-heading p + button { margin-top: 20px; }
+.admin-home .page-heading { margin-bottom: 32px; }
+
+/* Stack clock facts explicitly: inline shift and state badges must not touch. */
+.timebox {
+  display: flex; flex-direction: column; align-items: flex-start;
+  justify-content: flex-start; gap: 10px; padding: 18px 20px;
+  flex: 0 1 360px; min-width: 0; max-width: 100%; line-height: 1.5;
+}
+.timebox > * { max-width: 100%; margin: 0; }
+.timebox :is(.badge, .shift-status) { white-space: normal; overflow-wrap: anywhere; }
+.timebox small { display: block; }
+.timebox .shift-indicator { align-self: stretch; justify-content: flex-start; gap: 10px; }
+.timebox strong { line-height: 1.5; }
+
+/* Consistent separation in action groups, including their wrapped rows. */
+.instructor-links, .clock-speed-bands, .message-format-toolbar, .demo-choices { gap: 12px; }
+.workspace-tools { gap: 8px; }
+.mode-banner { flex-wrap: wrap; gap: 12px; padding-block: 14px; }
+.mode-banner > span { flex: 1 1 320px; min-width: 0; max-width: 100%; }
+.mode-banner > button { flex-shrink: 0; }
+.topbar { height: auto; min-height: 78px; }
+.toolbar > *, .form-actions > * { min-width: 0; max-width: 100%; }
+.panel-head > :is(button, .button), .pane-title > button { flex-shrink: 0; }
+.pane-content .panel-head { gap: 16px; margin-bottom: 16px; }
+dialog > .table-wrap + :is(button, .button) { margin-top: 20px; }
+
+@media (max-width: 760px) {
+  .page-heading { gap: 20px; }
+  .timebox { flex-basis: auto; width: 100%; }
+}
+@media (max-width: 480px) {
+  .clock-controls, .session-actions, dialog .form-actions { gap: 12px; }
+  .toggle-row > .toolbar { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  #effects-form > .toolbar > label { grid-column: auto; }
+  .toggle-row > .toolbar > button { justify-self: start; }
+}
