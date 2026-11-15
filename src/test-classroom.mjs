@@ -1,7 +1,7 @@
-import { createSession, applyCommand, tick, publicView, assertInvariants, fail } from './engine.mjs?v=f4c8a67c79de';
-import { typingPresence } from './typing-presence.mjs?v=f4c8a67c79de';
+import { createSession, applyCommand, tick, publicView, assertInvariants, fail } from './engine.mjs?v=fd6e2cc6ab75';
+import { typingPresence } from './typing-presence.mjs?v=fd6e2cc6ab75';
 
-// This model is held only by a SharedWorker. No storage, network or Firebase APIs.
+// Shared simulation model; durable snapshots are managed by the worker.
 export class TestClassroom {
   constructor(template, groups, uuid = () => crypto.randomUUID()) {
     if (!Array.isArray(groups) || groups.length < 1 || groups.length > 12) fail('Choose 1–12 companies.');
@@ -15,6 +15,18 @@ export class TestClassroom {
       for (let j = 0; j < groups[i].students; j++) this.people.push({ id: uuid(), name: `Test student ${i + 1}.${j + 1}`, role: 'student', companyId: company.id, key: uuid() });
     });
     this.receipts = new Map(); this.nextTick = null;
+  }
+  snapshot() {
+    return structuredClone({state:this.state, people:this.people, receipts:[...this.receipts], metadata:this.metadata || {}});
+  }
+  static restore(snapshot) {
+    const room = Object.create(TestClassroom.prototype);
+    Object.assign(room, structuredClone(snapshot));
+    room.receipts = new Map(snapshot.receipts);
+    room.nextTick = null;
+    // Time away must not consume the testing scenario.
+    if (room.state.status === 'running') { room.state.status = 'paused'; room.state.revision++; }
+    return room;
   }
   actor(key) { const person = this.people.find(p => p.key === key); if (!person) fail('This test tab link is invalid.', 403); const { key: _, ...actor } = person; return actor; }
   requireAccess(actor) {

@@ -7,27 +7,27 @@ import vm from 'node:vm';
 test('worker pushes changes and terminal events only to authorized room ports', async () => {
   const source = (await readFile(new URL('../src/test-worker.mjs', import.meta.url),'utf8')).replace(/^import [^\n]*\n/, '');
   let tick;
-  const context = vm.createContext({onconnect:null, setInterval:fn=>{tick=fn;}, Date});
-  vm.runInContext(source + '\nglobalThis.roomMap = rooms;', context);
-  const room = {state:{revision:0}, actor:key=>{if(key !== 'allowed') throw new Error('Denied');}, view:()=>({}), command(){this.state.revision++; return {};}, roster:()=>[], advance(){this.state.revision++;}};
+  const context = vm.createContext({onconnect:null, setInterval:fn=>{tick=fn;}, Date, structuredClone});
+  vm.runInContext(source + '\n storage = async () => undefined; globalThis.roomMap = rooms;', context);
+  const room = {state:{revision:0,status:'running'}, snapshot(){return structuredClone({state:this.state});}, actor:key=>{if(key !== 'allowed') throw new Error('Denied');}, view:()=>({}), command(){this.state.revision++; return {};}, roster:()=>[], advance(){this.state.revision++;}};
   context.roomMap.set('fixture',room);
-  function port(key='allowed',roomId='fixture') {
+  async function port(key='allowed',roomId='fixture') {
     const messages=[];
     const p={postMessage:m=>messages.push(m),start(){},close(){}};
     context.onconnect({ports:[p]});
     const send=action=>p.onmessage({data:{requestId:action,action,roomId,key}});
-    send('view'); messages.length=0;
+    await send('view'); messages.length=0;
     return {messages,send};
   }
-  const a=port(), b=port(), denied=port('denied'), other=port('allowed','other');
-  a.send('command');
+  const a=await port(), b=await port(), denied=await port('denied'), other=await port('allowed','other');
+  await a.send('command');
   assert.equal(b.messages.at(-1).event,'changed');
   assert.equal(denied.messages.length,0); assert.equal(other.messages.length,0);
-  tick(); assert.equal(b.messages.filter(m=>m.event==='changed').length,2);
-  a.send('end');
+  await tick(); assert.equal(b.messages.filter(m=>m.event==='changed').length,2);
+  await a.send('end');
   assert.equal(b.messages.at(-1).event,'ended'); assert.equal(context.roomMap.size,0);
-  b.send('view'); assert.equal(b.messages.at(-1).status,410);
-  tick(); assert.equal(b.messages.filter(m=>m.event==='changed').length,2);
+  await b.send('view'); assert.equal(b.messages.at(-1).status,410);
+  await tick(); assert.equal(b.messages.filter(m=>m.event==='changed').length,2);
 });
 
 test('client dispatches notifications separately from request responses and disconnects cleanly', async () => {

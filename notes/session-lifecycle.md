@@ -1,4 +1,4 @@
-# Session actions and temporary test classrooms
+# Session actions and saved test classrooms
 
 The instructor session cards use **Open**, **Copy link**, **Export data**, **Test**, **Close**, and **Delete**. Every action has a hover/focus description, including its effect on students. Company codes and bulk deletion also have descriptions.
 
@@ -11,13 +11,13 @@ The instructor session cards use **Open**, **Copy link**, **Export data**, **Tes
 
 ## Test workflow
 
-1. Select **Test** on an active or past session.
+1. Select **Test** on an active or past session to resume a saved test or create another. **Saved test sessions** on the admin home also lists tests independently of the source session.
 2. Choose 1–12 companies and their names, then 1–20 simulated students per company (60 total maximum). Every student belongs to exactly one company. A 2/3/1 allocation creates six independent student identities across three competing companies.
 3. The test starts paused at hour zero with the scenario setup. Use **Open test student tabs** to open each identity separately. All tabs must use the same browser profile and website origin.
 4. Play the student roles manually. Teammates share economic state; the instructor sees company results and the correct actor in the audit. Student permissions and message privacy still apply. These are simulated identities, not autonomous bots.
-5. **End test round** immediately discards the state and disconnects its tabs. Closing all test tabs also releases the shared worker; there is no recovery after it is discarded. Leaving just one tab does not end the other students' work.
+5. Close tabs or choose **Leave test** to keep the saved classroom. Use **Resume test** to continue later, including after restarting the browser. **Delete test session** requires confirmation and permanently removes that test and its synthetic students.
 
-A module SharedWorker holds the simulation, identities, clock and retry receipts in memory. Test tabs bypass Firebase authentication, health requests and classroom API calls. They do not write test state to localStorage, sessionStorage, IndexedDB, Firestore or Firebase Authentication. Normal theme preferences are independent of test data. Test links contain temporary identifiers in their fragment; they are not real student sign-ins. An instructor can explicitly download report data using the existing export controls, but there is no automatic saving.
+A module SharedWorker coordinates test tabs and saves full simulation snapshots, synthetic identities and retry receipts in IndexedDB before acknowledging decisions. Saved test sessions are listed in the instructor workspace and under each source session’s Test action. Reopening restores the same student links and pauses the simulation clock without advancing for time away. Leaving or closing tabs does not delete data; Delete test session explicitly removes the snapshot and disconnects student tabs. Test data stays in the same browser profile and is not sent to Firebase. Clearing site data removes it. Existing memory-only rounds created before this update cannot be recovered after their worker exits.
 
 The browser must support module SharedWorkers. Unsupported browsers show an explanatory error. Test links are for the current browser profile, not for distribution to real students on other devices.
 
@@ -36,3 +36,5 @@ Verification for this change uses mocked message ports and a stub UI only. No ne
 Firebase classrooms now hold an authenticated, bounded update request backed by a Firestore metadata listener. A committed revision wakes connected student and instructor tabs immediately; reconnects include the last observed revision. The existing state API still controls visibility and transaction authorization. Closed/deleted sessions clear student views and decision dialogs and invalidate pending reads; the transaction rejects subsequent student decisions before reading economic state or prior receipts. Active decision drafts are preserved on ordinary updates; closure always overrides them. Suspended tabs refresh when visible. Polling remains a recovery fallback.
 
 Listeners are removed on change, disconnect, error or a 25-second idle timeout. No client Firestore permissions were opened. Protocol-only mock checks cover notification, cleanup, authorization, reconnects, stale responses, closure UI and rejected post-closure commands; no accounts or simulation data were created.
+
+Persistence regression checks cover worker restart, retained identities and purchases, retry receipts, instructor-only deletion, source filtering, and rollback after storage failure.
