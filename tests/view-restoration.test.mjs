@@ -1,3 +1,4 @@
+import { operationalReports, buildOperationalReport, businessUpdates } from '../src/operational-reports.mjs';
 import { createMessageSounds } from '../src/message-sounds.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,7 +13,7 @@ function setup(values = new Map(), { id = 'teacher', sessionId = 'class-one', un
   const storage = { getItem: k => values.get(k) ?? null, setItem: (k,v) => { if(unavailable) throw new Error('Storage blocked'); values.set(k,v); } };
   const root = { innerHTML: '' }, requests = [];
   const location = { hostname: 'localhost', href: 'https://example.test/simulation/?session=' + sessionId };
-  const context = vm.createContext({ createMessageSounds, ...engine, URL, URLSearchParams, location, history: { replaceState: (_,__,href) => { location.href=href; } },
+  const context = vm.createContext({ operationalReports, buildOperationalReport, businessUpdates, createMessageSounds, ...engine, URL, URLSearchParams, location, history: { replaceState: (_,__,href) => { location.href=href; } },
     localStorage: storage, sessionStorage: storage, classroomBackend: '', firebaseConfig: {},
     document: { querySelector: s => s === '#app' ? root : { open: false }, addEventListener() {}, activeElement: { closest: () => null } },
     testView: {actor:teacher,state:engine.publicView(session,teacher)},
@@ -36,6 +37,17 @@ test('refresh restores every instructor page and company preview before the firs
       assert.doesNotMatch(refreshed.root.innerHTML,/firebase-login-form/);
     }
   }
+});
+
+test('panel sizes and order survive refresh without storing simulation records', async () => {
+  const original = setup(new Map(), {role:'student'}); await original.run('enter()');
+  original.run("page='workspace';openPanels.add('inventory');openPanels.add('report-orders');panelLayouts.set('inventory',{width:750,height:480});panelLayouts.set('report-orders',{full:true});render();");
+  const refreshed = setup(original.values, {role:'student'}); await refreshed.run('enter()');
+  assert.equal(refreshed.run("panelLayouts.get('inventory').width"),750);
+  assert.equal(refreshed.run("panelLayouts.get('inventory').height"),480);
+  assert.equal(refreshed.run("panelLayouts.get('report-orders').full"),true);
+  assert.equal(refreshed.run('[...openPanels].join()'),'inventory,report-orders');
+  assert.match(refreshed.root.innerHTML,/data-pane-resize="width"/);
 });
 
 test('refresh retains report and conversation selections without caching classroom data', async () => {

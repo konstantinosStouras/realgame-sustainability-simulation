@@ -1,3 +1,4 @@
+import { operationalReports, buildOperationalReport, businessUpdates } from '../src/operational-reports.mjs';
 import { createMessageSounds } from '../src/message-sounds.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -47,7 +48,7 @@ function harness() {
     ui.submit = element('button', { 'data-action': 'submit' }, ui.form);
     ui.orders = model.orders.map(id => element('button', { 'data-action': 'dispatch', 'data-id': id }, element('tr', {}, ui.table)));
   } });
-  const context = vm.createContext({ createMessageSounds, ...engine, document, localStorage: storage(), sessionStorage: storage(),
+  const context = vm.createContext({ operationalReports, buildOperationalReport, businessUpdates, createMessageSounds, ...engine, document, localStorage: storage(), sessionStorage: storage(),
     location: { hostname: 'localhost' }, firebaseConfig: {}, classroomBackend: '', URL, AbortSignal,
     crypto: { randomUUID: () => 'unique-request' }, FormData: class extends Map { constructor(form) { super(form.values); } }, setTimeout: () => 1, clearTimeout() {} });
   vm.runInContext(source, context);

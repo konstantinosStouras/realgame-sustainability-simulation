@@ -175,7 +175,7 @@ dialog .dialog-toolbar .close{position:static;min-width:44px;flex-shrink:0}
   --action-shadow:0 1px 2px #0002;
 }
 /* Specificity matches legacy theme rules so all action surfaces use these tokens. */
-:is(:root[data-theme],:root:not([data-theme])) body :is(button,.button):not(:where(.workspace-tools *, .nav *, .pane-title *, .account-dropdown *, .studio-google, .studio-reset, .theme-toggle, .close)) {
+:is(:root[data-theme],:root:not([data-theme])) body :is(button,.button):not(:where(.workspace-tools *, .workspace-flyout *, .workspace-submenu *, .nav *, .pane-title *, .account-dropdown *, .studio-google, .studio-reset, .theme-toggle, .close)) {
   min-height:44px; max-width:100%; padding:11px 16px;
   border:1px solid var(--action-border); border-radius:10px;
   background:var(--action-bg); color:var(--action-text);
@@ -183,7 +183,7 @@ dialog .dialog-toolbar .close{position:static;min-width:44px;flex-shrink:0}
   line-height:1.4; letter-spacing:.01em; white-space:normal; overflow-wrap:anywhere;
   gap:8px; box-shadow:var(--action-shadow); text-decoration:none; filter:none;
 }
-:is(:root[data-theme],:root:not([data-theme])) body :is(button,.button):not(:where(.workspace-tools *, .nav *, .pane-title *, .account-dropdown *, .studio-google, .studio-reset, .theme-toggle, .close)):hover:not(:disabled):not([aria-disabled="true"]) {
+:is(:root[data-theme],:root:not([data-theme])) body :is(button,.button):not(:where(.workspace-tools *, .workspace-flyout *, .workspace-submenu *, .nav *, .pane-title *, .account-dropdown *, .studio-google, .studio-reset, .theme-toggle, .close)):hover:not(:disabled):not([aria-disabled="true"]) {
   background:var(--action-hover); border-color:var(--action-hover-border); color:var(--action-hover-text);
 }
 :is(:root[data-theme],:root:not([data-theme])) body :is(button.primary,.button.primary,.session-open) {

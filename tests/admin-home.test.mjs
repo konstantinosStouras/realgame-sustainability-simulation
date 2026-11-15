@@ -1,3 +1,4 @@
+import { operationalReports, buildOperationalReport, businessUpdates } from '../src/operational-reports.mjs';
 import { createMessageSounds } from '../src/message-sounds.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,7 +11,7 @@ function setup(role, query = '') {
   const root = {}, values = new Map();
   const storage = { getItem: k => values.get(k), setItem: (k,v) => values.set(k,v) };
   const location = { hostname: 'localhost', href: 'https://example.test/simulation/' + query };
-  const context = vm.createContext({ createMessageSounds, URL, Blob, history: { replaceState: (_, __, href) => { location.href = href; } }, document: { querySelector: s => s === '#app' ? root : {}, addEventListener() {} },
+  const context = vm.createContext({ operationalReports, buildOperationalReport, businessUpdates, createMessageSounds, URL, Blob, history: { replaceState: (_, __, href) => { location.href = href; } }, document: { querySelector: s => s === '#app' ? root : {}, addEventListener() {} },
     localStorage: storage, sessionStorage: storage, location, classroomBackend: '', FEATURES: [],
     role, opened: 0, sampleSessions: [{id:'active-code',name:'Class <one>',status:'paused',hour:0},{id:'past-code',name:'Old class',status:'completed',hour:72}] });
   vm.runInContext(source, context);

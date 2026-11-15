@@ -1,3 +1,4 @@
+import { operationalReports, buildOperationalReport, businessUpdates } from '../src/operational-reports.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
@@ -6,7 +7,7 @@ import * as engine from '../src/engine.mjs';
 const source=readFileSync(new URL('../app.mjs',import.meta.url),'utf8').replace(/^import .*;\r?\n/gm,'').split('\nawait startWorkspace();')[0];
 const decode=s=>s.replace(/&(quot|amp|lt|gt|#39);/g,(_,e)=>({quot:'"',amp:'&',lt:'<',gt:'>','#39':"'"})[e]);
 function harness(){
- const context=vm.createContext({...engine,URL,location:{hostname:'localhost'},classroomBackend:'',firebaseConfig:{},localStorage:{getItem:()=>null},sessionStorage:{getItem:()=>null},document:{querySelector:()=>({}),addEventListener(){}}});
+ const context=vm.createContext({ operationalReports, buildOperationalReport, businessUpdates, ...engine,URL,location:{hostname:'localhost'},classroomBackend:'',firebaseConfig:{},localStorage:{getItem:()=>null},sessionStorage:{getItem:()=>null},document:{querySelector:()=>({}),addEventListener(){}}});
  vm.runInContext(source,context);const run=code=>vm.runInContext(code,context);
  const session=engine.createSession(),actor={id:'student',role:'student',companyId:session.companies[0].id};
  engine.applyCommand(session,{id:'teacher',role:'instructor'},{type:'step',hours:72});

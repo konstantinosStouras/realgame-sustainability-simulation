@@ -1,3 +1,4 @@
+import { operationalReports, buildOperationalReport, businessUpdates } from '../src/operational-reports.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
@@ -8,7 +9,7 @@ const source = readFileSync(new URL('../app.mjs', import.meta.url), 'utf8')
   .replace(/^import .*;\r?\n/gm, '').split('\nawait startWorkspace();')[0];
 function setup() {
   const storage = { getItem: () => null }, root = {};
-  const context = vm.createContext({ createSession, applyCommand, URL,
+  const context = vm.createContext({ operationalReports, buildOperationalReport, businessUpdates, createSession, applyCommand, URL,
     document: { querySelector: () => root, addEventListener() {} },
     localStorage: storage, sessionStorage: storage,
     location: { hostname: 'localhost', href: 'http://localhost/' } });

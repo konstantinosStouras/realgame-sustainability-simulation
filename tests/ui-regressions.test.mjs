@@ -1,3 +1,4 @@
+import { operationalReports, buildOperationalReport, businessUpdates } from '../src/operational-reports.mjs';
 import { createMessageSounds } from '../src/message-sounds.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,7 +23,7 @@ function harness(hostname = 'localhost') {
     document, localStorage: storage(), sessionStorage: storage(), crypto: { randomUUID },
     setTimeout: () => 1, clearTimeout: () => {}, URL, AbortSignal,
     FormData: class extends Map { constructor(form) { super(form.values); } },
-    createMessageSounds, applyCommand, createSession, itemName, productionRecipe, INVESTMENTS: {}, FEATURES: [], firebaseConfig: {}, classroomBackend: 'https://classroom.example', location: { hostname, href: 'https://' + hostname + '/' }, renderCount: 0,
+    operationalReports, buildOperationalReport, businessUpdates, createMessageSounds, applyCommand, createSession, itemName, productionRecipe, INVESTMENTS: {}, FEATURES: [], firebaseConfig: {}, classroomBackend: 'https://classroom.example', location: { hostname, href: 'https://' + hostname + '/' }, renderCount: 0,
     activeTestForm: null
   });
   context.history = { replaceState: (_, __, href) => { context.location.href = href; } };
@@ -41,6 +42,72 @@ function harness(hostname = 'localhost') {
   context.activeTestForm = form;
   return { context, run, form, toast, handlers, document };
 }
+
+test('simulation timestamps use am/pm and the icon explains the next working shift', () => {
+  const h = harness();
+  assert.equal(h.run('simDate(1.5)'), '1 Jan, 1:30am');
+  assert.equal(h.run('simDate(16.5)'), '1 Jan, 4:30pm');
+  assert.equal(h.run('simDate(12)'), '1 Jan, 12:00pm');
+  assert.equal(h.run('simDate(24)'), '2 Jan, 12:00am');
+  h.run('state.company = { shifts: [true, false, true], workers: 8 }; state.hour = 8;');
+  assert.match(h.run('shiftIndicator()'), /Day · 8am–4pm/);
+  assert.match(h.run('shiftIndicator()'), /Shift off/);
+  h.run('state.hour = 16;');
+  assert.match(h.run('shiftIndicator()'), /Evening/);
+  assert.match(h.run('shiftIndicator()'), /8 workers scheduled/);
+});
+
+test('pane resize bounds fit narrow screens and full-width layout can be restored', () => {
+  const h = harness();
+  assert.equal(h.run('constrainPaneSize(900, 5, 220).width'), 220);
+  assert.equal(h.run('constrainPaneSize(900, 5, 220).height'), 180);
+  assert.equal(h.run('constrainPaneSize(200, 2000, 1200).width'), 280);
+  h.run("panelLayouts.set('inventory', {width:720,height:430});");
+  assert.equal(h.run("paneLayoutStyle('inventory')"), '--pane-width:720px;height:430px;');
+  h.run("panelLayouts.set('inventory', {full:true,height:430});");
+  assert.equal(h.run("paneLayoutStyle('inventory')"), '--pane-width:100%;height:430px;');
+});
+test('live updates defer during menu browsing and resize, then render after the interaction', async () => {
+  for (const interaction of ['expandedWorkspaceMenu', 'activePaneResize', 'draggingPanel']) {
+    const h = harness();
+    h.context.apiImplementation = async () => ({ state: { revision: 2, hour: 73 }, actor: { id: 'test-user', role: 'instructor' } });
+    h.run(`api = apiImplementation; ${interaction} = 'active';`);
+    await h.run('load(false)');
+    assert.equal(h.run('state.revision'), 1);
+    assert.equal(h.run('refreshDeferred'), true);
+    assert.equal(h.context.renderCount, 0);
+    h.run(`${interaction} = null;`);
+    await h.run('load(false)');
+    assert.equal(h.run('state.revision'), 2);
+    assert.equal(h.context.renderCount, 1);
+  }
+});
+
+test('business updates are read-only and never become a recipient channel', () => {
+  const h = harness();
+  h.run(`actor={id:'s',role:'student',companyId:'c1'};state.status='paused';state.features={messaging:{allowed:true}};state.companies=[{id:'c1',name:'One'}];state.company={id:'c1',orders:[],shipments:[],notices:[{id:'n1',hour:20,kind:'outcome',text:'Components arrived.'}]};state.messages=[];channel='business';`);
+  const html = h.run('messagesPage()');
+  assert.match(html, /Components arrived/); assert.doesNotMatch(html, /id="message-form"|name="recipient"/);
+  h.run("channel='all';");
+  const conversation = h.run('messagesPage()');
+  const recipients = conversation.match(/<select name="recipient">([\s\S]*?)<\/select>/)[1];
+  assert.doesNotMatch(recipients, /business/);
+});
+
+test('operational pagination sorts the full filtered dataset and CSV exports all rows', async () => {
+  const h = harness();
+  h.run(`state=createSession();state.company=state.companies[0];state.company.profit=0;state.company.forecast=[];actor={id:'s',role:'student',companyId:'company-1'};state.hour=300;
+    state.company.orders=Array.from({length:205},(_,i)=>({id:'o'+i,marketId:'local',customer:'Customer '+i,originalQty:i+1,remaining:i+1,received:0,price:100,createdAt:i,dueAt:i+60,payment:24}));
+    const data=buildOperationalReport(state,'orders');tableSorts.set(tableKey(data.columns.map(c=>esc(c.label)),'operational-orders'),{column:5,direction:'descending'});`);
+  const html = h.run("operationalReportPanel('orders')");
+  assert.equal((html.match(/data-sort-original=/g) || []).length, 100);
+  assert.match(html, /Page 1 of 3/);
+  h.run('csv=(name,rows)=>{globalThis.exportedRows=rows;};');
+  await h.run("action('operational-csv','orders')");
+  assert.equal(h.run('exportedRows.length'), 206);
+  assert.equal(h.run('exportedRows[1][5]'), 205);
+  assert.equal(h.run('exportedRows.at(-1)[5]'), 1);
+});
 
 test('409 refresh preserves the connected draft and exposes an accessible error', async () => {
   const h = harness();
@@ -159,20 +226,20 @@ test('sidebar selects only the current panel and gives orders a single category 
   h.run("actor.role='student';page='workspace';state.company={orders:[]};['offers','production','finance','messages','inventory'].forEach(id=>openPanels.add(id));selectedPanel='offers';");
   let html = h.run('workspaceNavigation(false, () => true)');
   assert.equal((html.match(/class="active"/g)||[]).length,1);
-  assert.match(html, /data-id="sales"[^>]*aria-current="true"[^>]*class="active"/);
+  assert.match(html, /data-id="operations"[^>]*aria-current="true"[^>]*class="active"/);
   assert.doesNotMatch(html, /data-id="(?:inbox|chat)"/);
   h.run("selectedPanel='orders';openPanels.add('orders');");
-  assert.equal(h.run('selectedWorkspaceTool(false, () => true)'), 'sales');
+  assert.equal(h.run('selectedWorkspaceTool(false, () => true)'), 'logistics');
   h.run("openPanels.delete('orders');selectedPanel='messages';");
   assert.equal(h.run('selectedWorkspaceTool(false, () => true)'), 'messages');
   h.run("openPanels.delete('messages');");
-  assert.equal(h.run('selectedWorkspaceTool(false, () => true)'), 'logistics');
+  assert.equal(h.run('selectedWorkspaceTool(false, () => true)'), 'operations');
   h.run("page='reports';");
   html=h.run('workspaceNavigation(false, () => true)');
   assert.equal((html.match(/class="active"/g)||[]).length,1);
   assert.match(html,/data-id="reports"[^>]*aria-current="page"/);
   h.run("page='workspace';selectedPanel='finance';");
-  assert.equal(h.run("selectedWorkspaceTool(false, key => key !== 'finance')"),'logistics');
+  assert.equal(h.run("selectedWorkspaceTool(false, key => key !== 'finance')"),'operations');
 });
 
 test('unified messages show all authorized conversations and label recipients separately', () => {
@@ -334,7 +401,7 @@ test('student workspace exposes seven categories and shows filtered live stock w
   assert.match(workspace, /After incoming orders: 4 solar panels \(2 more\)/);
   assert.match(workspace, /Limiting after receipt: Junction box<\/span>/);
   assert.match(workspace, /data-sort-label="Total buildable"[^]*data-sort-label="Limiting components"/);
-  assert.match(workspace, /first<small><\/small><\/td><td[^>]*>16 × Photo cell<\/td><td[^>]*>4 Jan, 01:00<\/td><td[^>]*>0<\/td><td[^>]*>2<\/td><td[^>]*>Photo cell<\/td>.*later<small><\/small><\/td><td[^>]*>224 × Photo cell<\/td><td[^>]*>4 Jan, 03:00<\/td><td[^>]*>\+2<\/td><td[^>]*>4<\/td><td[^>]*>Junction box<\/td>/);
+  assert.match(workspace, /first<small><\/small><\/td><td[^>]*>16 × Photo cell<\/td><td[^>]*>4 Jan, 1:00am<\/td><td[^>]*>0<\/td><td[^>]*>2<\/td><td[^>]*>Photo cell<\/td>.*later<small><\/small><\/td><td[^>]*>224 × Photo cell<\/td><td[^>]*>4 Jan, 3:00am<\/td><td[^>]*>\+2<\/td><td[^>]*>4<\/td><td[^>]*>Junction box<\/td>/);
   assert.doesNotMatch(workspace, /received<small>/);
   assert.match(workspace, /Limiting: Photo cell<\/span>/);
   assert.match(workspace, /Photo cell<\/td><td[^>]*>[^]*?\/ 128<\/span><\/td><td[^>]*><span class="quantity-status"><span>32<\/span><span class="badge amber">Limiting<\/span><\/span><\/td>/);
@@ -346,8 +413,8 @@ test('student workspace exposes seven categories and shows filtered live stock w
   assert.match(legacy, /2 solar modules from stock on hand/);
   assert.match(legacy, /After incoming orders: 6 solar modules \(4 more\)/);
   assert.match(legacy, /Limiting after receipt: Recycled frame<\/span>/);
-  assert.match(legacy, /16 × PV cell<\/td><td[^>]*>4 Jan, 01:00<\/td><td[^>]*>\+1<\/td><td[^>]*>3<\/td><td[^>]*>PV cell<\/td>/);
-  assert.match(legacy, /224 × PV cell<\/td><td[^>]*>4 Jan, 03:00<\/td><td[^>]*>\+3<\/td><td[^>]*>6<\/td><td[^>]*>Recycled frame<\/td>/);
+  assert.match(legacy, /16 × PV cell<\/td><td[^>]*>4 Jan, 1:00am<\/td><td[^>]*>\+1<\/td><td[^>]*>3<\/td><td[^>]*>PV cell<\/td>/);
+  assert.match(legacy, /224 × PV cell<\/td><td[^>]*>4 Jan, 3:00am<\/td><td[^>]*>\+3<\/td><td[^>]*>6<\/td><td[^>]*>Recycled frame<\/td>/);
   assert.match(legacy, /PV cell<\/td><td[^>]*>[^]*?\/ 128<\/span><\/td><td[^>]*><span class="quantity-status"><span>24<\/span><span class="badge amber">Limiting<\/span><\/span><\/td>/);
   assert.match(legacy, /Controller<\/td><td[^>]*>[^]*?\/ 16<\/span><\/td><td[^>]*><span class="quantity-status"><span>1<\/span><\/span><\/td>/);
   h.run('state.recipe = {cell:32,frame:1,controller:2}');
@@ -355,7 +422,7 @@ test('student workspace exposes seven categories and shows filtered live stock w
   const tied = h.run('studentWorkspace(() => true)');
   assert.match(tied, /Limiting: Photo cell, Junction box<\/span>/);
   assert.match(tied, /After incoming orders: 2 solar panels \(0 more\)/);
-  assert.match(tied, /16 × Photo cell<\/td><td[^>]*>4 Jan, 01:00<\/td><td[^>]*>0<\/td><td[^>]*>2<\/td><td[^>]*>Photo cell, Junction box<\/td>/);
+  assert.match(tied, /16 × Photo cell<\/td><td[^>]*>4 Jan, 1:00am<\/td><td[^>]*>0<\/td><td[^>]*>2<\/td><td[^>]*>Photo cell, Junction box<\/td>/);
   h.run('state.company.inventory.cell.qty = 0');
   assert.match(h.run('studentWorkspace(() => true)'), /0 solar panels from stock on hand/);
   h.run("inventoryCategories.delete('component')");
@@ -380,8 +447,8 @@ test('pending energy and shift decisions retain the accepted choice and effectiv
   assert.match(energy, /data-action="energy-switch" data-id="solar" disabled/);
   assert.match(energy, /Switch pending/);
   assert.match(energy, /0.035/);
-  assert.match(shifts, /Active schedule:<\/strong> 00:00–08:00/);
-  assert.match(shifts, /Saved schedule pending: 08:00–16:00, 16:00–24:00/);
+  assert.match(shifts, /Active schedule:<\/strong> 12:00am–8:00am/);
+  assert.match(shifts, /Saved schedule pending: 8:00am–4:00pm, 4:00pm–12:00am/);
   assert.match(shifts, /Effective 4 Jan/);
   assert.match(shifts, /name="shift1" type="checkbox" checked disabled/);
   assert.match(shifts, /Shift change pending/);

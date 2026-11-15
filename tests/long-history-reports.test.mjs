@@ -1,3 +1,4 @@
+import { operationalReports, buildOperationalReport, businessUpdates } from '../src/operational-reports.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
@@ -16,7 +17,7 @@ function harness() {
   }))}));
   const teacher = {id:'instructor',role:'instructor',name:'Test instructor'};
   const storage = {getItem:()=>null,setItem(){},removeItem(){}};
-  const context = vm.createContext({...engine,URL,AbortSignal,setTimeout,clearTimeout,localStorage:storage,sessionStorage:storage,
+  const context = vm.createContext({ operationalReports, buildOperationalReport, businessUpdates, ...engine,URL,AbortSignal,setTimeout,clearTimeout,localStorage:storage,sessionStorage:storage,
     classroomBackend:'',firebaseConfig:{},location:{hostname:'localhost'},document:{querySelector:()=>({open:false}),addEventListener(){}},
     view:engine.publicView(session,teacher,'company-1'),testActor:teacher,captured:[]});
   vm.runInContext(source,context);

@@ -1,3 +1,4 @@
+import { operationalReports, buildOperationalReport, businessUpdates } from '../src/operational-reports.mjs';
 import { createMessageSounds } from '../src/message-sounds.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,7 +15,7 @@ test('every instructor and student page renders from current state without netwo
   for (const role of ['instructor', 'student']) {
     const root = { innerHTML: '' };
     const storage = { getItem: () => null };
-    const context = vm.createContext({ createMessageSounds, ...engine, document: { querySelector: s => s === '#app' ? root : {}, addEventListener() {} }, localStorage: storage, sessionStorage: storage, URL, location: { hostname: 'localhost', href: 'http://localhost/' }, classroomBackend: '', firebaseConfig: {}, fetch() { throw new Error('Navigation must not fetch'); } });
+    const context = vm.createContext({ operationalReports, buildOperationalReport, businessUpdates, createMessageSounds, ...engine, document: { querySelector: s => s === '#app' ? root : {}, addEventListener() {} }, localStorage: storage, sessionStorage: storage, URL, location: { hostname: 'localhost', href: 'http://localhost/' }, classroomBackend: '', firebaseConfig: {}, fetch() { throw new Error('Navigation must not fetch'); } });
     vm.runInContext(source, context);
     const actor = role === 'instructor' ? teacher : { id: 'student', role, name: 'Test student', companyId: session.companies[0].id };
     context.currentActor = actor;
