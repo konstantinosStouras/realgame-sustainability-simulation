@@ -32,7 +32,7 @@ test('60-day reports show exactly the selected completed-day window in chart, ta
     const html = h.run('reportsPage()');
     assert.equal((html.match(/class="chart-point /g)||[]).length,count*12,`${range}-day chart`);
     const exactTable = html.slice(html.indexOf('Exact daily values'));
-    assert.equal((exactTable.match(/<tr>/g)||[]).length,1+count*12,`${range}-day table`);
+    assert.equal((exactTable.match(/<tr(?: [^>]*)?>/g)||[]).length,1+count*12,`${range}-day table`);
     await h.run("action('report-csv')");
     const rows = h.context.captured.at(-1).data.split('\r\n');
     assert.equal(rows.length,1+count*12,`${range}-day CSV`);
@@ -43,7 +43,7 @@ test('daily changes use the preceding close outside the selected window and reta
   const h = harness();
   h.run("selectedCompanies.add('company-1'); reportRange=7; report='dailySales';");
   const html = h.run('reportsPage()');
-  assert.match(html.slice(html.indexOf('Exact daily values')), /<td>100\.01<\/td>/);
+  assert.match(html.slice(html.indexOf('Exact daily values')), /<td[^>]*>100\.01<\/td>/);
   assert.equal((html.match(/· €100\.01"/g)||[]).length,7);
   await h.run("action('report-csv')");
   for (const row of h.context.captured.at(-1).data.split('\r\n').slice(1)) assert.ok(row.endsWith(',"100.01"'));
@@ -66,9 +66,9 @@ test('carbon report tables suppress binary floating-point tails without changing
   h.run("report='emissions'; reportRange=7; selectedCompanies.add('company-1'); state.snapshots.at(-2).companies[0].emissions=184.32000000000002; state.snapshots.at(-1).companies[0].emissions=2925.7999999999997;");
   const html = h.run('reportsPage()');
   const exactTable = html.slice(html.indexOf('Exact daily values'));
-  assert.match(exactTable, /<td>184\.32<\/td>/);
-  assert.match(exactTable, /<td>2,925\.8<\/td>/);
-  assert.doesNotMatch(exactTable, /184\.32000000000002|2,925\.7999999999997/);
+  assert.match(exactTable, /<td[^>]*>184\.32<\/td>/);
+  assert.match(exactTable, /<td[^>]*>2,925\.8<\/td>/);
+  assert.doesNotMatch(exactTable.replace(/ data-sort-value="[^"]*"/g, ''), /184\.32000000000002|2,925\.7999999999997/);
   assert.equal(h.run("reportValue(100.01, 'EUR')"), '100.01');
   assert.equal(h.run("reportValue(192, 'modules')"), '192');
   assert.equal(h.run("reportValue(100/12, '%')"), '8.3333');

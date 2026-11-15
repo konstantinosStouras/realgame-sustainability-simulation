@@ -239,3 +239,31 @@ dialog .dialog-toolbar .close{position:static;min-width:44px;flex-shrink:0}
 .brand-mark{flex-shrink:0;line-height:1;letter-spacing:0;padding-bottom:.12em}
 
 :root[data-theme="dark"]{--chart-3:#79b9ef;--chart-4:#c29be2;--chart-5:#f48b9c;--chart-6:#6ed5da;--chart-7:#f4b477;--chart-8:#9daeff;--chart-9:#e88acb;--chart-10:#d1d881;--chart-11:#b9cad5}
+
+/* Headers remain table headings, with a keyboard-accessible three-state sort. */
+body th.sortable-heading { padding: 0; }
+:is(:root[data-theme],:root:not([data-theme])) body button.table-sort {
+  display: flex; align-items: center; justify-content: flex-start; gap: .4em;
+  width: 100%; min-height: 44px; padding: 12px;
+  border: 0; border-radius: 0; background: transparent; color: inherit;
+  box-shadow: none; font: inherit; letter-spacing: inherit; text-transform: inherit;
+  text-align: left; cursor: pointer;
+}
+:is(:root[data-theme],:root:not([data-theme])) body button.table-sort:hover {
+  background: color-mix(in srgb, currentColor 8%, transparent); color: inherit;
+  border: 0; box-shadow: none;
+}
+:is(:root[data-theme],:root:not([data-theme])) body button.table-sort:focus-visible { outline-offset: -3px; }
+.table-sort-icon { flex: 0 0 auto; font-size: .65em; line-height: 1; }
+.table-sort-icon:empty { display: none; }
+
+.dispatch-deadline { font-weight: 700; }
+.dispatch-comparison { margin-block: 1rem; }
+.dispatch-comparison ul { padding-left: 1.25rem; }
+.dispatch-comparison li { margin-block: .75rem; }
+.dispatch-comparison small { display: block; margin-top: .2rem; }
+body .deadline-early { color: #176c37; font-weight: 700; }
+body .deadline-late { color: #b42318; font-weight: 700; }
+body .deadline-exact { font-weight: 700; }
+:root[data-theme="dark"] body .deadline-early { color: #8de3a6; }
+:root[data-theme="dark"] body .deadline-late { color: #ffaaa3; }

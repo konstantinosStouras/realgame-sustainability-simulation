@@ -8,7 +8,7 @@ const source=readFileSync(new URL('../app.mjs',import.meta.url),'utf8').replace(
 function storage(){const data=new Map();return{getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,String(v)),removeItem:k=>data.delete(k)};}
 function control(value=''){return{value,innerHTML:'',textContent:'',validationMessage:'',setCustomValidity(message){this.validationMessage=message;}};}
 function harness(){
- const fields={'[name=qty]':control('30'),'[name=routeId]':control('rail'),'#dispatch-context':control(),'#dispatch-terms':control(),'#dispatch-quote':control(),'#purchase-context':control(),'#purchase-quote':control()};
+ const fields={'[name=qty]':control('30'),'[name=routeId]':control('rail'),'#dispatch-context':control(),'#dispatch-deadline':control(),'#dispatch-route-timing':control(),'#dispatch-terms':control(),'#dispatch-quote':control(),'#purchase-context':control(),'#purchase-quote':control()};
  const listeners={},form={querySelector:s=>fields[s],addEventListener:(type,fn)=>{listeners[type]=fn;}},dialog={open:true,querySelector:()=>form,close(){this.open=false;}};
  const document={activeElement:fields['[name=qty]'],querySelector:s=>s==='#dialog'?dialog:s==='#app'?{}:null,addEventListener(){}};
  const ctx=vm.createContext({document,URL,AbortSignal,location:{hostname:'localhost',href:'http://localhost/'},localStorage:storage(),sessionStorage:storage(),crypto:{randomUUID},setTimeout:()=>1,clearTimeout(){},firebaseConfig:{},classroomBackend:'',FormData:class extends Map{constructor(){super([['qty',fields['[name=qty]'].value],['routeId',fields['[name=routeId]'].value]]);}},itemName:()=> 'frame',renders:0});
@@ -27,6 +27,8 @@ test('409 refresh updates dispatch facts and current quote without replacing qua
  h.run("openDispatch('order-110')");
  assert.match(h.fields['#dispatch-context'].textContent,/Stock available: 372/);
  assert.match(h.fields['#dispatch-quote'].innerHTML,/104\.00/);
+ assert.match(h.fields['#dispatch-deadline'].textContent,/60h remaining/);
+ assert.match(h.fields['#dispatch-quote'].innerHTML,/deadline-early[^>]*>\(Arriving 12h before the deadline\)/);
  const fresh=structuredClone(h.state);fresh.revision=2;fresh.hour=48;fresh.company.inventory.panel.qty=341;fresh.company.orders[0].remaining=59;fresh.catalog.routes[0].unit=100;
  h.ctx.apiImplementation=async path=>{if(path.endsWith('/command'))throw Object.assign(new Error('Session changed. Review refreshed state.'),{status:409});return{state:fresh,actor:{id:'synthetic-student',role:'student',companyId:'company-1'}};};
  h.run('api=apiImplementation;');
@@ -35,7 +37,32 @@ test('409 refresh updates dispatch facts and current quote without replacing qua
  assert.equal(h.fields['[name=qty]'],qty);assert.equal(h.fields['[name=routeId]'],route);assert.equal(qty.value,'30');assert.equal(route.value,'rail');
  assert.equal(qty.max,'59');assert.match(h.fields['#dispatch-context'].textContent,/Still to dispatch: 59\. Stock available: 341/);
  assert.match(h.fields['#dispatch-quote'].innerHTML,/110\.00/);assert.match(h.fields['#dispatch-quote'].innerHTML,/Expected late/);
+ assert.match(h.fields['#dispatch-deadline'].textContent,/36h remaining/);
+ assert.match(h.fields['#dispatch-quote'].innerHTML,/deadline-late[^>]*>\(Arriving 12h after the deadline\)/);
  assert.equal(h.document.activeElement,qty);
+});
+
+test('route comparison distinguishes nominal margin, delay risk, exact deadline and overdue orders',()=>{
+ const h=harness();h.state.hour=32;h.state.company.orders[0].dueAt=84;
+ h.state.catalog.routes[0].hours=36;h.state.catalog.routes[0].maxDelay=8;
+ h.run("openDispatch('order-110')");
+ assert.match(h.fields['#dispatch-deadline'].textContent,/52h remaining/);
+ assert.match(h.fields['#dispatch-route-timing'].innerHTML,/Arriving 16h before the deadline/);
+ assert.match(h.fields['#dispatch-route-timing'].innerHTML,/full 8h carrier delay.*Arriving 8h before the deadline/);
+ assert.match(h.fields['[name=routeId]'].innerHTML,/\(Arriving 16h before the deadline\)/);
+ h.state.hour=45;h.form.refreshContext();
+ assert.match(h.fields['#dispatch-route-timing'].innerHTML,/deadline-early[^>]*>\(Arriving 3h before/);
+ assert.match(h.fields['#dispatch-route-timing'].innerHTML,/deadline-late[^>]*>\(Arriving 5h after/);
+ h.state.hour=48;h.form.refreshContext();
+ assert.match(h.fields['#dispatch-quote'].innerHTML,/deadline-exact[^>]*>\(Arriving exactly at the deadline\)/);
+ h.fields['[name=routeId]'].value='road';h.listeners.input();
+ assert.match(h.fields['#dispatch-quote'].innerHTML,/Arriving 12h before/);
+ h.state.hour=90;h.form.refreshContext();
+ assert.match(h.fields['#dispatch-deadline'].textContent,/Deadline passed 6h ago/);
+ h.state.catalog.routes[0].enabled=false;h.form.refreshContext();
+ assert.doesNotMatch(h.fields['#dispatch-route-timing'].innerHTML,/<strong>Rail/);
+ h.state.company.orders=[];h.form.refreshContext();
+ assert.equal(h.fields['#dispatch-deadline'].textContent,'');assert.equal(h.fields['#dispatch-route-timing'].innerHTML,'');
 });
 
 test('depleted stock and unavailable routes preserve draft values and prevent invalid resubmission',()=>{
