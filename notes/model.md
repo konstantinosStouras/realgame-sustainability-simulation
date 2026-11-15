@@ -8,6 +8,21 @@ Sign in with Google (including Gmail and Google Workspace) or verified email/pas
 
 Pause for decisions and discussion, step the simulation, then inspect outcomes. Continuous running is controlled by the authoritative server. Restarting the server preserves the state; no offline elapsed time is simulated. A configured end pauses economic activity in a completed state, preserving all obligations. Existing students can still view final reports and download report or ledger CSVs, but cannot submit new decisions or messages. New students cannot join a completed session. Explicitly closing student access in Session settings still revokes reads and exports. The instructor can extend the duration up to 180 days. There is no 180-hour cap.
 
+### Clock speed presets
+
+The six teaching presets cover 6–45 real seconds per simulation hour (s/h). Lower values run the simulation faster. Each button sets the band's midpoint, rounded to the nearest whole second with halves rounded up, without changing whether the clock is running or paused.
+
+| Band | Range (s/h) | Button sets (s/h) |
+| --- | --- | --- |
+| Very slow | 35–45 | 40 |
+| Slow | 25–34 | 30 |
+| Medium | 16–24 | 20 |
+| Brisk | 12–15 | 14 |
+| Fast | 9–11 | 10 |
+| Very fast | 6–8 | 7 |
+
+Session settings still accepts custom rates from 1–120 s/h. Rates outside the preset range show **Custom** with no band selected; opening the clock does not change a saved rate. Solo mode uses manual steps, and completed sessions disable clock controls.
+
 ## A useful first exercise
 
 1. Compare an offer's delivery promise to the available transport routes.

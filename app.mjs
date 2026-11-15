@@ -1,6 +1,6 @@
-import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=90e75474e288';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=90e75474e288';
-import { watchSession } from './src/session-updates.mjs?v=90e75474e288';
+import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=2a751d487002';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=2a751d487002';
+import { watchSession } from './src/session-updates.mjs?v=2a751d487002';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -372,7 +372,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=90e75474e288')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=2a751d487002')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -443,7 +443,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=90e75474e288')).testClient();
+      const client = (await import('./src/test-client.mjs?v=2a751d487002')).testClient();
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -1041,14 +1041,15 @@ function decisionTimingRows(player) {
   return entries.map(entry => [entry.timestamp !== undefined && Number.isFinite(entry.timestamp) ? new Date(entry.timestamp).toISOString() : 'Unknown timestamp', simDate(entry.hour), entry.command.type, timingSeconds(entry.gap), entry.result]);
 }
 // Seconds per simulation hour: smaller values mean a faster clock.
-// Bands cover every supported integer rate; half-second midpoints round up.
+// Teaching presets cover 6–45 s/h; other supported rates remain custom.
+// Half-second midpoints round up to the engine's whole-second precision.
 const clockSpeedBands = [
-  { id: 'very-slow', label: 'Very slow', min: 61, max: 120 },
-  { id: 'slow', label: 'Slow', min: 31, max: 60 },
-  { id: 'medium', label: 'Medium', min: 16, max: 30 },
-  { id: 'brisk', label: 'Brisk', min: 8, max: 15 },
-  { id: 'fast', label: 'Fast', min: 4, max: 7 },
-  { id: 'very-fast', label: 'Very fast', min: 1, max: 3 }
+  { id: 'very-slow', label: 'Very slow', min: 35, max: 45 },
+  { id: 'slow', label: 'Slow', min: 25, max: 34 },
+  { id: 'medium', label: 'Medium', min: 16, max: 24 },
+  { id: 'brisk', label: 'Brisk', min: 12, max: 15 },
+  { id: 'fast', label: 'Fast', min: 9, max: 11 },
+  { id: 'very-fast', label: 'Very fast', min: 6, max: 8 }
 ];
 const clockSpeedBand = speed => clockSpeedBands.find(band => speed >= band.min && speed <= band.max);
 const clockBandMidpoint = band => Math.round((band.min + band.max) / 2);
@@ -1066,12 +1067,12 @@ function adminClock() {
       <strong class="clock-rate" aria-label="${state.secondsPerHour} real seconds per simulation hour">${state.secondsPerHour} s/h</strong></div>
     </div>
     <p class="clock-status"><span class="badge ${state.status === 'running' ? '' : 'amber'}">● ${esc(state.status)}</span><span>Day ${Math.floor(state.hour / 24) + 1} · ends ${simDate(state.endHour)}</span></p>
-    <p class="clock-speed-label" id="clock-speed-label">Clock speed: <strong>${solo ? 'Manual' : band.label}</strong></p>
+    <p class="clock-speed-label" id="clock-speed-label">Clock speed: <strong>${solo ? 'Manual' : band?.label || 'Custom'}</strong></p>
     <div class="clock-speed-bands" role="group" aria-labelledby="clock-speed-label">${clockSpeedBands.map(b => {
       const description = `${b.label}: ${b.min}–${b.max} real seconds per simulation hour. Set to ${clockBandMidpoint(b)} s/h.`;
       return `<button class="small${!solo && b === band ? ' primary' : ''}" data-action="clock-speed" data-id="${b.id}" aria-pressed="${!solo && b === band}" aria-label="${description}" title="${description}" ${disabled ? 'disabled' : ''}>${b.label}</button>`;
     }).join('')}</div>
-    <p class="clock-speed-hint">${solo ? 'Solo mode advances with manual steps.' : 's/h = real seconds per simulation hour. Lower is faster.'}</p>
+    <p class="clock-speed-hint">${solo ? 'Solo mode advances with manual steps.' : 's/h = real seconds per simulation hour. Lower is faster. Presets cover 6–45 s/h; use Session settings for a custom speed.'}</p>
   </div>
   <details class="clock-step-options" data-view-key="clock-step-options"><summary>Manual steps</summary><div class="clock-controls">${button('step', '+ 1 hour', '1', 'small', state.status !== 'paused')}${button('step', '+ 1 day', '24', 'small', state.status !== 'paused')}${button('step', 'Custom step', 'custom', 'small', state.status !== 'paused')}</div><p class="form-note">Pause the clock before stepping forward.</p></details>
   <div class="clock-footer">${button('settings', 'Session settings', '', 'small')}<small>No time is skipped during server downtime.</small></div>`;
@@ -1289,7 +1290,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=90e75474e288')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=2a751d487002')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -1438,7 +1439,7 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=90e75474e288')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    try { const client = (await import('./src/test-client.mjs?v=2a751d487002')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p><div class="toolbar">' + (e.status === 403 ? button('retry-start', 'Try again', '', 'primary') : '') + button('test-leave','Return to classroom') + '</div></main>'; }
     return;
   }

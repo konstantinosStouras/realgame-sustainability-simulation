@@ -19,28 +19,46 @@ function setup() {
   return { run };
 }
 
-test('all supported rates map to exactly one band, with slower rates first', () => {
+test('teaching rates from 6 to 45 map to exactly one band, with slower rates first', () => {
   const h = setup();
   assert.equal(h.run('clockSpeedBands.length'), 6);
-  for (let speed = 1; speed <= 120; speed++) {
+  for (let speed = 6; speed <= 45; speed++) {
     assert.equal(h.run(`clockSpeedBands.filter(b => ${speed} >= b.min && ${speed} <= b.max).length`), 1);
     h.run(`state.secondsPerHour = ${speed}`);
     const html = h.run('adminClock()');
     assert.equal((html.match(/aria-pressed="true"/g) || []).length, 1);
     assert.match(html, new RegExp(`Clock speed: <strong>${h.run(`clockSpeedBand(${speed}).label`)}</strong>`));
   }
-  assert.equal(h.run('clockSpeedBand(120).label'), 'Very slow');
-  assert.equal(h.run('clockSpeedBand(1).label'), 'Very fast');
+  assert.equal(h.run('clockSpeedBand(45).label'), 'Very slow');
+  assert.equal(h.run('clockSpeedBand(6).label'), 'Very fast');
+});
+
+test('rates outside the teaching bands stay custom without selecting or changing a preset', async () => {
+  const h = setup();
+  for (let speed = 1; speed <= 120; speed++) {
+    if (speed >= 6 && speed <= 45) continue;
+    h.run(`state.secondsPerHour = ${speed}`);
+    const html = h.run('adminClock()');
+    assert.equal(h.run(`clockSpeedBand(${speed})`), undefined);
+    assert.match(html, /Clock speed: <strong>Custom<\/strong>/);
+    assert.equal((html.match(/aria-pressed="true"/g) || []).length, 0);
+    assert.match(html, new RegExp(`>${speed} s/h<`));
+    assert.equal(h.run('state.secondsPerHour'), speed);
+  }
+  await h.run("action('clock-speed', 'medium')");
+  assert.equal(h.run('state.secondsPerHour'), 20);
+  assert.match(h.run('adminClock()'), /Clock speed: <strong>Medium<\/strong>/);
 });
 
 test('each speed button sets its rounded midpoint without starting, pausing or advancing time', async () => {
   const h = setup();
-  const expected = [['very-slow', 91], ['slow', 46], ['medium', 23], ['brisk', 12], ['fast', 6], ['very-fast', 2]];
+  const expected = [['very-slow', 40], ['slow', 30], ['medium', 20], ['brisk', 14], ['fast', 10], ['very-fast', 7]];
   for (const status of ['paused', 'running']) {
     h.run(`state.status = '${status}'; state.hour = 25`);
     for (const [id, rate] of expected) {
       await h.run(`action('clock-speed', '${id}')`);
       assert.equal(h.run('state.secondsPerHour'), rate);
+      assert.equal(h.run(`clockSpeedBand(${rate}).id`), id);
       assert.equal(h.run('state.status'), status);
       assert.equal(h.run('state.hour'), 25);
     }
