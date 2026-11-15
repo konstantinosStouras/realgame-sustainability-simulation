@@ -208,7 +208,7 @@ test('message headers retain full names without repeating roles or internal labe
 });
 
 test('typing sends only a flag, clears on blur and ignores results after leaving a team view', async () => {
-  const h=harness(), calls=[], notice={textContent:''}, textarea={value:'Private draft'}, recipient={value:'team:c1'};
+  const h=harness(), calls=[], notice={innerHTML:'',dataset:{}}, textarea={value:'Private draft'}, recipient={value:'team:c1'};
   const nodes={'[data-team-typing]':notice,'#message-form textarea':textarea,'#message-form [name=recipient]':recipient};
   h.context.document.querySelector('#app').querySelector=selector=>nodes[selector];
   h.context.document.activeElement=textarea;
@@ -216,16 +216,17 @@ test('typing sends only a flag, clears on blur and ignores results after leaving
   h.run("actor={id:'s',role:'student',companyId:'c1'};state.status='paused';state.features={messaging:{allowed:true,visible:true}};health={typingPresence:true};channel='all';typingInputAt=Date.now();");
   await h.run('syncTyping(true)');
   assert.deepEqual(JSON.parse(calls[0].options.body),{active:true});
-  assert.equal(notice.textContent,'Typing...');
+  assert.match(notice.innerHTML,/typing-bubble/);
+  assert.match(notice.innerHTML,/A teammate is typing/);
   await h.run('syncTyping(true)');assert.equal(calls.length,1,'input is throttled');
   h.context.document.activeElement=null;
   await h.run('syncTyping(true)');assert.deepEqual(JSON.parse(calls[1].options.body),{active:false});
   let resolve;
   h.context.fetch=()=>new Promise(r=>{resolve=r;});
   const pending=h.run('syncTyping()');
-  delete nodes['[data-team-typing]'];notice.textContent='';
+  delete nodes['[data-team-typing]'];notice.innerHTML='';
   resolve({ok:true,json:async()=>({typing:true})});await pending;
-  assert.equal(notice.textContent,'','late response cannot restore a typing indicator after navigation');
+  assert.equal(notice.innerHTML,'','late response cannot restore a typing indicator after navigation');
 });
 
 test('decision timing separates students, excludes non-decisions and preserves millisecond timestamps', () => {

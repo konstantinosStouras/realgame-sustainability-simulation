@@ -1,6 +1,6 @@
-import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=0e07673da16a';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=0e07673da16a';
-import { watchSession } from './src/session-updates.mjs?v=0e07673da16a';
+import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=41e3f78fd3b5';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=41e3f78fd3b5';
+import { watchSession } from './src/session-updates.mjs?v=41e3f78fd3b5';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -372,7 +372,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=0e07673da16a')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=41e3f78fd3b5')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -443,7 +443,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=0e07673da16a')).testClient();
+      const client = (await import('./src/test-client.mjs?v=41e3f78fd3b5')).testClient();
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -930,6 +930,12 @@ function messageStyle(message) {
   return 'message-conversation';
 }
 let typingJob = null, typingInputAt = 0;
+function setTypingIndicator(notice, active) {
+  if (!notice || notice.dataset.typing === String(active)) return;
+  // Keep existing dots between polls so their animation never restarts.
+  notice.dataset.typing = String(active);
+  notice.innerHTML = active ? '<span class="typing-bubble" aria-hidden="true"><span></span><span></span><span></span></span><span class="typing-accessible">A teammate is typing</span>' : '';
+}
 function typingContext() {
   if (!state || !sessionId || solo || preview || actor?.role !== 'student' || document.hidden
       || state.status === 'completed' || state.studentAccess === false
@@ -972,12 +978,12 @@ async function syncTyping(fromInput = false) {
       const result = await job.request(update);
       if (typingJob === job && typingContext()?.scope === job.scope) {
         const notice = root.querySelector('[data-team-typing]');
-        if (notice) notice.textContent = result.typing ? 'Typing...' : '';
+        setTypingIndicator(notice, !!result.typing);
       }
     } catch {
       if (typingJob === job) {
         const notice = root.querySelector('[data-team-typing]');
-        if (notice) notice.textContent = '';
+        setTypingIndicator(notice, false);
       }
     } finally { job.pending = null; }
   })();
@@ -1247,7 +1253,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=0e07673da16a')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=41e3f78fd3b5')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -1390,7 +1396,7 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=0e07673da16a')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    try { const client = (await import('./src/test-client.mjs?v=41e3f78fd3b5')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p><div class="toolbar">' + (e.status === 403 ? button('retry-start', 'Try again', '', 'primary') : '') + button('test-leave','Return to classroom') + '</div></main>'; }
     return;
   }
