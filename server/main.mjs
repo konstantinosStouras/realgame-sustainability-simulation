@@ -22,10 +22,11 @@ export function createApp({ store = new Store(process.env.DATA_PATH || '.data/si
       if (origin && origin !== ownOrigin && !origins.includes(origin)) fail('This origin is not allowed.', 403);
       if (origins.includes(origin)) { res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Vary', 'Origin'); }
       if (req.method === 'OPTIONS') { res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type'); res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'); res.writeHead(204); res.end(); return; }
-      if (url.pathname === '/api/health') return send(200, { ok: true, demo, version: 1, classroomAccounting: true, atomicSessionSettings: true, operatingCostSettings: true, pricingInventorySettings: true, sessionLifecycle: true, attachmentExport: true, testClassroom: true, auth: verifyFirebase ? 'firebase' : 'local-demo', projectId });
+      if (url.pathname === '/api/health') return send(200, { ok: true, demo, version: 1, classroomAccounting: true, atomicSessionSettings: true, operatingCostSettings: true, pricingInventorySettings: true, sessionLifecycle: true, attachmentExport: true, testClassroom: true, typingPresence: true, auth: verifyFirebase ? 'firebase' : 'local-demo', projectId });
       if (!url.pathname.startsWith('/api/')) {
         if (req.method !== 'GET' && req.method !== 'HEAD') fail('Method not allowed.', 405);
         const files = { '/': 'index.html', '/index.html': 'index.html', '/styles.css': 'styles.css', '/theme.css': 'theme.css', '/theme.mjs': 'theme.mjs', '/google-g.png': 'google-g.png', '/app.mjs': 'app.mjs', '/src/engine.mjs': 'src/engine.mjs', '/src/solo.mjs': 'src/solo.mjs', '/src/test-client.mjs': 'src/test-client.mjs', '/src/test-worker.mjs': 'src/test-worker.mjs', '/src/test-classroom.mjs': 'src/test-classroom.mjs', '/src/firebase-client.mjs': 'src/firebase-client.mjs', '/firebase-config.mjs': 'firebase-config.mjs', '/notes/model.md': 'notes/model.md' };
+        files['/src/typing-presence.mjs'] = 'src/typing-presence.mjs';
         files['/src/session-updates.mjs'] = 'src/session-updates.mjs';
         const file = files[url.pathname]; if (!file) fail('Not found.', 404);
         const type = file.endsWith('.mjs') ? 'text/javascript; charset=utf-8' : file.endsWith('.css') ? 'text/css; charset=utf-8' : file.endsWith('.png') ? 'image/png' : file.endsWith('.md') ? 'text/plain; charset=utf-8' : 'text/html; charset=utf-8';
@@ -66,9 +67,13 @@ export function createApp({ store = new Store(process.env.DATA_PATH || '.data/si
       if (url.pathname === '/api/enter' && req.method === 'POST') return send(200, store.enter(user, body.sessionId, body.code));
       if (url.pathname === '/api/join' && req.method === 'POST') return send(200, store.join(user, body.code));
       if (url.pathname === '/api/sessions' && req.method === 'POST') return send(201, { id: store.create(user, body).id });
-      const match = url.pathname.match(/^\/api\/sessions\/([^/]+)(?:\/(command|roster|assign|replay|test-template))?$/);
+      const match = url.pathname.match(/^\/api\/sessions\/([^/]+)(?:\/(command|roster|assign|replay|test-template|typing))?$/);
       if (!match) fail('Not found.', 404);
       const id = match[1], action = match[2];
+      if (action === 'typing' && ['GET', 'POST'].includes(req.method)) {
+        if (req.method === 'POST' && typeof body.active !== 'boolean') fail('Expected a typing flag.');
+        return send(200, await store.typing(user, id, req.method === 'POST' ? body.active : undefined));
+      }
       if (action === 'command' && req.method === 'POST') return send(200, store.command(user, id, body));
       const actor = store.actor(user, id);
       if (!action && req.method === 'GET') return send(200, { state: publicView(store.session(id), actor, url.searchParams.get('company')), actor });

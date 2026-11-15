@@ -1,4 +1,5 @@
 import { requireOpen, requireReadable } from './session-access.mjs';
+import { typingPresence } from '../src/typing-presence.mjs';
 import { waitForSessionUpdate } from './session-updates.mjs';
 import { testTemplate } from './test-template.mjs';
 import { sessionId } from '../src/session-id.mjs';
@@ -86,7 +87,7 @@ export class FirestoreStore {
     const encoded = encodeState(state), { chunks, ...info } = encoded;
     chunks.forEach((data, i) => tx.set(ref.collection('stateChunks').doc(String(i)), { data }));
     for (let i = chunks.length; i < (metadata.chunkCount || 0); i++) tx.delete(ref.collection('stateChunks').doc(String(i)));
-    tx.set(ref, { ...metadata, ...info, chunkCount: chunks.length, id: state.id, name: state.name, hour: state.hour, status: state.status, studentAccess: state.studentAccess !== false, revision: state.revision, nextTickAt });
+    tx.set(ref, { ...metadata, ...info, chunkCount: chunks.length, id: state.id, name: state.name, hour: state.hour, status: state.status, studentAccess: state.studentAccess !== false, messaging: state.features.messaging, revision: state.revision, nextTickAt });
   }
   log(tx, ref, actor, command, realAt, revision) {
     tx.create(ref.collection('commands').doc(String(revision).padStart(12, '0')), { actor, command, realAt, revision });
@@ -235,6 +236,24 @@ export class FirestoreStore {
     // Reauthorize every connection; no state reads, clock advances or writes.
     await this.db.runTransaction(tx => this.actor(tx, user, id), { readOnly: true });
     return waitForSessionUpdate(this.sessionRef(id), revision, user.role !== 'instructor', signal);
+  }
+  async typing(user, id, active) {
+    return this.db.runTransaction(async tx => {
+      const actor = await this.actor(tx, user, id), ref = this.sessionRef(id);
+      const snapshot = await tx.get(ref);
+      if (!snapshot.exists) fail('Session not found.', 404);
+      const metadata = snapshot.data();
+      // Existing sessions acquire the compact feature flag on their next save.
+      const messaging = metadata.messaging || (await this.readSnapshot(tx, ref, metadata)).state.features.messaging;
+      const presenceRef = ref.collection('typing').doc(digest(String(actor.companyId)));
+      const presence = await tx.get(presenceRef);
+      const result = typingPresence(presence.data()?.entries, actor, { ...metadata, features: { messaging } }, active, this.now());
+      if (active !== undefined) {
+        if (result.entries.length) tx.set(presenceRef, { entries: result.entries });
+        else tx.delete(presenceRef);
+      }
+      return { typing: result.typing };
+    }, active === undefined ? { readOnly: true } : undefined);
   }
   async roster(user, id) {
     if (user.role !== 'instructor') fail('Instructor access required.', 403);

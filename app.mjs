@@ -1,6 +1,6 @@
-import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=1c844334b87f';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=1c844334b87f';
-import { watchSession } from './src/session-updates.mjs?v=1c844334b87f';
+import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=0e07673da16a';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=0e07673da16a';
+import { watchSession } from './src/session-updates.mjs?v=0e07673da16a';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -372,7 +372,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=1c844334b87f')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=0e07673da16a')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -443,7 +443,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=1c844334b87f')).testClient();
+      const client = (await import('./src/test-client.mjs?v=0e07673da16a')).testClient();
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -912,7 +912,7 @@ function helpPage() {
     ${section('energy', 'Energy, carbon, research and marketing', '<p>Compare electricity tariffs by shift, daily standing charges, switching fees, activation delays and carbon intensity. A new energy contract changes future production. Existing stock retains its embodied carbon.</p><p>Operational carbon includes received components and inbound transport, production electricity and outbound freight. Lower-carbon choices can affect customer demand when the instructor enables that preference.</p><p>Daily research gradually improves quality; daily marketing influences demand. Both create recurring costs. Review capacity before increasing demand, and compare the benefit with the cash commitment.</p>')}
     ${section('finance', 'Cash, profit, payments and financing', `<p><strong>Cash and profit are different.</strong> This session recognizes sales at ${state.accounting?.revenueAt === 'dispatch' ? 'dispatch' : 'customer receipt'}. Customer payment still follows actual receipt plus the accepted payment term. A shipped order can therefore be unpaid.</p><p>Finance separates receivables, supplier payables, debt, stock and locked deposits. Scheduled cash movements include committed events only, not all future wages, overhead or new trading. The transaction journal explains each posting.</p><p>Bullet loans fund after 24 hours; annuity loans after 48 hours. Review repayment dates and interest before borrowing. Term deposits lock cash until maturity with no early withdrawal. Keep enough liquidity for wages, freight, materials and scheduled obligations.</p><p>Daily rent, energy standing charges, budgets and depreciation affect profit. Depreciation is not a cash payment. If a due payment lacks cash, the obligation remains and is retried.</p>`)}
     ${section('reports', 'Reports and performance', '<p>Operational panels show live state. Reports show frozen snapshots taken at each midnight close, so today’s decisions may not appear in the chart yet.</p><p>Choose a measure and time window, select companies to compare, and open the exact-values table when you need precise numbers. Export CSV uses the selected report and time window. Daily sales and production are changes between closes; cash, inventory and cumulative measures describe each close.</p><p>Judge decisions across profit, cash, delivery service and carbon together. A high cash balance alone does not show whether customer promises are being met.</p>')}
-    ${section('messages', 'Messages, announcements and teamwork', '<p>Open <strong>Messages</strong> for one feed of instructor announcements, your team’s internal messages and conversations with the instructor. Each item names its conversation and sender.</p><p><strong>Show messages</strong> filters what you read. <strong>Send to</strong> chooses who receives your next message. Team messages stay inside your company; instructor conversations include your company and the instructor. Only instructors post class announcements.</p>')}
+    ${section('messages', 'Messages, announcements and teamwork', '<p>Open <strong>Messages</strong> for one feed of instructor announcements, your team’s messages and conversations with the instructor. Each item names its conversation and sender.</p><p><strong>Show messages</strong> filters what you read. <strong>Send to</strong> chooses who receives your next message. Team messages stay inside your company; instructor conversations include your company and the instructor. Only instructors post class announcements.</p>')}
     ${section('troubleshooting', 'When an action does not work', '<ul><li><strong>Disabled control:</strong> check stock, feature permissions, pending changes and whether the session has ended.</li><li><strong>Production stopped:</strong> check the active shift, limiting component, staffing, machine capacity, storage and cash.</li><li><strong>State changed:</strong> review the refreshed quote before retrying. A confirmation is required before treating a decision as accepted.</li><li><strong>Connection interrupted:</strong> keep the draft and use the pending-decision retry to avoid duplicating a commitment.</li><li><strong>Temporary test round:</strong> keep a test tab open. Test decisions are not saved as permanent classroom records.</li></ul>')}
     ${isTeacher() ? section('instructor', 'Instructor controls and decision timing', '<p>Session control manages the clock, feature visibility, decision permissions and future catalogue conditions. Company previews are read-only. Use announcements for class-wide guidance and instructor conversations for company-specific discussion.</p><p><strong>Student decision timing</strong> lists accepted decisions with real UTC timestamps and simulation times. Open a student’s history or export CSV. A rapid pattern is flagged for review at 4 decisions within 2 seconds or 6 within 10 seconds. Timing alone does not prove AI use; the indicator never changes grades or access.</p>') : ''}
     </div></div>`;
@@ -923,12 +923,72 @@ function reportsPage() {
   return `<div class="advice"><strong>Daily reports are frozen at each midnight close.</strong>Last close: ${state.snapshots.length ? simDate(state.snapshots.at(-1).hour) : 'none yet'}. Live operations: ${simDate(state.hour)}. Each close includes that hour’s arrivals, production, demand, automation, costs, and depreciation.</div><div class="toolbar control-toolbar">${select('report', 'Measure', Object.entries(reportTypes).map(([k, [n]]) => [k, n]), report)}${select('range', 'Time window', [['7', 'Last 7 days'], ['30', 'Last 30 days'], ['180', 'Full session']], String(reportRange))}${button('report-csv', 'Export CSV', '', 'small')}</div>${panel(title, `${unit} · daily snapshots`, `<div class="toolbar">${state.companies.map(c => check(`series-${c.id}`, c.name, !selectedCompanies.size || selectedCompanies.has(c.id))).join('')}</div>${chart(report, unit, { selected: true, range: reportRange })}`)}${panel('Exact daily values', 'Accessible data table · one row per company per completed day', `<details data-view-key="report-values"><summary>Show report values</summary>${table(['As of (simulation)', 'Company', `${esc(title)} (${unit})`], reportRows(snaps, true).map(row => [sortCell(simDate(row[0]), row[0]), esc(row[1]), sortCell(reportValue(row[2], unit), row[2])]))}</details>`)}`;
 }
 function reportRows(snaps = state.snapshots, rawTime = false) { return snaps.flatMap(s => s.companies.filter(c => !selectedCompanies.size || selectedCompanies.has(c.id)).map(c => { const prev = state.snapshots.find(x => x.hour === s.hour - 24)?.companies.find(x => x.id === c.id); let n = report === 'dailySales' ? c.revenue - (prev?.revenue || 0) : report === 'dailyProduction' ? c.production - (prev?.production || 0) : c[report]; if (reportTypes[report][1] === 'EUR') n /= 100; return [rawTime ? s.hour : simDate(s.hour), c.name, n]; })); }
-function channelOptions() { return [['announcements', 'Instructor announcements'], ...(isTeacher() ? state.companies.map(c => [`teacher:${c.id}`, `Teacher ↔ ${c.name}`]) : [[`team:${actor.companyId}`, 'My team · internal'], [`teacher:${actor.companyId}`, 'Ask the instructor']])]; }
+function channelOptions() { return [['announcements', 'Instructor announcements'], ...(isTeacher() ? state.companies.map(c => [`teacher:${c.id}`, `Teacher ↔ ${c.name}`]) : [[`team:${actor.companyId}`, 'My team'], [`teacher:${actor.companyId}`, 'Ask the instructor']])]; }
 function messageStyle(message) {
   if (message.channel === 'announcements') return 'message-announcement';
   if (message.channel.startsWith('team:')) return message.senderId === actor.id ? 'message-sent' : 'message-received';
   return 'message-conversation';
 }
+let typingJob = null, typingInputAt = 0;
+function typingContext() {
+  if (!state || !sessionId || solo || preview || actor?.role !== 'student' || document.hidden
+      || state.status === 'completed' || state.studentAccess === false
+      || !state.features.messaging?.allowed || !state.features.messaging?.visible
+      || (!testRoom && !health?.typingPresence) || !root.querySelector('[data-team-typing]')) return null;
+  const textarea = root.querySelector('#message-form textarea');
+  const teamRecipient = root.querySelector('#message-form [name=recipient]')?.value === `team:${actor.companyId}`;
+  return { scope: JSON.stringify([connectionScope(), actor.id, actor.companyId, channel]),
+    active: !!(teamRecipient && textarea?.value.trim() && document.activeElement === textarea && Date.now() - typingInputAt < 4000) };
+}
+function stopTypingJob() {
+  const old = typingJob; typingJob = null; typingInputAt = 0;
+  if (old?.sent) void (old.pending || Promise.resolve()).then(() => old.request(false)).catch(() => {});
+}
+async function syncTyping(fromInput = false) {
+  const context = typingContext();
+  if (typingJob && typingJob.scope !== context?.scope) stopTypingJob();
+  if (!context) return;
+  if (!typingJob) {
+    const client = testRoom, path = `${backend}/api/sessions/${encodeURIComponent(sessionId)}/typing`;
+    const auth = firebaseClient, localToken = token;
+    typingJob = { scope: context.scope, active: false, sent: false, lastPost: 0, pending: null,
+      request: async active => {
+        if (client) return client.call('typing', active === undefined ? undefined : { active });
+        const authorization = auth?.user ? await auth.token() : localToken;
+        const response = await fetch(path, { method: active === undefined ? 'GET' : 'POST', cache: 'no-store',
+          headers: { Authorization: `Bearer ${authorization}`, ...(active === undefined ? {} : { 'Content-Type': 'application/json' }) },
+          ...(active === undefined ? {} : { body: JSON.stringify({ active }) }), signal: AbortSignal.timeout(5000) });
+        if (!response.ok) throw new Error('Typing status unavailable');
+        return response.json();
+      } };
+  }
+  const job = typingJob;
+  if (job.pending) return;
+  if (fromInput && context.active === job.active && (!context.active || Date.now() - job.lastPost < 2000)) return;
+  const update = context.active ? true : job.active ? false : undefined;
+  if (update !== undefined) { job.sent = true; job.active = update; job.lastPost = Date.now(); }
+  job.pending = (async () => {
+    try {
+      const result = await job.request(update);
+      if (typingJob === job && typingContext()?.scope === job.scope) {
+        const notice = root.querySelector('[data-team-typing]');
+        if (notice) notice.textContent = result.typing ? 'Typing...' : '';
+      }
+    } catch {
+      if (typingJob === job) {
+        const notice = root.querySelector('[data-team-typing]');
+        if (notice) notice.textContent = '';
+      }
+    } finally { job.pending = null; }
+  })();
+  await job.pending;
+}
+document.addEventListener('input', event => {
+  if (event.target.matches?.('#message-form textarea')) { typingInputAt = Date.now(); void syncTyping(true); }
+});
+document.addEventListener('focusout', event => {
+  if (event.target.matches?.('#message-form textarea')) { typingInputAt = 0; void syncTyping(true); }
+});
 function messagesPage() {
   const conversations = channelOptions(), options = [['all', 'All messages'], ...conversations];
   if (!options.some(x => x[0] === channel)) channel = 'all';
@@ -938,7 +998,7 @@ function messagesPage() {
   const recipients = conversations.filter(([id]) => isTeacher() || id !== 'announcements');
   const recipient = recipients.some(([id]) => id === channel) ? channel : recipients[0]?.[0];
   const canSend = (state.status !== 'completed' || isTeacher()) && state.features.messaging.allowed && !!recipient;
-  return `<div class="toolbar">${select('channel', 'Show messages', options, channel)}<span class="form-note">Announcements and conversations appear together. Only messages available to your account are shown.</span></div>${panel(esc(options.find(x => x[0] === channel)?.[1]), 'Each message names its conversation and sender. Real and simulation times are shown separately.', `<div class="messages" data-view-key="messages">${messages.map(m => `<article class="message ${messageStyle(m)}"><div class="message-header"><strong>${esc(labels.get(m.channel))}</strong>${m.channel === 'announcements' ? '<span class="announcement-label">Announcement · No reply needed</span>' : ''}<span>${esc(m.senderName)} · ${esc(m.role)}</span></div><p>${esc(m.text)}</p><small>Real time: ${new Date(m.realAt).toLocaleString('en-GB')} · Simulation: ${simDate(m.hour)}</small></article>`).join('') || '<p class="empty">No messages in this view yet.</p>'}</div>${canSend ? `<form id="message-form">${select('recipient', 'Send to', recipients, recipient)}<p class="form-note">Your message goes only to the selected conversation. Only instructors can post announcements.</p><label>Your message<textarea name="text" maxlength="2000" placeholder="Share a decision, ask a question, or coordinate a next step…" required></textarea></label>${button('submit', 'Send message', '', 'primary')}<div class="error" role="alert"></div></form>` : '<p class="form-note">Messaging is read-only for your role or disabled.</p>'}`)}`;
+  return `<div class="toolbar">${select('channel', 'Show messages', options, channel)}<span class="form-note">Announcements and conversations appear together. Only messages available to your account are shown.</span></div>${panel(esc(options.find(x => x[0] === channel)?.[1]), 'Real and simulation times are shown separately.', `<div class="messages" data-view-key="messages">${messages.map(m => `<article class="message ${messageStyle(m)}"><div class="message-header">${m.channel === 'announcements' ? '<span>Instructor announcement</span>' : m.channel.startsWith('teacher:') ? `<span>${esc(labels.get(m.channel))}</span>` : ''}<span>${esc(m.senderName)}</span></div><p>${esc(m.text)}</p><small>Real time: ${new Date(m.realAt).toLocaleString('en-GB')} · Simulation: ${simDate(m.hour)}</small></article>`).join('') || '<p class="empty">No messages in this view yet.</p>'}</div>${actor.role === 'student' && (channel === 'all' || channel === `team:${actor.companyId}`) ? '<p class="team-typing" data-team-typing role="status" aria-live="polite" aria-label="Team typing status"></p>' : ''}${canSend ? `<form id="message-form">${select('recipient', 'Send to', recipients, recipient)}<p class="form-note">Your message goes only to the selected conversation. Only instructors can post announcements.</p><label>Your message<textarea name="text" maxlength="2000" placeholder="Share a decision, ask a question, or coordinate a next step…" required></textarea></label>${button('submit', 'Send message', '', 'primary')}<div class="error" role="alert"></div></form>` : '<p class="form-note">Messaging is read-only for your role or disabled.</p>'}`)}`;
 }
 const studentDecisionTypes = new Set(['offer', 'purchase', 'dispatch', 'shifts', 'staff', 'loan', 'deposit', 'energy', 'invest', 'reorder', 'budget']);
 function decisionTiming(audit = state?.audit || []) {
@@ -1187,7 +1247,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=1c844334b87f')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=0e07673da16a')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -1289,12 +1349,13 @@ document.addEventListener('submit', async event => {
     if (form.id === 'shifts-form') { await command({ type: 'shifts', shifts: [0, 1, 2].map(i => f.has(`shift${i}`)) }); render(); }
     if (form.id === 'effects-form') { await command({ type: 'configure', carbonDemand: f.has('carbonDemand') }); render(); }
     if (form.dataset.feature) { await command({ type: 'configure', feature: form.dataset.feature, visible: f.has('visible'), allowed: f.has('allowed') }); render(); }
-    if (form.id === 'message-form') { await command({ type: 'message', channel: f.get('recipient') || channel, text: f.get('text') }); render(); }
+    if (form.id === 'message-form') { typingInputAt = 0; void syncTyping(true); await command({ type: 'message', channel: f.get('recipient') || channel, text: f.get('text') }); render(); }
   } catch (e) { reportFormError(form, e); }
   finally { submittingForms.delete(form); if (submit) submit.disabled = false; }
 });
 document.addEventListener('change', async event => {
   const target = event.target;
+  if (target.name === 'recipient') { typingInputAt = 0; void syncTyping(true); }
   if (target.name === 'sessionCity') {
     const label = target.form.querySelector('[data-custom-session]');
     const input = label.querySelector('input'), custom = target.value === 'custom';
@@ -1329,7 +1390,7 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=1c844334b87f')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    try { const client = (await import('./src/test-client.mjs?v=0e07673da16a')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p><div class="toolbar">' + (e.status === 403 ? button('retry-start', 'Try again', '', 'primary') : '') + button('test-leave','Return to classroom') + '</div></main>'; }
     return;
   }
@@ -1356,6 +1417,7 @@ async function startWorkspace() {
   }
 }
 await startWorkspace();
+setInterval(() => { void syncTyping(); }, 2000);
 setInterval(() => { if (needsBackgroundPoll()) void refreshInBackground(); }, 3000);
 
 window.addEventListener('popstate', () => { if (user && !solo) enter().catch(e => toast(e.message)); });
@@ -1364,5 +1426,8 @@ window.addEventListener('online', connectionRestored);
 
 // Suspended browser tabs resync as soon as they become visible again.
 document.addEventListener('visibilitychange', () => {
+  if (document.hidden) stopTypingJob(); else void syncTyping();
   if (!solo && sessionId && !document.hidden) void refreshInBackground();
 });
+
+window.addEventListener('pagehide', stopTypingJob);

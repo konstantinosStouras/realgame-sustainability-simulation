@@ -196,6 +196,38 @@ test('message submission uses the selected recipient rather than the all-message
   assert.equal(h.context.sent.channel,'teacher:c1');assert.equal(h.context.sent.text,'Preserve this draft');
 });
 
+test('message headers retain full names without repeating roles or internal labels', () => {
+  const h=harness();
+  h.run(`actor={id:'s',role:'student',companyId:'c1'};state.status='paused';state.features={messaging:{allowed:true}};state.companies=[];channel='all';
+    state.messages=[{channel:'announcements',senderId:'t',senderName:'Taylor Morgan',role:'instructor',text:'Review your plan.'},{channel:'team:c1',senderId:'s',senderName:'Alex Parker',role:'student',text:'Ready.'}].map(m=>({...m,hour:24,realAt:'2026-11-15T10:00:00Z'}));`);
+  const html=h.run('messagesPage()');
+  const headers=[...html.matchAll(/<div class="message-header">(.*?)<\/div>/g)].map(m=>m[1]);
+  assert.equal(headers[0],'<span>Instructor announcement</span><span>Taylor Morgan</span>');
+  assert.equal(headers[1],'<span>Alex Parker</span>');
+  assert.doesNotMatch(html,/internal|· student|· instructor/);
+});
+
+test('typing sends only a flag, clears on blur and ignores results after leaving a team view', async () => {
+  const h=harness(), calls=[], notice={textContent:''}, textarea={value:'Private draft'}, recipient={value:'team:c1'};
+  const nodes={'[data-team-typing]':notice,'#message-form textarea':textarea,'#message-form [name=recipient]':recipient};
+  h.context.document.querySelector('#app').querySelector=selector=>nodes[selector];
+  h.context.document.activeElement=textarea;
+  h.context.fetch=async (url,options)=>{calls.push({url,options});return {ok:true,json:async()=>({typing:true})};};
+  h.run("actor={id:'s',role:'student',companyId:'c1'};state.status='paused';state.features={messaging:{allowed:true,visible:true}};health={typingPresence:true};channel='all';typingInputAt=Date.now();");
+  await h.run('syncTyping(true)');
+  assert.deepEqual(JSON.parse(calls[0].options.body),{active:true});
+  assert.equal(notice.textContent,'Typing...');
+  await h.run('syncTyping(true)');assert.equal(calls.length,1,'input is throttled');
+  h.context.document.activeElement=null;
+  await h.run('syncTyping(true)');assert.deepEqual(JSON.parse(calls[1].options.body),{active:false});
+  let resolve;
+  h.context.fetch=()=>new Promise(r=>{resolve=r;});
+  const pending=h.run('syncTyping()');
+  delete nodes['[data-team-typing]'];notice.textContent='';
+  resolve({ok:true,json:async()=>({typing:true})});await pending;
+  assert.equal(notice.textContent,'','late response cannot restore a typing indicator after navigation');
+});
+
 test('decision timing separates students, excludes non-decisions and preserves millisecond timestamps', () => {
   const h=harness();h.context.audit=[0,500,1000,1500].map((ms,i)=>({id:'a'+i,role:'student',actorId:'s1',actorName:'Student',companyId:'c1',realAt:new Date(Date.UTC(2026,0,1)+ms).toISOString(),hour:0,command:{type:'offer'},result:'Saved'}));
   h.context.audit.push({role:'student',actorId:'s2',realAt:'2026-01-01T00:00:00.250Z',command:{type:'purchase'}},{role:'student',actorId:'s1',realAt:'bad',command:{type:'staff'}},{role:'student',actorId:'s1',realAt:'2026-01-01T00:00:00.100Z',command:{type:'message'}},{role:'instructor',actorId:'teacher',realAt:'2026-01-01T00:00:00.000Z',command:{type:'offer'}});

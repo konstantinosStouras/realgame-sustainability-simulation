@@ -1,4 +1,5 @@
 import { requireOpen, requireReadable } from './session-access.mjs';
+import { typingPresence } from '../src/typing-presence.mjs';
 import { testTemplate } from './test-template.mjs';
 import { sessionId } from '../src/session-id.mjs';
 import { DatabaseSync } from 'node:sqlite';
@@ -105,6 +106,14 @@ export class Store {
   roster(user, sessionId) {
     this.actor(user, sessionId); if (user.role !== 'instructor') fail('Instructor access required.', 403);
     return { members: this.db.prepare('SELECT u.id,u.name,u.username,u.role,m.companyId FROM members m JOIN users u ON u.id=m.userId WHERE m.sessionId=?').all(sessionId), invites: this.db.prepare('SELECT code,companyId FROM invites WHERE sessionId=?').all(sessionId) };
+  }
+  typing(user, id, active) {
+    const actor = this.actor(user, id), session = this.session(id);
+    this.typingEntries ||= new Map();
+    const key = JSON.stringify([id, actor.companyId]);
+    const result = typingPresence(this.typingEntries.get(key), actor, session, active);
+    if (result.entries.length) this.typingEntries.set(key, result.entries); else this.typingEntries.delete(key);
+    return { typing: result.typing };
   }
   assign(user, sessionId, userId, companyId) {
     const actor = this.actor(user, sessionId); if (user.role !== 'instructor') fail('Instructor access required.', 403);
