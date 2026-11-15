@@ -1,6 +1,6 @@
-import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=78f8ea13698e';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=78f8ea13698e';
-import { watchSession } from './src/session-updates.mjs?v=78f8ea13698e';
+import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=6d9f06df8dd2';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=6d9f06df8dd2';
+import { watchSession } from './src/session-updates.mjs?v=6d9f06df8dd2';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -371,14 +371,14 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=78f8ea13698e')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=6d9f06df8dd2')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
   const auth = await getFirebase(); token = await auth.token();
   if (!auth.user) return renderWelcome();
   if (!auth.user.emailVerified) {
-    root.innerHTML = `<main class="welcome" id="content">${brand}<h1>Check your inbox.</h1><p>Verify your email to join your classroom. Then return here and continue.</p>${button('firebase-refresh', 'I’ve verified my email', '', 'primary')} ${button('firebase-verify', 'Resend verification')} ${button('logout', 'Sign out')}<p class="form-note">Google sign-in verifies supported accounts automatically.</p></main>`;
+    root.innerHTML = `<main class="welcome" id="content">${brand}<h1>Check your inbox.</h1><p>Verify your email to join your classroom. Then return here and continue.</p><div class="toolbar">${button('firebase-refresh', 'I’ve verified my email', '', 'primary')}${button('firebase-verify', 'Resend verification')}${button('logout', 'Sign out')}</div><p class="form-note">Google sign-in verifies supported accounts automatically.</p></main>`;
     return;
   }
   if (health?.auth === 'firebase') return enter();
@@ -442,7 +442,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=78f8ea13698e')).testClient();
+      const client = (await import('./src/test-client.mjs?v=6d9f06df8dd2')).testClient();
       try { await client.create(template,groups); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -750,7 +750,7 @@ function instructorOverview() {
 }
 function offersPanel(embedded = false) {
   const c = company();
-  return `${panel(embedded ? '' : 'Sales offers', 'One transparent offer per market. Editing affects future orders.', table(['Market', 'Price / module', 'Quantity band', 'Delivery promise', 'Payment after receipt', ''], c.offers.map(o => [esc(state.catalog.markets.find(m => m.id === o.marketId)?.name), sortCell(exactMoney(o.price), o.price), sortCell(`${o.min}–${o.max}`, o.min), sortCell(`${o.delivery} h`, o.delivery), sortCell(`${o.payment} h`, o.payment), `${o.enabled ? '<span class="badge">Active</span>' : '<span class="badge amber">Off</span>'} ${button('offer', 'Edit', o.id, 'small', !permitted('offers'))}`])))}`;
+  return `${panel(embedded ? '' : 'Sales offers', 'One transparent offer per market. Editing affects future orders.', table(['Market', 'Price / module', 'Quantity band', 'Delivery promise', 'Payment after receipt', ''], c.offers.map(o => [esc(state.catalog.markets.find(m => m.id === o.marketId)?.name), sortCell(exactMoney(o.price), o.price), sortCell(`${o.min}–${o.max}`, o.min), sortCell(`${o.delivery} h`, o.delivery), sortCell(`${o.payment} h`, o.payment), `<div class="table-actions">${o.enabled ? '<span class="badge">Active</span>' : '<span class="badge amber">Off</span>'}${button('offer', 'Edit', o.id, 'small', !permitted('offers'))}</div>`])))}`;
 }
 function ordersPanel(embedded = false) {
   const c = company();
@@ -1098,7 +1098,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=78f8ea13698e')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=6d9f06df8dd2')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -1231,8 +1231,8 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=78f8ea13698e')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
-    catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p>' + (e.status === 403 ? button('retry-start', 'Try again', '', 'primary') : '') + button('test-leave','Return to classroom') + '</main>'; }
+    try { const client = (await import('./src/test-client.mjs?v=6d9f06df8dd2')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p><div class="toolbar">' + (e.status === 403 ? button('retry-start', 'Try again', '', 'primary') : '') + button('test-leave','Return to classroom') + '</div></main>'; }
     return;
   }
   // Restore authentication alongside discovery; never paint a speculative login.
