@@ -410,7 +410,7 @@ body .deadline-exact { font-weight: 700; }
 .timebox strong { line-height: 1.5; }
 
 /* Consistent separation in action groups, including their wrapped rows. */
-.instructor-links, .clock-speed-bands, .message-format-toolbar, .demo-choices { gap: 12px; }
+.instructor-links, .clock-speed-bands, .message-format-toolbar, .demo-choices, .account-controls { gap: 12px; }
 .workspace-tools { gap: 8px; }
 .mode-banner { flex-wrap: wrap; gap: 12px; padding-block: 14px; }
 .mode-banner > span { flex: 1 1 320px; min-width: 0; max-width: 100%; }
