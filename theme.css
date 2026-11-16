@@ -462,15 +462,15 @@ dialog > .table-wrap + :is(button, .button) { margin-top: 20px; }
   [data-operational-report] thead { position: static; }
   .history-bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(44px, 1fr)); gap: 12px 8px; overflow: visible; }
   .history-bar { min-width: 0; }
+  .pane-title { flex-wrap: wrap; padding: 12px; }
+  .pane-title h2 { flex: 1 1 100%; }
+  .pane-controls { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; width: 100%; }
+  .pane-controls button { min-width: 0; min-height: 44px; padding: 8px; }
 }
 @media (max-width: 700px) {
   .value-list > div { flex-wrap: wrap; gap: 8px 16px; }
   .value-list > div > * { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
   .pane-title h2, .panel-head h2 { min-width: 0; overflow-wrap: anywhere; }
-  .pane-title { flex-wrap: wrap; padding: 12px; }
-  .pane-title h2 { flex: 1 1 100%; }
-  .pane-controls { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; width: 100%; }
-  .pane-controls button { min-width: 0; min-height: 44px; padding: 8px; }
   .pane-content { padding-bottom: 28px; }
   .pane-resize-corner { width: 24px; height: 24px; }
   .pane-resize-right { right: 0; }
