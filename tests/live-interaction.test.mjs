@@ -16,7 +16,7 @@ function harness() {
   const handlers = {};
   const body = { closest: () => null }, document = { activeElement: body, scrollingElement: { scrollLeft: 0, scrollTop: 0 }, addEventListener: (name, handler) => { handlers[name] = handler; } };
   const model = { orders: ['first', 'second'], day: 24, value: 'fresh' };
-  const root = { querySelectorAll: () => nodes, querySelector: () => ({ insertAdjacentHTML: (_, text) => { html += text; } }) };
+  const root = { querySelectorAll: selector => selector === '.student-pane' ? [] : nodes, querySelector: () => ({ insertAdjacentHTML: (_, text) => { html += text; } }) };
   const dialog = { open: false }, toast = {};
   document.querySelector = selector => ({ '#app': root, '#dialog': dialog, '#toast': toast })[selector];
   function element(tag, attrs = {}, parent = root) {

@@ -1,8 +1,8 @@
-import { operationalReports, buildOperationalReport, businessUpdates } from './src/operational-reports.mjs?v=05c658c52356';
-import { createMessageSounds } from './src/message-sounds.mjs?v=05c658c52356';
-import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=05c658c52356';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=05c658c52356';
-import { watchSession } from './src/session-updates.mjs?v=05c658c52356';
+import { operationalReports, buildOperationalReport, businessUpdates } from './src/operational-reports.mjs?v=65cb6a4b3873';
+import { createMessageSounds } from './src/message-sounds.mjs?v=65cb6a4b3873';
+import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=65cb6a4b3873';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=65cb6a4b3873';
+import { watchSession } from './src/session-updates.mjs?v=65cb6a4b3873';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -401,7 +401,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=05c658c52356')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=65cb6a4b3873')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -467,7 +467,7 @@ async function testStudents() {
 }
 function testOwner() { return JSON.stringify([backend, firebaseClient?.user?.uid || user.id]); }
 async function savedTests(source) {
-  const client = (await import('./src/test-client.mjs?v=05c658c52356')).testClient();
+  const client = (await import('./src/test-client.mjs?v=65cb6a4b3873')).testClient();
   let saved;
   try { saved = await client.call('list',{owner:testOwner(),source}); } finally { client.close(); }
   modal('Saved test sessions', '<p>Saved on this device in this browser profile. Clearing site data removes these tests. Each session retains its students, decisions and results. Open a session to resume or delete it.</p>' + (saved.length ? table(['Session','Hour','Students',''],saved.map(s => {
@@ -484,7 +484,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=05c658c52356')).testClient();
+      const client = (await import('./src/test-client.mjs?v=65cb6a4b3873')).testClient();
       try { await navigator.storage?.persist?.().catch(() => false); await client.create(template,groups,{owner:testOwner(),source:id}); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -691,7 +691,7 @@ function openReportCategory(id, focus = false) {
   if (focus) menu.querySelector('button')?.focus();
 }
 document.addEventListener('pointerover', event => {
-  if (event.pointerType !== 'mouse') return;
+  if (event.pointerType !== 'mouse' || document.documentElement.clientWidth <= 700) return;
   const tool = event.target.closest?.('.workspace-tools [aria-haspopup]');
   if (tool) openWorkspaceMenu(tool.dataset.id);
   const category = event.target.closest?.('.menu-category');
@@ -781,7 +781,7 @@ function studentWorkspace(visible) {
   if (!panels.length) return '<p class="empty">Choose a tool from the left menu to open its panel here.</p>';
   return '<div class="student-panels" data-view-key="student-panels">' + panels.map(id => {
     const [label, , renderPanel] = studentPanels[id];
-    return '<section class="student-pane" data-pane-id="' + id + '" style="' + paneLayoutStyle(id) + '" data-view-key="pane-' + id + '" aria-labelledby="pane-' + id + '"><div class="pane-title" draggable="true" title="Drag to reorder this panel"><h2 id="pane-' + id + '" tabindex="-1">' + label + '</h2><div class="pane-controls">' +
+    return '<section class="student-pane" data-pane-id="' + id + '" data-view-key="pane-' + id + '" aria-labelledby="pane-' + id + '"><div class="pane-title" draggable="true" title="Drag to reorder this panel"><h2 id="pane-' + id + '" tabindex="-1">' + label + '</h2><div class="pane-controls">' +
       '<button type="button" data-action="pane-earlier" data-id="' + id + '" aria-label="Move ' + label + ' earlier" title="Move earlier">←</button>' +
       '<button type="button" data-action="pane-later" data-id="' + id + '" aria-label="Move ' + label + ' later" title="Move later">→</button>' +
       '<button type="button" data-action="pane-wide" data-id="' + id + '" aria-label="Expand ' + label + ' to full width" title="Full width">↔</button>' +
@@ -797,6 +797,10 @@ function paneLayoutStyle(id) {
   const layout = panelLayouts.get(id) || {};
   const full = layout.full || (!layout.width && ['production', 'finance', 'energy', 'messages'].includes(id)) || (!layout.width && id.startsWith('report-'));
   return '--pane-width:' + (full ? '100%' : (layout.width || 560) + 'px') + ';' + (layout.height ? 'height:' + layout.height + 'px;' : '');
+}
+function applyPaneLayout(pane) {
+  // Apply through CSSOM so strict style-src CSP also permits restored sizes.
+  pane.style.cssText = paneLayoutStyle(pane.dataset.paneId);
 }
 function constrainPaneSize(width, height, available) {
   const maxWidth = Math.max(1, available);
@@ -924,6 +928,7 @@ function render() {
   const titles = { workspace: 'Decision workspace', overview: c ? `Let's make progress, ${c.name.split(' ')[0]}.` : 'A classroom in motion.', orders: 'From offer to arrival.', supply: 'Keep your business moving.', production: 'Make capacity count.', finance: 'Follow the money.', energy: 'Build a better footprint.', reports: 'See the whole picture.', messages: 'Better decisions, together.', help: 'Your guide to running the business.', admin: 'Set the pace of learning.' };
   const subtitles = { workspace: 'Open the panels you need and compare them side by side.', overview: 'Your business, at a glance. Every decision has a next step.', orders: 'Accepted terms stay with each order, from first dispatch to final payment.', supply: 'Balance availability, working capital, and the footprint of every component.', production: 'Coordinate materials, people, machines, and the hours they work.', finance: 'Cash is available money. Profit is revenue earned less costs incurred.', energy: 'Invest now. Track activation and the results over time.', reports: 'Comparable daily results, with every reporting boundary clearly marked.', messages: 'A shared space for announcements, questions, and team decisions.', help: 'Know what to check, which decisions to make, and what happens next.', admin: 'Control the shared clock, classroom access, and teaching parameters.' };
   root.innerHTML = `<div class="layout">${!admin || preview ? workspaceNavigation(admin, visible) : ''}<div class="workspace"><header class="topbar"><div class="breadcrumb">Workspace &nbsp; / &nbsp; <strong>${pages[page] || "Decision workspace"}</strong></div><div class="top-actions">${user?.role === 'instructor' ? button('sessions', 'All sessions', '', 'small') : ''}${accountControls(actor)}</div></header>${testRoom ? `<div class="mode-banner"><span><strong>Saved test session</strong> · ${esc(actor.name)} · Saved in this browser profile. Close tabs and return later; delete only when finished.</span>${admin ? button('test-students', 'Open test student tabs') + button('test-end', 'Delete test session') : ''}${button('test-leave', 'Leave test')}</div>` : solo ? `<div class="mode-banner"><span><strong>Solo sandbox</strong> · ${solo.isTest ? 'Private test round · changes are discarded when you leave.' : 'Saved in this browser. Switch roles to rehearse; no other people are connected.'}</span>${button('switch-solo', admin ? 'Play a company' : 'Instructor view')}</div>` : health?.demo ? '<div class="mode-banner"><span><strong>Local classroom demo</strong> · Synthetic accounts share durable server state. Demo sign-in is enabled on this computer.</span></div>' : ''}<main id="content" class="content">${connectionNotice()}<div class="page-heading"><div><div class="eyebrow">${esc(state.name)}${c ? ` &nbsp; / &nbsp; ${esc(c.name)}` : ''}</div><h1 tabindex="-1">${esc(titles[page])}</h1><p>${subtitles[page]}</p></div>${page === 'admin' ? '' : `<div class="timebox">${shiftIndicator()}<span class="badge ${state.status === 'running' ? '' : 'amber'}">● ${esc(state.status)}</span><strong>${simDate(state.hour)} · simulation</strong><small>Day ${Math.floor(state.hour / 24) + 1} · ends ${simDate(state.endHour)}</small></div>`}</div>${state.status === 'completed' ? `<div class="advice warning"><strong>Session complete. ${state.events.filter(e => e.status === 'pending').length} scheduled events remain.</strong>${admin ? 'Pending deliveries, payments, and investments are preserved. The instructor can extend the end date to settle them.' : 'Final reports and CSV downloads remain available. New decisions are disabled.'}</div>` : ''}${admin ? `<div class="toolbar instructor-toolbar control-toolbar" aria-label="Instructor controls">${select('preview', 'Company preview · read-only', [['', 'All companies'], ...state.companies.map(x => [x.id, x.name])], preview || '')}<nav class="instructor-links" aria-label="Instructor pages">${button('nav', 'Session control', 'admin', 'small')}${button('nav', 'Class overview', 'overview', 'small')}${button('nav', 'Reports', 'reports', 'small')}${button('nav', 'Messages', 'messages', 'small')}</nav></div>` : ''}${!admin && !solo && !testRoom ? `<div class="toolbar" aria-label="Classroom access">${button('join', 'Join another class', '', 'small')}${button('sessions', 'Switch session', '', 'small')}</div>` : ''}${page === "workspace" ? studentWorkspace(visible) : pageBody()}<div class="footer-note">${button('nav', 'Help & guide', 'help', 'small')}<p>All amounts are simulated EUR · Emissions in kg CO₂e · Simulation dates use UTC · Live state at ${simDate(state.hour)} · Model v${state.schema}</p></div></main></div></div>`;
+  for (const pane of root.querySelectorAll?.('.student-pane') || []) applyPaneLayout(pane);
   rememberWorkspaceView();
   const pending = !solo && !testRoom && sessionStorage.getItem(`studio-pending:${backend}:${actor.id}:${sessionId}`);
   if (pending && !busy) root.querySelector('#content').insertAdjacentHTML('afterbegin', `<div id="pending-decision" class="advice warning"><strong>A decision is awaiting confirmation.</strong>The response was interrupted. Retry with the same request key to confirm the outcome safely. ${button('retry-decision', 'Retry pending decision', '', 'small')}</div>`);
@@ -1561,7 +1566,7 @@ async function action(name, id) {
     if (!Object.hasOwn(studentPanels, id)) return;
     if (name === 'pane-wide') panelLayouts.set(id, { ...panelLayouts.get(id), full: true }); else panelLayouts.delete(id);
     const pane = root.querySelector('[data-pane-id="' + id + '"]');
-    if (pane) pane.style.cssText = paneLayoutStyle(id);
+    if (pane) applyPaneLayout(pane);
     rememberWorkspaceView(); return;
   }
   if (name === 'pane-earlier' || name === 'pane-later') {
@@ -1674,7 +1679,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=05c658c52356')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=65cb6a4b3873')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -1831,7 +1836,7 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=05c658c52356')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    try { const client = (await import('./src/test-client.mjs?v=65cb6a4b3873')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p><div class="toolbar">' + (e.status === 403 ? button('retry-start', 'Try again', '', 'primary') : '') + button('test-leave','Return to classroom') + '</div></main>'; }
     return;
   }

@@ -11,7 +11,11 @@ function setup(values = new Map(), { id = 'teacher', sessionId = 'class-one', un
   const teacher = { id, role, name: 'Test actor', ...(role === 'student' ? {companyId:'company-1'} : {}) };
   engine.applyCommand(session, {id:'teacher',role:'instructor'}, { type: 'step', hours: 48 });
   const storage = { getItem: k => values.get(k) ?? null, setItem: (k,v) => { if(unavailable) throw new Error('Storage blocked'); values.set(k,v); } };
-  const root = { innerHTML: '' }, requests = [];
+  const root = { innerHTML: '', panes: [], querySelectorAll(selector) {
+    if (selector !== '.student-pane') return [];
+    this.panes = [...this.innerHTML.matchAll(/data-pane-id="([^"]+)"/g)].map(match => ({dataset:{paneId:match[1]},style:{cssText:''}}));
+    return this.panes;
+  } }, requests = [];
   const location = { hostname: 'localhost', href: 'https://example.test/simulation/?session=' + sessionId };
   const context = vm.createContext({ operationalReports, buildOperationalReport, businessUpdates, createMessageSounds, ...engine, URL, URLSearchParams, location, history: { replaceState: (_,__,href) => { location.href=href; } },
     localStorage: storage, sessionStorage: storage, classroomBackend: '', firebaseConfig: {},
@@ -48,6 +52,9 @@ test('panel sizes and order survive refresh without storing simulation records',
   assert.equal(refreshed.run("panelLayouts.get('report-orders').full"),true);
   assert.equal(refreshed.run('[...openPanels].join()'),'inventory,report-orders');
   assert.match(refreshed.root.innerHTML,/data-pane-resize="width"/);
+  assert.equal(refreshed.root.panes.find(p => p.dataset.paneId === 'inventory').style.cssText,'--pane-width:750px;height:480px;');
+  assert.equal(refreshed.root.panes.find(p => p.dataset.paneId === 'report-orders').style.cssText,'--pane-width:100%;');
+  assert.doesNotMatch(refreshed.root.innerHTML, /class="student-pane"[^>]+style=/);
 });
 
 test('refresh retains report and conversation selections without caching classroom data', async () => {
