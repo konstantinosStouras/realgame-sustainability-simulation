@@ -654,3 +654,30 @@ test('instructor timing CSV exports each accepted decision and protects student 
   await h.run("action('decision-timing-csv','')");
   assert.equal(h.context.exports.length,1);
 });
+
+test('market editor submits fractional hourly λ and explains shared live demand', async () => {
+  const h = harness();
+  h.run("state = createSession(); modal = (title, body, submit) => { marketModal = {title,body,submit}; }; command = async cmd => { marketCommand = cmd; };");
+  await h.run("action('catalog-edit', 'markets:local')");
+  const body = h.run('marketModal.body');
+  assert.match(body, /Demand rate λ \(modules \/ simulation hour\)/);
+  assert.match(body, /step="any"/);
+  assert.match(body, /across all teams/);
+  assert.match(body, /next simulation hour/);
+  assert.doesNotMatch(body, /name="volume"/);
+  h.context.rateForm = new Map([['lambda', '12.5'], ['referencePrice', '28500'], ['greenWeight', '25'], ['enabled', 'on']]);
+  await h.run('marketModal.submit(rateForm)');
+  assert.equal(h.run('marketCommand.patch.lambda'), 12.5);
+  assert.equal(h.run('marketCommand.patch.enabled'), true);
+  assert.equal(h.run('Object.hasOwn(marketCommand.patch, "volume")'), false);
+});
+
+test('legacy market editor labels conversion and preserves the expected daily rate', async () => {
+  const h = harness();
+  h.run("state = createSession(); delete state.catalog.markets[0].lambda; state.catalog.markets[0].volume = 120; modal = (title, body, submit) => { marketModal = {title,body,submit}; };");
+  await h.run("action('catalog-list', 'markets')");
+  assert.match(h.run('marketModal.body'), /Legacy/);
+  await h.run("action('catalog-edit', 'markets:local')");
+  assert.match(h.run('marketModal.body'), /Saving this form switches it/);
+  assert.match(h.run('marketModal.body'), /name="lambda"[^>]*value="20"/);
+});

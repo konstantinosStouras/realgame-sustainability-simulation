@@ -72,7 +72,8 @@ for (const revenueAt of ['receipt', 'dispatch']) test(`60-day complete 12-team e
   for (let day = 0; day < 60; day++) {
     if (day === 1) for (let team = 0; team < 12; team++) {
       const order = state.companies[team].orders[0];
-      act(students[team * 10], { type: 'dispatch', orderId: order.id, qty: 2, routeId: 'air' });
+      // Hourly Poisson demand can create single-module orders.
+      act(students[team * 10], { type: 'dispatch', orderId: order.id, qty: Math.min(2, order.remaining), routeId: 'air' });
     }
     if (day === 7) for (let team = 0; team < 12; team++) act(students[team * 10 + 3], { type: 'invest', kind: 'efficiency' });
     if (day === 20) for (let team = 0; team < 12; team++) {

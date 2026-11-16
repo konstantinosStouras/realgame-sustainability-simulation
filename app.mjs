@@ -1,8 +1,8 @@
-import { operationalReports, buildOperationalReport, businessUpdates } from './src/operational-reports.mjs?v=4faa8c1dfbf7';
-import { createMessageSounds } from './src/message-sounds.mjs?v=4faa8c1dfbf7';
-import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=4faa8c1dfbf7';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=4faa8c1dfbf7';
-import { watchSession } from './src/session-updates.mjs?v=4faa8c1dfbf7';
+import { operationalReports, buildOperationalReport, businessUpdates } from './src/operational-reports.mjs?v=d6028004bc69';
+import { createMessageSounds } from './src/message-sounds.mjs?v=d6028004bc69';
+import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=d6028004bc69';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=d6028004bc69';
+import { watchSession } from './src/session-updates.mjs?v=d6028004bc69';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -401,7 +401,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=4faa8c1dfbf7')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=d6028004bc69')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -467,7 +467,7 @@ async function testStudents() {
 }
 function testOwner() { return JSON.stringify([backend, firebaseClient?.user?.uid || user.id]); }
 async function savedTests(source) {
-  const client = (await import('./src/test-client.mjs?v=4faa8c1dfbf7')).testClient();
+  const client = (await import('./src/test-client.mjs?v=d6028004bc69')).testClient();
   let saved;
   try { saved = await client.call('list',{owner:testOwner(),source}); } finally { client.close(); }
   modal('Saved test sessions', '<p>Saved on this device in this browser profile. Clearing site data removes these tests. Each session retains its students, decisions and results. Open a session to resume or delete it.</p>' + (saved.length ? table(['Session','Hour','Students',''],saved.map(s => {
@@ -484,7 +484,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=4faa8c1dfbf7')).testClient();
+      const client = (await import('./src/test-client.mjs?v=d6028004bc69')).testClient();
       try { await navigator.storage?.persist?.().catch(() => false); await client.create(template,groups,{owner:testOwner(),source:id}); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -1679,7 +1679,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=4faa8c1dfbf7')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=d6028004bc69')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -1717,8 +1717,22 @@ async function action(name, id) {
   if (name === 'roster') { roster = await api(`/sessions/${sessionId}/roster`); modal('Companies & join codes', `<p class="form-note">Share each code with that company’s students. Codes do not grant instructor access.</p>${table(['Company', 'Student join code', ''], roster.invites.map(i => [esc(state.companies.find(c => c.id === i.companyId)?.name), `<code>${esc(i.code)}</code>`, button('rename', 'Rename', i.companyId, 'small')]))}${table(['Participant', 'Company', ''], roster.members.filter(u => u.role === 'student').map(u => [esc(u.name), esc(state.companies.find(c => c.id === u.companyId)?.name), button('assign', 'Reassign', u.id, 'small')]))}`); }
   if (name === 'rename') modal('Rename company', field('name', 'Company name', state.companies.find(c => c.id === id).name, 'text', 'maxlength="60"'), f => command({ type: 'renameCompany', companyId: id, name: f.get('name') }));
   if (name === 'assign') modal('Assign student to a company', `<p class="form-note">Previous team and peer channels will no longer be accessible. Membership is checked on each request.</p>${select('companyId', 'Company', state.companies.map(c => [c.id, c.name]), roster.members.find(u => u.id === id)?.companyId)}`, async f => { await api(`/sessions/${sessionId}/assign`, { userId: id, companyId: f.get('companyId') }); await load(false); });
-  if (name === 'catalog-list') modal(`${id.charAt(0).toUpperCase() + id.slice(1)} catalogue`, table(['Name', 'State', ''], state.catalog[id].map(x => [esc(x.name), x.enabled ? 'Enabled' : 'Disabled', button('catalog-edit', 'Edit', `${id}:${x.id}`, 'small')]), 'Nothing here yet.', `catalog-${id}`));
-  if (name === 'catalog-edit') { const [collection, rowId] = id.split(':'), row = state.catalog[collection].find(x => x.id === rowId), fields = { suppliers: ['price', 'stock', 'replenish', 'lead', 'term', 'reliability'], routes: ['hours', 'fixed', 'unit', 'term', 'reliability'], markets: ['volume', 'referencePrice', 'greenWeight'], energy: ['fee', 'daily', 'delay'] }[collection]; modal(row.name, `<p class="form-note">Money fields are integer cents; time fields are hours; reliability and green weight are percent; stock and volume are units. Changes affect future contracts.</p><div class="form-grid">${fields.map(k => field(k, ({ price: 'Unit price (cents)', fixed: 'Fixed freight (cents)', unit: 'Freight / unit (cents)', referencePrice: 'Reference price (cents)', fee: 'Switch fee (cents)', daily: 'Standing charge (cents/day)', volume: 'Demand / 6-hour cycle', greenWeight: 'Carbon preference (%)', stock: 'Available stock', replenish: 'Daily replenishment', lead: 'Lead time (hours)', term: 'Payment term (hours)', hours: 'Transit (hours)', delay: 'Switch delay (hours)', reliability: 'On-time probability (%)' })[k], (row[k] ?? 0), 'number', 'min="0"')).join('')}${check('enabled', 'Enabled', row.enabled)}</div>`, f => command({ type: 'catalog', collection, id: rowId, patch: { ...Object.fromEntries(fields.map(k => [k, value(f, k)])), enabled: f.has('enabled') } })); }
+  if (name === 'catalog-list') {
+    const markets = id === 'markets';
+    modal(`${id.charAt(0).toUpperCase() + id.slice(1)} catalogue`,
+      (markets ? '<p class="form-note">All teams compete for one shared demand pool per market. Poisson arrivals are sampled each simulation hour. Edit λ before or during play.</p>' : '') +
+      table(['Name', ...(markets ? ['Demand model'] : []), 'State', ''], state.catalog[id].map(x => [esc(x.name), ...(markets ? [x.lambda === undefined ? `Legacy · ${number(x.volume)} modules / 6 h` : `Poisson · λ ${precise(x.lambda)} modules / h`] : []), x.enabled ? 'Enabled' : 'Disabled', button('catalog-edit', 'Edit', `${id}:${x.id}`, 'small')]), 'Nothing here yet.', `catalog-${id}`));
+  }
+  if (name === 'catalog-edit') {
+    const [collection, rowId] = id.split(':'), row = state.catalog[collection].find(x => x.id === rowId);
+    const markets = collection === 'markets';
+    const fields = { suppliers: ['price', 'stock', 'replenish', 'lead', 'term', 'reliability'], routes: ['hours', 'fixed', 'unit', 'term', 'reliability'], markets: ['lambda', 'referencePrice', 'greenWeight'], energy: ['fee', 'daily', 'delay'] }[collection];
+    const help = markets
+      ? `Demand follows a Poisson distribution: λ is the expected number of module arrivals per simulation hour across all teams, not a guaranteed quantity. For example, λ = 20 means an average of 480 modules per day. Changes apply from the next simulation hour. Zero or Disabled stops new demand; accepted orders remain.${row.lambda === undefined ? ' This saved market still uses the legacy six-hour model. Saving this form switches it to hourly Poisson demand; the suggested λ preserves its average demand per day.' : ''}`
+      : 'Money fields are integer cents; time fields are hours; reliability is percent; stock is units. Changes affect future contracts.';
+    const labels = { price: 'Unit price (cents)', fixed: 'Fixed freight (cents)', unit: 'Freight / unit (cents)', referencePrice: 'Reference price (cents)', fee: 'Switch fee (cents)', daily: 'Standing charge (cents/day)', lambda: 'Demand rate λ (modules / simulation hour)', greenWeight: 'Carbon preference (%)', stock: 'Available stock', replenish: 'Daily replenishment', lead: 'Lead time (hours)', term: 'Payment term (hours)', hours: 'Transit (hours)', delay: 'Switch delay (hours)', reliability: 'On-time probability (%)' };
+    modal(row.name, `<p class="form-note">${help}</p><div class="form-grid">${fields.map(k => field(k, labels[k], k === 'lambda' ? (row.lambda ?? row.volume / 6) : (row[k] ?? 0), 'number', k === 'lambda' ? 'min="0" max="1000" step="any" required' : 'min="0"')).join('')}${check('enabled', 'Enabled', row.enabled)}</div>`, f => command({ type: 'catalog', collection, id: rowId, patch: { ...Object.fromEntries(fields.map(k => [k, value(f, k)])), enabled: f.has('enabled') } }));
+  }
   if (name === 'replay') download('simulation-replay.json', await api(`/sessions/${sessionId}/replay`));
   if (name === 'report-csv') csv('daily-report.csv', [['Simulation time (UTC)', 'Company', `${reportTypes[report][0]} (${reportTypes[report][1]})`], ...reportRows(reportSnapshots(reportRange))]);
   if (name === 'ledger-csv') csv('transaction-journal.csv', [['Hour', 'Simulation time (UTC)', 'Transaction', 'Account', 'Debit positive / credit negative (EUR)'], ...c.ledger.flatMap(l => Object.entries(l.lines).map(([a, n]) => [l.hour, simDate(l.hour), l.description, a, n / 100]))]);
@@ -1836,7 +1850,7 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=4faa8c1dfbf7')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    try { const client = (await import('./src/test-client.mjs?v=d6028004bc69')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p><div class="toolbar">' + (e.status === 403 ? button('retry-start', 'Try again', '', 'primary') : '') + button('test-leave','Return to classroom') + '</div></main>'; }
     return;
   }

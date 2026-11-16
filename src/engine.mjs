@@ -27,6 +27,23 @@ export function cleanText(value, name, max = 120) {
 function bool(v, name) { if (typeof v !== 'boolean') fail(`${name} must be true or false.`); return v; }
 function uid(s, kind) { return `${kind}-${++s.sequence}`; }
 function random(s) { s.rng = (Math.imul(1664525, s.rng) + 1013904223) >>> 0; return s.rng / 4294967296; }
+function demandRate(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1000) fail('Demand rate λ must be a number between 0 and 1000 modules per simulation hour.');
+  return value;
+}
+export function samplePoisson(s, lambda) {
+  demandRate(lambda);
+  // Independent Poisson counts add. Small chunks keep exp(-rate) away from
+  // underflow, including at the maximum instructor rate; no normal approximation.
+  let count = 0;
+  for (let remaining = lambda; remaining > 0;) {
+    const rate = Math.min(remaining, 20), limit = Math.exp(-rate);
+    let product = 1, arrivals = -1;
+    do { product *= 1 - random(s); arrivals++; } while (product > limit);
+    count += arrivals; remaining -= rate;
+  }
+  return count;
+}
 const sum = values => values.reduce((a, b) => a + b, 0);
 export const balance = (c, account) => c.accounts[account] || 0;
 export const profit = c => -balance(c, 'revenue') - balance(c, 'interestIncome') - balance(c, 'cogs') - balance(c, 'expense');
@@ -71,8 +88,8 @@ function catalog() {
       { id: 'solar', name: 'Solar cooperative', rates: [12, 24, 22], carbon: 0.055, fee: 30000, daily: 2400, delay: 24, enabled: true }
     ],
     markets: [
-      { id: 'local', name: 'Regional installers', volume: 95, referencePrice: 28500, greenWeight: 25, enabled: true },
-      { id: 'export', name: 'International projects', volume: 120, referencePrice: 30000, greenWeight: 40, enabled: true }
+      { id: 'local', name: 'Regional installers', lambda: 95 / 6, referencePrice: 28500, greenWeight: 25, enabled: true },
+      { id: 'export', name: 'International projects', lambda: 20, referencePrice: 30000, greenWeight: 40, enabled: true }
     ]
   };
 }
@@ -210,7 +227,16 @@ export function applyCommand(s, actor, a, realAt = '2026-01-01T00:00:00.000Z', {
       const rules = editable[a.collection];
       const row = s.catalog[a.collection].find(x => x.id === a.id); if (!row) fail('Catalog row not found.');
       if (!a.patch || typeof a.patch !== 'object' || Array.isArray(a.patch)) fail('Catalog changes required.');
-      for (const [key, value] of Object.entries(a.patch)) { if (key === 'enabled') row.enabled = bool(value, 'Enabled'); else if (Object.hasOwn(rules, key)) row[key] = integer(value, key, ...rules[key]); else fail(`Field ${key} is not editable.`); }
+      if (a.collection === 'markets' && Object.hasOwn(a.patch, 'volume') && (row.lambda !== undefined || Object.hasOwn(a.patch, 'lambda'))) fail('Use demand rate λ instead of six-hour volume. Refresh the market editor.');
+      const patch = {};
+      for (const [key, value] of Object.entries(a.patch)) {
+        if (key === 'enabled') patch.enabled = bool(value, 'Enabled');
+        else if (a.collection === 'markets' && key === 'lambda') patch.lambda = demandRate(value);
+        else if (Object.hasOwn(rules, key)) patch[key] = integer(value, key, ...rules[key]);
+        else fail(`Field ${key} is not editable.`);
+      }
+      Object.assign(row, patch);
+      if (patch.lambda !== undefined) delete row.volume;
       result = 'Catalog updated; pending contracts retain their original terms.';
     }
   } else if (a.type === 'message') {
@@ -417,9 +443,13 @@ function production(s, c, shifts) {
   c.production += qty; c.energyKwh += kwh; c.energyCost += energyCost; c.emissions += kwh * energy.carbon;
 }
 function demand(s) {
-  for (const market of s.catalog.markets.filter(m => m.enabled && m.volume > 0)) {
-    // Four opportunities per day; common random demand then weighted integer allocation.
-    const units = Math.round(market.volume * (0.8 + 0.4 * random(s)));
+  for (const market of s.catalog.markets.filter(m => m.enabled)) {
+    const poisson = market.lambda !== undefined;
+    // Old saved markets and replays retain their six-hour model until an
+    // instructor explicitly saves λ. New markets share one hourly Poisson draw.
+    if (poisson ? market.lambda <= 0 : s.hour % 6 !== 0 || !(market.volume > 0)) continue;
+    const units = poisson ? samplePoisson(s, market.lambda) : Math.round(market.volume * (0.8 + 0.4 * random(s)));
+    if (!units) continue;
     const candidates = s.companies.map(c => {
       const offer = c.offers.filter(o => o.marketId === market.id && o.enabled).sort((a, b) => a.price - b.price || a.id.localeCompare(b.id))[0];
       if (!offer) return null;
@@ -511,7 +541,7 @@ export function advance(s, hours) {
     let due;
     while ((due = s.events.filter(e => e.status === 'pending' && e.at <= s.hour).sort((a, b) => a.at - b.at || Number(a.id.split('-')[1]) - Number(b.id.split('-')[1]))[0])) executeEvent(s, due);
     for (const c of s.companies) production(s, c, closingShifts.get(c.id));
-    if (s.hour % 6 === 0) demand(s);
+    demand(s);
     for (const c of s.companies) automated(s, c);
     if (s.hour % 24 === 0) dailyClose(s);
   }

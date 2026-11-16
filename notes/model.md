@@ -40,7 +40,7 @@ The seeded demonstration contains three companies with different shift and elect
 
 Time is an integer number of hours after 1 January 2026 00:00 UTC. Each tick advances one hour. Production recorded at hour `h` belongs to the closing interval `(h - 1, h]`. Its shift eligibility uses the schedule in force before events at `h`: a shift change effective at a boundary governs the following interval and cannot add or remove production or wages for the interval just closed. For example, a change effective at 08:00 leaves 07:00–08:00 under the old schedule; 08:00–09:00 uses the new schedule. At midnight, 23:00–24:00 therefore belongs to the closing day's output and snapshot.
 
-All due events still execute first, ordered by due hour then creation sequence, including same-hour consequences; then production runs with the saved shift eligibility, demand is allocated every six hours, automation runs, and a midnight daily close records costs and a snapshot. Only shift eligibility is saved: other production inputs and daily charges use the state after due events, so receipts, staffing, equipment and energy activations retain their existing same-tick effects. Real-world message/audit timestamps are stored separately as UTC ISO dates and displayed in the viewer's local time. Simulation timestamps always use UTC.
+All due events still execute first, ordered by due hour then creation sequence, including same-hour consequences; then production runs with the saved shift eligibility, Poisson demand is allocated each hour (legacy markets retain their six-hour cycle), automation runs, and a midnight daily close records costs and a snapshot. Only shift eligibility is saved: other production inputs and daily charges use the state after due events, so receipts, staffing, equipment and energy activations retain their existing same-tick effects. Real-world message/audit timestamps are stored separately as UTC ISO dates and displayed in the viewer's local time. Simulation timestamps always use UTC.
 
 The shift-boundary rule was corrected on 12 November 2026. Saved historical snapshots are not rewritten. Replaying commands recorded before that correction with the current engine can produce different outcomes at affected shift boundaries.
 
@@ -54,7 +54,13 @@ Production uses 3 kWh per module, reduced by 25% after the efficiency retrofit. 
 
 ## Competitive demand
 
-Every six hours each active market draws total demand uniformly between 80% and 120% of its configured volume, rounded to whole units. Companies compete using this original score:
+New markets use **Poisson demand arrivals**. Each simulation hour, each enabled market draws one shared count N ~ Poisson(λ), where λ is the instructor's expected number of module-demand arrivals per simulation hour. One arrival represents demand for one module; arrivals are aggregated into at most one order per company and market for that hour. This is an hourly model, not a model of individual customer timestamps or variable order sizes. The distribution has mean and variance λ; zero arrivals and counts above λ are possible. There is no ±20% band. See the [Poisson distribution reference](https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.poisson.html).
+
+The instructor edits **Scenario catalogues → Markets → Edit → Demand rate λ**, before starting or while running. Fractional rates from 0 to 1000 are supported. λ = 20 means 20 modules/hour or 480/day on average across all teams, not for each team. Saved changes govern the next hour processed after acceptance. λ = 0 or disabling the market stops new arrivals; re-enabling resumes future arrivals without accumulating demand for disabled hours. Existing orders, receipts and payments retain their terms. Pausing the simulation pauses arrivals. Concurrent edits use the normal revision checks; an obsolete form must be reviewed and resubmitted.
+
+New-session defaults are 95/6 modules/hour locally and 20 modules/hour internationally, preserving the previous expected daily totals. Markets in older saved sessions and historical replay initial states retain the uniform six-hour model until the instructor saves λ for that market. The editor labels these as legacy and suggests old volume / 6; saving explicitly switches that market to Poisson without rewriting old orders. Old volume-only commands remain replayable for legacy markets. Poisson draws use the seeded simulation generator, so the same initial state and command history reproduce the same results. The sampler sums small independent Poisson draws to avoid numerical underflow at high rates.
+
+The realized market count is shared among eligible companies, using this original score:
 
 ```
 score = (reference price / offer price)^2

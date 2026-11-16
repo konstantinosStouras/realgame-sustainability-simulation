@@ -94,3 +94,19 @@ test('delivery notes distinguish estimates from actual early, on-time and late a
   assert.equal(businessUpdates(view, true)[0].severity, 'success');
   assert.ok(businessUpdates(view).length >= notes.length);
 });
+
+test('market demand report shows hourly Poisson rates and respects disabled and legacy markets', () => {
+  const s = createSession();
+  s.catalog.markets[0].lambda = 12.5;
+  s.catalog.markets[1].enabled = false;
+  let report = buildOperationalReport(publicView(s, student), 'marketVolumes');
+  assert.equal(report.rows[0][1], 'Hourly Poisson (λ)');
+  assert.equal(report.rows[0][2], 12.5);
+  assert.equal(report.rows[0][3], 9000);
+  assert.equal(report.rows[1][3], 0);
+  delete s.catalog.markets[0].lambda; s.catalog.markets[0].volume = 120;
+  report = buildOperationalReport(publicView(s, student), 'marketVolumes');
+  assert.equal(report.rows[0][1], 'Legacy six-hour uniform');
+  assert.equal(report.rows[0][2], 20);
+  assert.equal(report.rows[0][3], 14400);
+});
