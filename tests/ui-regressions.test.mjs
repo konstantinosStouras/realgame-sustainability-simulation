@@ -273,7 +273,7 @@ test('instructor formatting renders for students while student text stays litera
 test('message formatting supports blocks, images and links without executing supplied HTML or URLs', () => {
   const h = harness(), render = text => h.run(`renderMessageText(${JSON.stringify(text)})`);
   const html = render('# Heading\n## Smaller\n### Smallest\n> Quote\n- One\n- Two\n1. First\n2. Second\n\n| Topic | Next |\n| --- | --- |\n| **Plan** | Review |');
-  for (const tag of ['h3', 'h4', 'h5', 'blockquote', 'ul', 'ol', 'table', 'strong']) assert.ok(html.includes(`<${tag}>`), tag);
+  for (const tag of ['h3', 'h4', 'h5', 'blockquote', 'ul', 'ol', 'table', 'strong']) assert.match(html, new RegExp(`<${tag}(?:\\s[^>]*)?>`), tag);
   assert.match(render('***Both*** ~~old~~'), /<strong><em>Both<\/em><\/strong> <s>old<\/s>/);
   assert.match(render('[Meet](https://example.com/meeting)'), /rel="noopener noreferrer"/);
   assert.match(render('![Diagram](https://example.com/image.png)'), /<img.*alt="Diagram".*referrerpolicy="no-referrer"/);
@@ -373,6 +373,10 @@ test('timing thresholds require a burst, handle boundary cases, and remain instr
 
 test('student workspace exposes seven categories and shows filtered live stock with one Inventory heading', () => {
   const h = harness();
+  // These assertions cover inventory values independently of responsive labels.
+  const stockHTML = () => h.run('studentWorkspace(() => true)')
+    .replace(/<span class="table-cell-label" aria-hidden="true">[^]*?<\/span><div class="table-cell-value">/g, '')
+    .replace(/<\/div><\/td>/g, '</td>');
   h.run(`actor.role = 'student'; page = 'workspace';
     state.recipe = {cell:32,frame:1,controller:2};
     state.company = {
@@ -392,7 +396,7 @@ test('student workspace exposes seven categories and shows filtered live stock w
   const navigation = h.run('workspaceNavigation(false, () => true)');
   assert.equal((navigation.match(/data-action="workspace-tool"/g) || []).length, 7);
   assert.match(navigation, /data-id="operations"[\s\S]*data-id="logistics"[\s\S]*data-id="help"/);
-  const workspace = h.run('studentWorkspace(() => true)');
+  const workspace = stockHTML();
   assert.equal((workspace.match(/<h2[^>]*>Inventory<\/h2>/g) || []).length, 1);
   assert.match(workspace, /Solar panel[\s\S]*Photo cell[\s\S]*240/);
   assert.match(workspace, /Needed \/ solar panel/);
@@ -408,7 +412,7 @@ test('student workspace exposes seven categories and shows filtered live stock w
   assert.match(workspace, /Recycled frame<\/td><td[^>]*>[^]*?\/ 12<\/span><\/td><td[^>]*><span class="quantity-status"><span>1<\/span><\/span><\/td>/);
   assert.match(workspace, /Junction box<\/td><td[^>]*>[^]*?\/ 16<\/span><\/td><td[^>]*><span class="quantity-status"><span>2<\/span><\/span><\/td>/);
   h.run('delete state.recipe');
-  const legacy = h.run('studentWorkspace(() => true)');
+  const legacy = stockHTML();
   assert.match(legacy, /Needed \/ solar module/);
   assert.match(legacy, /2 solar modules from stock on hand/);
   assert.match(legacy, /After incoming orders: 6 solar modules \(4 more\)/);
@@ -419,14 +423,14 @@ test('student workspace exposes seven categories and shows filtered live stock w
   assert.match(legacy, /Controller<\/td><td[^>]*>[^]*?\/ 16<\/span><\/td><td[^>]*><span class="quantity-status"><span>1<\/span><\/span><\/td>/);
   h.run('state.recipe = {cell:32,frame:1,controller:2}');
   h.run('state.company.inventory.controller.qty = 4');
-  const tied = h.run('studentWorkspace(() => true)');
+  const tied = stockHTML();
   assert.match(tied, /Limiting: Photo cell, Junction box<\/span>/);
   assert.match(tied, /After incoming orders: 2 solar panels \(0 more\)/);
   assert.match(tied, /16 × Photo cell<\/td><td[^>]*>4 Jan, 1:00am<\/td><td[^>]*>0<\/td><td[^>]*>2<\/td><td[^>]*>Photo cell, Junction box<\/td>/);
   h.run('state.company.inventory.cell.qty = 0');
   assert.match(h.run('studentWorkspace(() => true)'), /0 solar panels from stock on hand/);
   h.run("inventoryCategories.delete('component')");
-  const finishedOnly = h.run('studentWorkspace(() => true)');
+  const finishedOnly = stockHTML();
   assert.doesNotMatch(finishedOnly, /aria-label="Component"/);
   assert.match(finishedOnly, /224 × Photo cell<\/td>/);
   assert.match(finishedOnly, /Limiting: Photo cell<\/span>/);

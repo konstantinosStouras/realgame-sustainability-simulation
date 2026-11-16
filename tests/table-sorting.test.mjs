@@ -90,3 +90,16 @@ test('plain identifiers sort naturally, names are decoded, and row data cannot i
  const html=h.run('table(["Name"],[[sortCell(esc(\'<script>alert(1)</script>\'),\'<script>alert(1)</script>\')]])');
  assert.doesNotMatch(html,/<script>/);assert.match(html,/&lt;script&gt;/);
 });
+
+test('mobile record labels stay with their values and actions after sorting',()=>{
+ const h=harness();
+ h.run(`mobileHeaders=['Supplier & item','Quantity','']; mobileRows=[['Alpha',2,button('purchase','Order','alpha')],['Beta',10,button('purchase','Order','beta')]];`);
+ sort(h,['Supplier & item','Quantity',''],1);
+ const html=h.run('table(mobileHeaders,mobileRows)'),rows=parsedRows(html);
+ assert.match(html,/class="responsive-table" role="table"/);
+ assert.match(rows[0].html,/class="table-cell-label" aria-hidden="true">Supplier &amp; item<\/span><div class="table-cell-value">Beta<\/div>/);
+ assert.match(rows[0].html,/>Quantity<\/span><div class="table-cell-value">10<\/div>/);
+ assert.match(rows[0].html,/class="table-cell-label" aria-hidden="true"><\/span><div class="table-cell-value"><button[^>]*data-id="beta"/);
+ assert.match(rows[1].html,/data-id="alpha"/);
+ assert.equal(h.run('table(["Name"],[])').includes('responsive-table'),false);
+});

@@ -44,7 +44,7 @@ test('daily changes use the preceding close outside the selected window and reta
   const h = harness();
   h.run("selectedCompanies.add('company-1'); reportRange=7; report='dailySales';");
   const html = h.run('reportsPage()');
-  assert.match(html.slice(html.indexOf('Exact daily values')), /<td[^>]*>100\.01<\/td>/);
+  assert.match(html.slice(html.indexOf('Exact daily values')), /<div class="table-cell-value">100\.01<\/div><\/td>/);
   assert.equal((html.match(/· €100\.01"/g)||[]).length,7);
   await h.run("action('report-csv')");
   for (const row of h.context.captured.at(-1).data.split('\r\n').slice(1)) assert.ok(row.endsWith(',"100.01"'));
@@ -67,8 +67,8 @@ test('carbon report tables suppress binary floating-point tails without changing
   h.run("report='emissions'; reportRange=7; selectedCompanies.add('company-1'); state.snapshots.at(-2).companies[0].emissions=184.32000000000002; state.snapshots.at(-1).companies[0].emissions=2925.7999999999997;");
   const html = h.run('reportsPage()');
   const exactTable = html.slice(html.indexOf('Exact daily values'));
-  assert.match(exactTable, /<td[^>]*>184\.32<\/td>/);
-  assert.match(exactTable, /<td[^>]*>2,925\.8<\/td>/);
+  assert.match(exactTable, /<div class="table-cell-value">184\.32<\/div><\/td>/);
+  assert.match(exactTable, /<div class="table-cell-value">2,925\.8<\/div><\/td>/);
   assert.doesNotMatch(exactTable.replace(/ data-sort-value="[^"]*"/g, ''), /184\.32000000000002|2,925\.7999999999997/);
   assert.equal(h.run("reportValue(100.01, 'EUR')"), '100.01');
   assert.equal(h.run("reportValue(192, 'modules')"), '192');

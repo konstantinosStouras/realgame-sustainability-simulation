@@ -1,8 +1,8 @@
-import { operationalReports, buildOperationalReport, businessUpdates } from './src/operational-reports.mjs?v=d6028004bc69';
-import { createMessageSounds } from './src/message-sounds.mjs?v=d6028004bc69';
-import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=d6028004bc69';
-import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=d6028004bc69';
-import { watchSession } from './src/session-updates.mjs?v=d6028004bc69';
+import { operationalReports, buildOperationalReport, businessUpdates } from './src/operational-reports.mjs?v=c74182d4779b';
+import { createMessageSounds } from './src/message-sounds.mjs?v=c74182d4779b';
+import { itemName, productionRecipe, inventoryStatementValues, INVESTMENTS, FEATURES } from './src/engine.mjs?v=c74182d4779b';
+import { firebaseConfig, classroomBackend } from './firebase-config.mjs?v=c74182d4779b';
+import { watchSession } from './src/session-updates.mjs?v=c74182d4779b';
 const root = document.querySelector('#app'), dialog = document.querySelector('#dialog');
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((n || 0) / 100);
@@ -157,16 +157,19 @@ function tableSortHelp(label, current, column) {
 function tableKey(headers, id = '') {
   return JSON.stringify([backend, state?.id || sessionId, actor?.id, preview || '', id || headers]);
 }
+function tableCell(content, label, attributes = '') {
+  return `<td${attributes}><span class="table-cell-label" aria-hidden="true">${esc(label)}</span><div class="table-cell-value">${content}</div></td>`;
+}
 function table(headers, rows, empty = 'Nothing here yet.', id = '') {
   if (!rows.length) return `<p class="empty">${empty}</p>`;
   const key = tableKey(headers, id), current = tableSorts.get(key);
   const ordered = rows.map((cells, index) => ({ cells, index }));
   if (current) ordered.sort((a, b) => compareTableValues(cellSortValue(a.cells[current.column]), cellSortValue(b.cells[current.column]), current.direction) || a.index - b.index);
-  return `<div class="table-wrap" data-view-key="${esc('table:' + (id || JSON.stringify(headers)))}"><table data-sort-table="${esc(key)}"><thead><tr>${headers.map((h, column) => {
+  return `<div class="table-wrap" data-view-key="${esc('table:' + (id || JSON.stringify(headers)))}"><table data-sort-table="${esc(key)}" class="responsive-table" role="table"><thead><tr>${headers.map((h, column) => {
     if (!h) return '<th scope="col"></th>';
     const label = sortText(h), active = current?.column === column;
     return `<th scope="col" class="sortable-heading"${active ? ` aria-sort="${current.direction}"` : ''}><button type="button" class="table-sort" data-view-key="sort-header:${column}" data-table-sort="${column}" data-sort-label="${esc(label)}" title="${esc(tableSortHelp(label, current, column))}" aria-label="${esc(tableSortHelp(label, current, column))}"><span>${h}</span><span class="table-sort-icon" aria-hidden="true">${active ? current.direction === 'descending' ? '▼' : '▲' : ''}</span></button></th>`;
-  }).join('')}</tr></thead><tbody>${ordered.map(({ cells, index }) => `<tr data-sort-original="${index}">${cells.map(cell => `<td data-sort-value="${esc(JSON.stringify(cellSortValue(cell) ?? null))}">${cellHTML(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  }).join('')}</tr></thead><tbody>${ordered.map(({ cells, index }) => `<tr data-sort-original="${index}">${cells.map((cell, column) => tableCell(cellHTML(cell), sortText(headers[column] || ''), ` data-sort-value="${esc(JSON.stringify(cellSortValue(cell) ?? null))}"`)).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
 function sortTable(button) {
   const element = button.closest('table'), key = element.dataset.sortTable;
@@ -401,7 +404,7 @@ function renderWelcome() {
   }
 }
 async function getFirebase() {
-  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=d6028004bc69')).firebase;
+  if (!firebaseClient) firebaseClient = (await import('./src/firebase-client.mjs?v=c74182d4779b')).firebase;
   return firebaseClient;
 }
 async function enterFirebase() {
@@ -467,7 +470,7 @@ async function testStudents() {
 }
 function testOwner() { return JSON.stringify([backend, firebaseClient?.user?.uid || user.id]); }
 async function savedTests(source) {
-  const client = (await import('./src/test-client.mjs?v=d6028004bc69')).testClient();
+  const client = (await import('./src/test-client.mjs?v=c74182d4779b')).testClient();
   let saved;
   try { saved = await client.call('list',{owner:testOwner(),source}); } finally { client.close(); }
   modal('Saved test sessions', '<p>Saved on this device in this browser profile. Clearing site data removes these tests. Each session retains its students, decisions and results. Open a session to resume or delete it.</p>' + (saved.length ? table(['Session','Hour','Students',''],saved.map(s => {
@@ -484,7 +487,7 @@ async function startTestSetup(id) {
     // The first modal closes before its next form is opened.
     setTimeout(() => modal('Assign test students', '<p>Each student belongs to exactly one company. Choose 1–20 students per company (60 total maximum).</p>' + Array.from({length:count}, (_,i) => `<div class="form-grid">${field('company-'+i,'Company '+(i+1),template.companyNames[i] || 'Company '+(i+1),'text','maxlength="60"')}${field('students-'+i,'Test students', i === 0 ? 2 : 1,'number','min="1" max="20"')}</div>`).join(''), async f => {
       const groups = Array.from({length:count},(_,i) => ({name:f.get('company-'+i),students:value(f,'students-'+i)}));
-      const client = (await import('./src/test-client.mjs?v=d6028004bc69')).testClient();
+      const client = (await import('./src/test-client.mjs?v=c74182d4779b')).testClient();
       try { await navigator.storage?.persist?.().catch(() => false); await client.create(template,groups,{owner:testOwner(),source:id}); await enterTest(client); } catch(e) {client.close();throw e;}
     }, 'Start test round'), 0);
   }, 'Choose students');
@@ -1278,10 +1281,10 @@ function renderMessageText(text) {
       let rows = '';
       while (i < lines.length && lines[i].includes('|') && lines[i].trim()) {
         const row = cells(lines[i++]);
-        rows += `<tr>${header.map((_, n) => `<td>${messageInline(row[n] || '')}</td>`).join('')}</tr>`;
+        rows += `<tr>${header.map((label, n) => tableCell(messageInline(row[n] || ''), sortText(messageInline(label)))).join('')}</tr>`;
       }
       i--;
-      blocks.push(`<div class="table-wrap"><table><thead><tr>${header.map(cell => `<th scope="col">${messageInline(cell)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`);
+      blocks.push(`<div class="table-wrap"><table class="responsive-table" role="table"><thead><tr>${header.map(cell => `<th scope="col">${messageInline(cell)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`);
       continue;
     }
     const heading = /^(#{1,3})\s+(.+)$/.exec(line);
@@ -1679,7 +1682,7 @@ async function action(name, id) {
     return;
   }
   if (name === 'nav') { page = id; if (id === 'admin' && preview) { preview = undefined; await load(); } else render(); return; }
-  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=d6028004bc69')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
+  if (name === 'solo') { solo = (await import('./src/solo.mjs?v=c74182d4779b')).soloAdapter(); sessionId = 'solo'; page = 'overview'; preview = undefined; await load(); return; }
   if (name === 'switch-solo') { solo.switchRole(isTeacher() ? 'student' : 'instructor'); preview = undefined; page = isTeacher() ? 'overview' : 'admin'; await load(); return; }
   if (name === 'demo') { await signIn(await api('/demo', { username: id })); return; }
   if (name === 'logout') { if (!solo && token) { try { await api('/logout', {}); } catch {} } if (firebaseClient?.user) await firebaseClient.logout(); solo = null; state = null; actor = null; user = null; token = ''; sessionId = null; sessionStorage.removeItem('studio-token'); selectSession(null); renderWelcome(); return; }
@@ -1850,7 +1853,7 @@ document.addEventListener('change', async event => {
 async function startWorkspace() {
   if (location.hash?.startsWith('#test=')) {
     const testLink = new URLSearchParams(location.hash.slice(1));
-    try { const client = (await import('./src/test-client.mjs?v=d6028004bc69')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
+    try { const client = (await import('./src/test-client.mjs?v=c74182d4779b')).testClient({roomId:testLink.get('test'),key:testLink.get('key')}); await enterTest(client); }
     catch(e) { root.innerHTML = '<main class="welcome"><h1>Test round unavailable</h1><p>' + esc(e.message) + '</p><div class="toolbar">' + (e.status === 403 ? button('retry-start', 'Try again', '', 'primary') : '') + button('test-leave','Return to classroom') + '</div></main>'; }
     return;
   }

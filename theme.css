@@ -431,3 +431,64 @@ dialog > .table-wrap + :is(button, .button) { margin-top: 20px; }
   #effects-form > .toolbar > label { grid-column: auto; }
   .toggle-row > .toolbar > button { justify-self: start; }
 }
+
+/* On phones, read complete records vertically instead of panning wide tables. */
+.table-cell-label { display: none; }
+.table-cell-value { min-width: 0; }
+@media (max-width: 900px) {
+  .table-wrap:has(> .responsive-table) { overflow: visible; }
+  .responsive-table, .responsive-table thead, .responsive-table tbody { display: block; width: 100%; }
+  .responsive-table thead tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .responsive-table thead th { display: block; min-width: 0; border: 1px solid var(--line); border-radius: 8px; }
+  .responsive-table thead th:empty { display: none; }
+  .responsive-table thead::before { content: 'Sort by'; display: block; margin-bottom: 10px; color: var(--muted); font-size: .875rem; }
+  .responsive-table:not([data-sort-table]) thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .responsive-table:not([data-sort-table]) thead::before { content: none; }
+  .responsive-table tbody tr { display: block; margin-top: 16px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
+  .table-wrap .responsive-table tbody td { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 12px; padding: 12px 0; text-align: left; white-space: normal; border-bottom: 1px solid var(--line); }
+  .table-wrap .responsive-table tbody td:last-child { border-bottom: 0; }
+  .responsive-table .table-cell-label { display: block; color: var(--muted); font-size: .875rem; font-weight: 600; }
+  .responsive-table :is(.table-cell-label, .table-cell-value) { overflow-wrap: anywhere; }
+  .responsive-table .table-cell-label:empty { display: none; }
+  .responsive-table td:has(> .table-cell-label:empty) > .table-cell-value { grid-column: 1 / -1; }
+  .responsive-table .table-cell-value .nowrap { white-space: normal; }
+  .responsive-table .badge { max-width: 100%; white-space: normal; line-height: 1.5; }
+  .responsive-table .quantity-status { justify-content: flex-start; }
+  :is(:root[data-theme],:root:not([data-theme])) body .responsive-table button.table-sort { height: 100%; padding: 10px; font-size: .8125rem; line-height: 1.5; white-space: normal; overflow-wrap: anywhere; }
+  :is(:root[data-theme],:root:not([data-theme])) body .table-wrap .responsive-table td button { white-space: normal; overflow-wrap: anywhere; }
+  .responsive-table .table-actions { align-items: stretch; }
+  .responsive-table .table-cell-value > :is(button, .button) { width: 100%; }
+  [data-operational-report] .table-wrap { max-height: none; overflow: visible; }
+  [data-operational-report] thead { position: static; }
+  .history-bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(44px, 1fr)); gap: 12px 8px; overflow: visible; }
+  .history-bar { min-width: 0; }
+}
+@media (max-width: 700px) {
+  .value-list > div { flex-wrap: wrap; gap: 8px 16px; }
+  .value-list > div > * { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+  .pane-title h2, .panel-head h2 { min-width: 0; overflow-wrap: anywhere; }
+  .pane-title { flex-wrap: wrap; padding: 12px; }
+  .pane-title h2 { flex: 1 1 100%; }
+  .pane-controls { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; width: 100%; }
+  .pane-controls button { min-width: 0; min-height: 44px; padding: 8px; }
+  .pane-content { padding-bottom: 28px; }
+  .pane-resize-corner { width: 24px; height: 24px; }
+  .pane-resize-right { right: 0; }
+  .pane-resize-bottom { bottom: 0; }
+  /* Let long menu lists scroll in their own area without covering the content. */
+  .workspace-nav { position: static; }
+  .workspace-nav.mobile-menu-open .workspace-tools { max-height: 65dvh; overflow-y: auto; }
+  .session-action-hint .session-tooltip { position: fixed; inset: auto 16px 16px; width: auto; max-width: none; }
+  .session-actions .session-action-hint:nth-child(n) > .session-tooltip,
+  .session-access .session-action-hint > .session-tooltip { left: 16px; right: 16px; }
+}
+@media (max-width: 480px) {
+  dialog { width: calc(100% - 24px); max-height: calc(100dvh - 24px); padding: 20px; }
+  .dialog-toolbar { top: -20px; margin: -20px -20px 18px; }
+  #modal-form:has(.session-setup) .form-actions { bottom: -20px; }
+  .toolbar > label, .control-toolbar > label { flex: 1 1 100%; }
+  .toolbar select { max-width: 100%; }
+  .session-actions { grid-template-columns: minmax(0, 1fr); }
+  .session-access .session-access-button { width: 100%; }
+  .session-access > .session-action-hint { width: 100%; }
+}
